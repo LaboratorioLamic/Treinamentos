@@ -762,7 +762,7 @@
         // Render pagination buttons
         function renderPagination() {
             pdfNavigation.innerHTML = '';
-            const maxButtons = 5;
+            const maxButtons = 3;
             let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
             let endPage = Math.min(totalPages, startPage + maxButtons - 1);
 
