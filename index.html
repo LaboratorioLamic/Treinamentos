@@ -20,7 +20,7 @@
         header {
             width: 100%;
             text-align: center;
-            padding: 50px 0;
+            padding: 30px 0;
             background: linear-gradient(135deg, #1a2b49, #2c4373);
             color: white;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -43,30 +43,29 @@
         }
         h1 {
             margin: 0;
-            font-size: 2.8em;
+            font-size: clamp(1.8em, 5vw, 2.4em);
             font-weight: 700;
         }
         .dropdown-container {
             background: white;
-            width: 50%;
+            width: 90%;
             max-width: 600px;
             padding: 15px;
             margin: 20px 0;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             display: flex;
-            align-items: center;
-            gap: 15px;
+            flex-direction: column;
+            gap: 10px;
         }
         .dropdown-container label {
             font-size: 1.2em;
             font-weight: 600;
             color: #1a2b49;
-            white-space: nowrap;
         }
         .dropdown {
             position: relative;
-            flex: 1;
+            width: 100%;
         }
         #dropdownBtn {
             background-color: #1a2b49;
@@ -115,43 +114,44 @@
             max-width: 1200px;
             width: 90%;
             background: white;
-            padding: 30px;
+            padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             margin-bottom: 40px;
         }
         .video-section {
             display: flex;
-            gap: 25px;
+            flex-direction: column;
+            gap: 20px;
         }
         .video-player {
-            flex: 3;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
         .video-player iframe {
             width: 100%;
-            height: 450px;
+            height: clamp(200px, 50vw, 400px);
             border: none;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         .video-player h2 {
             margin: 15px 0 5px;
-            font-size: 1.6em;
+            font-size: clamp(1.2em, 3vw, 1.6em);
             font-weight: 600;
             color: #1a2b49;
         }
         .video-player p {
             margin: 0;
             color: #4a5b7a;
-            font-size: 0.95em;
+            font-size: clamp(0.85em, 2vw, 0.95em);
             line-height: 1.5;
         }
         .attachment-container {
             margin-top: 10px;
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
         }
         .attachment-btn {
@@ -161,7 +161,7 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: clamp(0.8em, 2vw, 0.9em);
             transition: background-color 0.3s ease, transform 0.2s ease;
         }
         .attachment-btn:hover {
@@ -171,12 +171,12 @@
         .quiz-container {
             display: none;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
         }
         .quiz-card {
             background: #f8fafc;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -187,20 +187,30 @@
             transform: translateY(-5px);
             box-shadow: 0 6px 16px rgba(0,0,0,0.15);
         }
+        .quiz-card.missing {
+            animation: shake 0.5s ease-in-out;
+            border: 2px solid #dc3545;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
         .quiz-card h3 {
-            margin: 0 0 15px;
-            font-size: 1.3em;
+            margin: 0 0 10px;
+            font-size: clamp(1.1em, 2.5vw, 1.3em);
             font-weight: 600;
             color: #1a2b49;
         }
         .quiz-option {
             display: block;
-            padding: 12px;
+            padding: 10px;
             margin: 5px 0;
             background: white;
             border: 1px solid #e0e0e0;
             border-radius: 6px;
-            font-size: 0.95em;
+            font-size: clamp(0.85em, 2vw, 0.95em);
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
         }
@@ -241,20 +251,20 @@
             text-align: center;
         }
         .result-container h2 {
-            font-size: 1.8em;
+            font-size: clamp(1.5em, 4vw, 1.8em);
             color: #1a2b49;
         }
         .result-container p {
-            font-size: 1.2em;
+            font-size: clamp(1em, 3vw, 1.2em);
             color: #4a5b7a;
         }
         .success-message {
             background: linear-gradient(135deg, #28a745, #34c759);
             color: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            font-size: 1.5em;
+            font-size: clamp(1.2em, 3vw, 1.5em);
             font-weight: 600;
             animation: successPop 1s ease-in-out;
             display: flex;
@@ -283,18 +293,18 @@
         .form-container {
             display: none;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
             width: 100%;
             max-width: 400px;
             background: white;
-            padding: 20px;
+            padding: 15px;
             border: 2px solid #1a2b49;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            margin: 0 auto; /* Centralizar o formulário */
+            margin: 0 auto;
         }
         .form-container label {
-            font-size: 1em;
+            font-size: clamp(0.9em, 2.5vw, 1em);
             font-weight: 600;
             color: #1a2b49;
         }
@@ -302,12 +312,16 @@
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-size: 1em;
+            font-size: clamp(0.9em, 2.5vw, 1em);
             transition: border-color 0.3s ease;
         }
         .form-container input:focus {
             border-color: #1a2b49;
             outline: none;
+        }
+        .form-container input.invalid {
+            border-color: #dc3545;
+            animation: shake 0.5s ease-in-out;
         }
         .form-container button {
             background-color: #1a2b49;
@@ -316,7 +330,7 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: clamp(0.9em, 2.5vw, 1em);
             font-weight: 600;
             transition: background-color 0.3s ease, transform 0.2s ease;
         }
@@ -325,27 +339,27 @@
             transform: scale(1.05);
         }
         .sidebar {
-            flex: 1;
             background: #f8fafc;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-            max-height: 360px;
+            max-height: 400px;
             overflow-y: auto;
+            width: 100%;
         }
         .sidebar h3 {
-            margin: 0 0 15px;
-            font-size: 1.3em;
+            margin: 0 0 10px;
+            font-size: clamp(1.1em, 2.5vw, 1.3em);
             font-weight: 600;
             color: #1a2b49;
         }
         .module {
-            padding: 12px 15px;
+            padding: 10px;
             cursor: pointer;
             border-radius: 6px;
             margin-bottom: 8px;
             background: white;
-            font-size: 0.95em;
+            font-size: clamp(0.85em, 2vw, 0.95em);
             transition: background-color 0.3s ease, transform 0.2s ease;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
@@ -365,12 +379,52 @@
         #assessment-module:hover {
             background: #ffca2c;
         }
+        .warning-message {
+            display: none;
+            background: linear-gradient(135deg, #dc3545, #e4606d);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: clamp(1em, 2.5vw, 1.2em);
+            font-weight: 600;
+            animation: warningPop 0.5s ease-in-out;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        @keyframes warningPop {
+            0% { transform: translateX(-50%) scale(0.8); opacity: 0; }
+            50% { transform: translateX(-50%) scale(1.1); opacity: 0.8; }
+            100% { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+        @media (min-width: 768px) {
+            .dropdown-container {
+                flex-direction: row;
+                align-items: center;
+                gap: 15px;
+            }
+            .video-section {
+                flex-direction: row;
+            }
+            .video-player {
+                flex: 3;
+            }
+            .sidebar {
+                flex: 1;
+            }
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="title-container">
-            <i class="fas fa-graduation-cap" style="font-size: 2.5em;"></i>
+            <i class="fas fa-graduation-cap" style="font-size: clamp(1.8em, 5vw, 2.5em);"></i>
             <h1>Universidade LAMIC - Treinamentos</h1>
         </div>
     </header>
@@ -386,6 +440,10 @@
                 </ul>
             </div>
         </div>
+    </div>
+
+    <div class="warning-message" id="warning-message">
+        <i class="fas fa-exclamation-circle"></i> <span id="warning-text">Por favor, responda todas as questões antes de enviar.</span>
     </div>
 
     <div class="content" id="content">
@@ -413,7 +471,6 @@
     </div>
 
     <script>
-        // Dados dos treinamentos e módulos (fácil de editar)
         const trainingData = {
             1: [
                 { 
@@ -547,7 +604,6 @@
             ]
         };
 
-        // Banco de questões para avaliações (fácil de editar)
         const quizData = {
             1: [
                 { question: 'Qual é o conceito básico do Treinamento1?', options: ['Opção A', 'Opção B correta', 'Opção C'], correct: 1 },
@@ -572,7 +628,8 @@
         const quizContainer = document.getElementById('quiz-container');
         const resultContainer = document.getElementById('result-container');
         const formContainer = document.getElementById('form-container');
-        const playerContainer = document.getElementById('player-container');
+        const warningMessage = document.getElementById('warning-message');
+        const warningText = document.getElementById('warning-text');
         const quizSubmit = document.createElement('button');
         quizSubmit.id = 'quiz-submit';
         quizSubmit.textContent = 'Enviar Avaliação';
@@ -580,20 +637,48 @@
         let currentTrainingId = null;
         let selectedAnswers = {};
 
-        // Abrir/fechar dropdown
+        // Ensure warning message is hidden on page load
+        window.onload = () => {
+            warningMessage.style.display = 'none';
+            resetContent();
+        };
+
+        // Email validation
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Email input event listener
+        document.getElementById('email').addEventListener('input', function() {
+            const emailInput = this;
+            if (!validateEmail(emailInput.value)) {
+                emailInput.classList.add('invalid');
+            } else {
+                emailInput.classList.remove('invalid');
+            }
+        });
+
+        // Show warning message
+        function showWarning(message) {
+            warningText.textContent = message;
+            warningMessage.style.display = 'flex';
+            setTimeout(() => {
+                warningMessage.style.display = 'none';
+            }, 3000);
+        }
+
         btn.onclick = (e) => {
             e.stopPropagation();
             dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
         };
 
-        // Fechar dropdown ao clicar fora
         document.addEventListener('click', (e) => {
             if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) {
                 dropdownContent.style.display = 'none';
             }
         });
 
-        // Selecionar item
         dropdownContent.querySelectorAll('li').forEach(li => {
             li.onclick = (e) => {
                 const value = e.target.dataset.value;
@@ -609,9 +694,7 @@
             const training = trainingData[id];
             if (!training) return;
             contentDiv.style.display = 'block';
-            // Carregar o primeiro módulo por padrão
             loadModule(training[0], training);
-            // Popular a sidebar com módulos
             modulesDiv.innerHTML = '';
             training.forEach((mod, index) => {
                 const div = document.createElement('div');
@@ -625,7 +708,6 @@
                 if (index === 0) div.classList.add('active');
                 modulesDiv.appendChild(div);
             });
-            // Adicionar card de Avaliação após os módulos
             const assessmentDiv = document.createElement('div');
             assessmentDiv.className = 'module';
             assessmentDiv.id = 'assessment-module';
@@ -633,6 +715,7 @@
             assessmentDiv.onclick = () => {
                 document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                 assessmentDiv.classList.add('active');
+                video.src = '';
                 loadQuiz(id);
             };
             modulesDiv.appendChild(assessmentDiv);
@@ -643,7 +726,6 @@
             video.src = `https://www.youtube.com/embed/${mod.videoId}`;
             titleEl.textContent = mod.title;
             captionEl.textContent = mod.caption;
-            // Carregar anexos
             attachmentContainer.innerHTML = '';
             if (mod.attachments && mod.attachments.length > 0) {
                 mod.attachments.forEach(attachment => {
@@ -668,6 +750,7 @@
             questions.forEach((q, index) => {
                 const card = document.createElement('div');
                 card.className = 'quiz-card';
+                card.id = `quiz-card-${index}`;
                 const h3 = document.createElement('h3');
                 h3.textContent = q.question;
                 card.appendChild(h3);
@@ -682,6 +765,7 @@
                         selectedAnswers[index] = optIndex;
                         card.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
                         label.classList.add('selected');
+                        card.classList.remove('missing');
                     };
                     label.appendChild(input);
                     label.appendChild(document.createTextNode(` ${opt}`));
@@ -696,6 +780,21 @@
 
         function calculateScore() {
             const questions = quizData[currentTrainingId];
+            let allAnswered = true;
+            questions.forEach((q, index) => {
+                if (!(index in selectedAnswers)) {
+                    allAnswered = false;
+                    const card = document.getElementById(`quiz-card-${index}`);
+                    card.classList.add('missing');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    document.getElementById(`quiz-card-${index}`).classList.remove('missing');
+                }
+            });
+            if (!allAnswered) {
+                showWarning('Por favor, responda todas as questões antes de enviar.');
+                return;
+            }
             let correctCount = 0;
             questions.forEach((q, index) => {
                 if (selectedAnswers[index] === q.correct) correctCount++;
@@ -711,17 +810,33 @@
         }
 
         function submitForm(score) {
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            if (!name || !email) {
-                alert('Por favor, preencha nome e email.');
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            name.classList.remove('invalid');
+            email.classList.remove('invalid');
+
+            if (!name.value) {
+                name.classList.add('invalid');
+                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, preencha o campo Nome.');
                 return;
             }
-            const dateTime = new Date().toLocaleString('pt-BR');
-            const data = { dateTime, email, name, score };
+            if (!email.value) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, preencha o campo Email.');
+                return;
+            }
+            if (!validateEmail(email.value)) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, insira um email válido.');
+                return;
+            }
 
-            // Placeholder para envio para planilha (ex: Google Sheets via Apps Script)
-            const url = 'YOUR_APPS_SCRIPT_URL'; // Adicione aqui a URL da planilha/script
+            const dateTime = new Date().toLocaleString('pt-BR');
+            const data = { dateTime, email: email.value, name: name.value, score };
+            const url = 'YOUR_APPS_SCRIPT_URL';
             fetch(url, {
                 method: 'POST',
                 mode: 'no-cors',
@@ -762,6 +877,7 @@
         }
 
         function resetContent() {
+            video.src = '';
             video.style.display = 'none';
             titleEl.style.display = 'none';
             captionEl.style.display = 'none';
@@ -769,6 +885,7 @@
             quizContainer.style.display = 'none';
             resultContainer.style.display = 'none';
             formContainer.style.display = 'none';
+            warningMessage.style.display = 'none';
             if (document.getElementById('retry-btn')) document.getElementById('retry-btn').style.display = 'none';
         }
     </script>
