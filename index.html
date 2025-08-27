@@ -743,6 +743,11 @@
         }
 
         function loadQuiz(id) {
+            // Rolar até o topo da página de forma fluida
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
             resetContent();
             const questions = quizData[id];
             quizContainer.innerHTML = '';
@@ -795,6 +800,11 @@
                 showWarning('Por favor, responda todas as questões antes de enviar.');
                 return;
             }
+            // Rolar até o topo da página de forma fluida
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
             let correctCount = 0;
             questions.forEach((q, index) => {
                 if (selectedAnswers[index] === q.correct) correctCount++;
