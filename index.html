@@ -6,6 +6,7 @@
     <title>Universidade LAMIC - Treinamentos</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -67,7 +68,7 @@
             position: relative;
             width: 100%;
         }
-        #dropdownBtn {
+        #dropdownBtn, #themeBtn {
             background-color: #1a2b49;
             color: white;
             padding: 10px 15px;
@@ -80,34 +81,38 @@
             text-align: center;
             transition: background-color 0.3s ease;
         }
-        #dropdownBtn:hover {
+        #dropdownBtn:hover, #themeBtn:hover {
             background-color: #2c4373;
         }
-        .dropdown-content {
+        .dropdown-content, .theme-dropdown-content {
             display: none;
             position: absolute;
-            background-color: white;
+            background-color: #ffffff;
             width: 100%;
             box-shadow: 0px 8px 16px rgba(0,0,0,0.15);
             z-index: 1;
-            max-height: 150px;
+            max-height: 300px;
             overflow-y: auto;
             border-radius: 6px;
             margin-top: 5px;
         }
-        .dropdown-content ul {
+        .dropdown-content ul, .theme-dropdown-content ul {
             list-style: none;
             padding: 0;
             margin: 0;
         }
-        .dropdown-content li {
+        .dropdown-content li.subject, .theme-dropdown-content li.theme {
             padding: 12px 20px;
             cursor: pointer;
             font-size: 0.95em;
+            background-color: #ffffff;
+            color: #1a2b49;
+            font-weight: 600;
             transition: background-color 0.2s ease;
         }
-        .dropdown-content li:hover {
+        .dropdown-content li.subject:hover, .theme-dropdown-content li.theme:hover {
             background-color: #e6f0fa;
+            color: #1a2b49;
         }
         .content {
             display: none;
@@ -135,6 +140,53 @@
             border: none;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .pdf-container {
+            display: none;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        .pdf-container canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .pdf-navigation {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .pdf-navigation button {
+            background-color: #1a2b49;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: clamp(0.8em, 2vw, 0.9em);
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            min-width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .pdf-navigation button:hover {
+            background-color: #2c4373;
+            transform: scale(1.05);
+        }
+        .pdf-navigation button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .pdf-navigation button.active {
+            background-color: #4a90e2;
+            font-weight: 600;
         }
         .video-player h2 {
             margin: 15px 0 5px;
@@ -408,6 +460,10 @@
                 flex-direction: row;
                 align-items: center;
                 gap: 15px;
+                flex-wrap: wrap;
+            }
+            .dropdown {
+                flex: 1;
             }
             .video-section {
                 flex-direction: row;
@@ -430,14 +486,18 @@
     </header>
 
     <div class="dropdown-container">
-        <label>Selecione o Assunto</label>
         <div class="dropdown">
-            <button id="dropdownBtn">Escolha um Treinamento</button>
+            <label>Selecione o Tema</label>
+            <button id="dropdownBtn">Escolha um Tema</button>
             <div id="dropdownContent" class="dropdown-content">
-                <ul>
-                    <li data-value="1">Treinamento1</li>
-                    <li data-value="2">Treinamento2</li>
-                </ul>
+                <ul id="dropdownList"></ul>
+            </div>
+        </div>
+        <div class="dropdown" id="themeDropdown">
+            <label>Selecione o Assunto</label>
+            <button id="themeBtn">Escolha um Assunto</button>
+            <div id="themeDropdownContent" class="theme-dropdown-content">
+                <ul id="themeDropdownList"></ul>
             </div>
         </div>
     </div>
@@ -450,6 +510,10 @@
         <div class="video-section">
             <div class="video-player" id="player-container">
                 <iframe id="video" src="" allowfullscreen></iframe>
+                <div id="pdf-container" class="pdf-container">
+                    <canvas id="pdf-canvas"></canvas>
+                    <div class="pdf-navigation" id="pdf-navigation"></div>
+                </div>
                 <h2 id="title"></h2>
                 <p id="caption"></p>
                 <div id="attachment-container" class="attachment-container"></div>
@@ -472,155 +536,117 @@
 
     <script>
         const trainingData = {
-            1: [
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 1: Introdução ao Treinamento1', 
-                    caption: 'Aprenda os conceitos básicos do Treinamento1.',
-                    attachments: [
-                        { title: 'Material de Apoio 1', url: 'https://example.com/anexo1.pdf' },
-                        { title: 'Slides do Módulo 1', url: 'https://example.com/slides1.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 2: Técnicas Avançadas', 
-                    caption: 'Aprofunde-se nas técnicas do Treinamento1.',
-                    attachments: [
-                        { title: 'Guia Prático', url: 'https://example.com/guia2.pdf' },
-                        { title: 'Estudo de Caso', url: 'https://example.com/caso2.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 3: Aplicações Práticas', 
-                    caption: 'Como aplicar o Treinamento1 no dia a dia.',
-                    attachments: [
-                        { title: 'Exercícios Práticos', url: 'https://example.com/exercicios3.pdf' },
-                        { title: 'Referências', url: 'https://example.com/referencias3.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 4: Estudos de Caso', 
-                    caption: 'Análise de casos reais do Treinamento1.',
-                    attachments: [
-                        { title: 'Estudo de Caso 1', url: 'https://example.com/caso4.pdf' },
-                        { title: 'Referências', url: 'https://example.com/referencias4.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 5: Prática Avançada', 
-                    caption: 'Exercícios práticos avançados do Treinamento1.',
-                    attachments: [
-                        { title: 'Exercícios Avançados', url: 'https://example.com/exercicios5.pdf' },
-                        { title: 'Material Suplementar', url: 'https://example.com/suplementar5.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 6: Revisão Intermediária', 
-                    caption: 'Revisão dos conceitos do Treinamento1.',
-                    attachments: [
-                        { title: 'Resumo Intermediário', url: 'https://example.com/resumo6.pdf' },
-                        { title: 'Checklist', url: 'https://example.com/checklist6.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 7: Aplicações Avançadas', 
-                    caption: 'Aplicações avançadas do Treinamento1.',
-                    attachments: [
-                        { title: 'Projetos Avançados', url: 'https://example.com/projetos7.pdf' },
-                        { title: 'Referências', url: 'https://example.com/referencias7.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 8: Certificação Intermediária', 
-                    caption: 'Preparação para certificação do Treinamento1.',
-                    attachments: [
-                        { title: 'Guia de Certificação', url: 'https://example.com/certificacao8.pdf' },
-                        { title: 'Simulado', url: 'https://example.com/simulado8.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 9: Projetos Finais', 
-                    caption: 'Desenvolvimento de projetos finais do Treinamento1.',
-                    attachments: [
-                        { title: 'Projeto Final', url: 'https://example.com/projeto9.pdf' },
-                        { title: 'Instruções', url: 'https://example.com/instrucoes9.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 10: Conclusão', 
-                    caption: 'Resumo e próximos passos do Treinamento1.',
-                    attachments: [
-                        { title: 'Resumo Final', url: 'https://example.com/resumo10.pdf' },
-                        { title: 'Plano de Ação', url: 'https://example.com/plano10.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 11: Revisão Final', 
-                    caption: 'Revisão final do Treinamento1.',
-                    attachments: [
-                        { title: 'Resumo Completo', url: 'https://example.com/resumo11.pdf' },
-                        { title: 'Guia Final', url: 'https://example.com/guia11.pdf' }
-                    ]
+            1: {
+                name: "Atendimento",
+                themes: {
+                    1: {
+                        name: "Sistema UniLab",
+                        modules: [
+                            {
+                                videoId: 'IuuwZY2Q0Lo',
+                                title: 'Módulo 1: Fundamentos da Função Renal',
+                                caption: 'Aprofunde-se nas técnicas de avaliação renal.',
+                                attachments: [
+                                    { title: 'Guia Prático', url: 'https://example.com/guia2.pdf' },
+                                    { title: 'Estudo de Caso', url: 'https://example.com/caso2.pdf' }
+                                ]
+                            },
+                            {
+                                pdfUrl: 'https://raw.githubusercontent.com/LaboratorioLamic/EAD/main/assents/pdfhvp1.pdf',
+                                title: 'Material de Apoio',
+                                caption: 'Explore os fundamentos da função renal através do material.',
+                                attachments: [
+                                    { title: 'Material de Apoio 1', url: 'https://example.com/anexo1.pdf' },
+                                    { title: 'Slides do Módulo 1', url: 'https://example.com/slides1.pdf' }
+                                ]
+                            }
+                        ]
+                    },
+                    2: {
+                        name: "Autorização de Convênios",
+                        modules: [
+                            {
+                                videoId: 'dQw4w9WgXcQ',
+                                title: 'Módulo 1: Introdução aos Biomarcadores',
+                                caption: 'Conheça os principais biomarcadores usados na avaliação renal.',
+                                attachments: [
+                                    { title: 'Resumo do Módulo 1', url: 'https://example.com/resumo1.pdf' }
+                                ]
+                            }
+                        ]
+                    }
                 }
-            ],
-            2: [
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 1: Fundamentos do Treinamento2', 
-                    caption: 'Introdução ao conteúdo do Treinamento2.',
-                    attachments: [
-                        { title: 'Resumo do Módulo 1', url: 'https://example.com/resumo1.pdf' },
-                        { title: 'Ferramentas', url: 'https://example.com/ferramentas1.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 2: Ferramentas Essenciais', 
-                    caption: 'Conheça as ferramentas do Treinamento2.',
-                    attachments: [
-                        { title: 'Manual de Ferramentas', url: 'https://example.com/manual2.pdf' },
-                        { title: 'Tutorial', url: 'https://example.com/tutorial2.pdf' }
-                    ]
-                },
-                { 
-                    videoId: 'dQw4w9WgXcQ', 
-                    title: 'Módulo 3: Prática Intensiva', 
-                    caption: 'Exercícios práticos do Treinamento2.',
-                    attachments: [
-                        { title: 'Projetos Práticos', url: 'https://example.com/projetos3.pdf' },
-                        { title: 'Checklist', url: 'https://example.com/checklist3.pdf' }
-                    ]
+            },
+            2: {
+                name: "Coleta",
+                themes: {
+                    1: {
+                        name: "Procedimento de Coleta",
+                        modules: [
+                            {
+                                videoId: 'dQw4w9WgXcQ',
+                                title: 'Módulo 1: Fundamentos do Treinamento2',
+                                caption: 'Introdução ao conteúdo do Treinamento2.',
+                                attachments: [
+                                    { title: 'Resumo do Módulo 1', url: 'https://example.com/resumo1.pdf' },
+                                    { title: 'Ferramentas', url: 'https://example.com/ferramentas1.pdf' }
+                                ]
+                            }
+                        ]
+                    },
+                    2: {
+                        name: "Materiais biológicos",
+                        modules: [
+                            {
+                                videoId: 'dQw4w9WgXcQ',
+                                title: 'Módulo 2: Ferramentas Essenciais',
+                                caption: 'Conheça as ferramentas do Treinamento2.',
+                                attachments: [
+                                    { title: 'Manual de Ferramentas', url: 'https://example.com/manual2.pdf' },
+                                    { title: 'Tutorial', url: 'https://example.com/tutorial2.pdf' }
+                                ]
+                            }
+                        ]
+                    }
                 }
-            ]
+            }
         };
 
         const quizData = {
-            1: [
-                { question: 'Qual é o conceito básico do Treinamento1?', options: ['Opção A', 'Opção B correta', 'Opção C'], correct: 1 },
-                { question: 'O que é uma técnica avançada?', options: ['Opção A correta', 'Opção B', 'Opção C'], correct: 0 },
-                { question: 'Como aplicar no dia a dia?', options: ['Opção A', 'Opção B', 'Opção C correta'], correct: 2 }
+            '1_1': [ // Função Renal -> Fundamentos da Função Renal
+                { question: "Qual é a principal função dos rins?", options: ["Digestão", "Filtração do sangue", "Produção de insulina", "Regulação cardíaca"], correct: 1 },
+                { question: "O que mede a taxa de filtração glomerular?", options: ["Volume de urina", "Velocidade de filtração do plasma", "Frequência cardíaca", "Nível de glicose"], correct: 1 },
+                { question: "Qual é um marcador da função renal?", options: ["Glicose", "Creatinina", "Colesterol", "Hemoglobina"], correct: 1 }
             ],
-            2: [
-                { question: 'Qual é o fundamento do Treinamento2?', options: ['Opção A correta', 'Opção B', 'Opção C'], correct: 0 },
-                { question: 'Qual ferramenta essencial?', options: ['Opção A', 'Opção B correta', 'Opção C'], correct: 1 },
-                { question: 'O que é prática intensiva?', options: ['Opção A', 'Opção B', 'Opção C correta'], correct: 2 }
+            '1_2': [ // Função Renal -> Biomarcadores Renais
+                { question: "O que é cistatina C?", options: ["Hormônio", "Proteína marcador renal", "Célula na urina", "Medicamento"], correct: 1 },
+                { question: "Por que cistatina C é útil?", options: ["Mais barata", "Menos influenciada por massa muscular", "Produzida só pelos rins", "Fácil de coletar"], correct: 1 },
+                { question: "Qual exame monitora a função renal?", options: ["Hemograma", "Dosagem de creatinina", "Raio-X", "Teste hepático"], correct: 1 }
+            ],
+            '2_1': [ // Treinamento2 -> Fundamentos do Treinamento2
+                { question: "Qual é o foco do Treinamento2?", options: ["Programação", "Fundamentos teóricos", "Design gráfico", "Marketing"], correct: 1 },
+                { question: "O que é essencial no Treinamento2?", options: ["Teoria básica", "Prática intensiva", "Estudo de caso", "Simulação"], correct: 1 },
+                { question: "Qual é um objetivo do Treinamento2?", options: ["Vendas", "Compreensão teórica", "Produção", "Publicidade"], correct: 1 }
+            ],
+            '2_2': [ // Treinamento2 -> Ferramentas Essenciais
+                { question: "Qual ferramenta é usada no Treinamento2?", options: ["Editor de texto", "Ferramenta específica", "Planilha", "Navegador"], correct: 1 },
+                { question: "Qual é o propósito da ferramenta?", options: ["Facilitar aprendizado", "Editar vídeos", "Gerar relatórios", "Criar gráficos"], correct: 0 },
+                { question: "Como a ferramenta ajuda?", options: ["Automatiza tarefas", "Ensina teoria", "Cria apresentações", "Gerencia projetos"], correct: 0 }
             ]
         };
 
         const btn = document.getElementById('dropdownBtn');
         const dropdownContent = document.getElementById('dropdownContent');
+        const dropdownList = document.getElementById('dropdownList');
+        const themeBtn = document.getElementById('themeBtn');
+        const themeDropdown = document.getElementById('themeDropdown');
+        const themeDropdownContent = document.getElementById('themeDropdownContent');
+        const themeDropdownList = document.getElementById('themeDropdownList');
         const contentDiv = document.getElementById('content');
         const video = document.getElementById('video');
+        const pdfContainer = document.getElementById('pdf-container');
+        const pdfCanvas = document.getElementById('pdf-canvas');
+        const pdfNavigation = document.getElementById('pdf-navigation');
         const titleEl = document.getElementById('title');
         const captionEl = document.getElementById('caption');
         const attachmentContainer = document.getElementById('attachment-container');
@@ -635,13 +661,65 @@
         quizSubmit.textContent = 'Enviar Avaliação';
 
         let currentTrainingId = null;
+        let currentThemeId = null;
         let selectedAnswers = {};
+        let pdfDoc = null;
+        let currentPage = 1;
+        let totalPages = 0;
 
-        // Ensure warning message is hidden on page load
+        // Ensure warning message is hidden and theme dropdown is reset on page load
         window.onload = () => {
             warningMessage.style.display = 'none';
             resetContent();
+            populateDropdown();
+            themeDropdownContent.style.display = 'none';
+            themeDropdownList.innerHTML = '';
+            themeBtn.textContent = 'Escolha um Assunto';
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
         };
+
+        // Populate subject dropdown
+        function populateDropdown() {
+            dropdownList.innerHTML = '';
+            Object.keys(trainingData).forEach(subjectId => {
+                const subject = trainingData[subjectId];
+                const subjectLi = document.createElement('li');
+                subjectLi.className = 'subject';
+                subjectLi.dataset.subjectId = subjectId;
+                subjectLi.textContent = subject.name;
+                subjectLi.onclick = (e) => {
+                    e.stopPropagation();
+                    btn.textContent = subject.name;
+                    dropdownContent.style.display = 'none';
+                    currentTrainingId = subjectId;
+                    populateThemeDropdown(subjectId);
+                    themeBtn.textContent = 'Escolha um Assunto';
+                    contentDiv.style.display = 'none';
+                    resetContent();
+                };
+                dropdownList.appendChild(subjectLi);
+            });
+        }
+
+        // Populate theme dropdown based on selected subject
+        function populateThemeDropdown(subjectId) {
+            themeDropdownList.innerHTML = '';
+            const themes = trainingData[subjectId].themes;
+            Object.keys(themes).forEach(themeId => {
+                const theme = themes[themeId];
+                const themeLi = document.createElement('li');
+                themeLi.className = 'theme';
+                themeLi.dataset.themeId = themeId;
+                themeLi.textContent = theme.name;
+                themeLi.onclick = (e) => {
+                    e.stopPropagation();
+                    themeBtn.textContent = theme.name;
+                    themeDropdownContent.style.display = 'none';
+                    loadTraining(subjectId, themeId);
+                };
+                themeDropdownList.appendChild(themeLi);
+            });
+        }
 
         // Email validation
         function validateEmail(email) {
@@ -668,42 +746,126 @@
             }, 3000);
         }
 
+        // Render PDF page
+        function renderPage(pageNum) {
+            pdfDoc.getPage(pageNum).then(page => {
+                const viewport = page.getViewport({ scale: 1.5 });
+                pdfCanvas.height = viewport.height;
+                pdfCanvas.width = viewport.width;
+                const context = pdfCanvas.getContext('2d');
+                page.render({ canvasContext: context, viewport: viewport });
+                currentPage = pageNum;
+                renderPagination();
+            });
+        }
+
+        // Render pagination buttons
+        function renderPagination() {
+            pdfNavigation.innerHTML = '';
+            const maxButtons = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            // First page button
+            const firstBtn = document.createElement('button');
+            firstBtn.innerHTML = '<i class="fas fa-fast-backward"></i>';
+            firstBtn.disabled = currentPage === 1;
+            firstBtn.onclick = () => {
+                if (currentPage !== 1) {
+                    renderPage(1);
+                }
+            };
+            pdfNavigation.appendChild(firstBtn);
+
+            // Numbered page buttons
+            for (let i = startPage; i <= endPage; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = i === currentPage ? 'active' : '';
+                btn.onclick = () => renderPage(i);
+                pdfNavigation.appendChild(btn);
+            }
+
+            // Last page button
+            const lastBtn = document.createElement('button');
+            lastBtn.innerHTML = '<i class="fas fa-fast-forward"></i>';
+            lastBtn.disabled = currentPage === totalPages;
+            lastBtn.onclick = () => {
+                if (currentPage !== totalPages) {
+                    renderPage(totalPages);
+                }
+            };
+            pdfNavigation.appendChild(lastBtn);
+        }
+
+        // Load PDF
+        function loadPDF(url) {
+            fetch(url, { method: 'HEAD' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return pdfjsLib.getDocument(url).promise;
+                })
+                .then(doc => {
+                    pdfDoc = doc;
+                    totalPages = doc.numPages;
+                    currentPage = 1;
+                    renderPage(currentPage);
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar PDF:', error);
+                    showWarning('Não foi possível carregar o PDF. Verifique se o arquivo existe e é acessível.');
+                });
+        }
+
+        // Subject dropdown toggle
         btn.onclick = (e) => {
             e.stopPropagation();
             dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
         };
 
+        // Theme dropdown toggle
+        themeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (!currentTrainingId) {
+                showWarning('Selecione o Tema.');
+                return;
+            }
+            themeDropdownContent.style.display = themeDropdownContent.style.display === 'block' ? 'none' : 'block';
+        };
+
+        // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) {
                 dropdownContent.style.display = 'none';
             }
+            if (!themeBtn.contains(e.target) && !themeDropdownContent.contains(e.target)) {
+                themeDropdownContent.style.display = 'none';
+            }
         });
 
-        dropdownContent.querySelectorAll('li').forEach(li => {
-            li.onclick = (e) => {
-                const value = e.target.dataset.value;
-                btn.textContent = e.target.textContent;
-                dropdownContent.style.display = 'none';
-                loadTraining(value);
-            };
-        });
-
-        function loadTraining(id) {
-            if (!id) return;
-            currentTrainingId = id;
-            const training = trainingData[id];
-            if (!training) return;
+        function loadTraining(subjectId, themeId) {
+            if (!subjectId || !themeId) return;
+            currentTrainingId = subjectId;
+            currentThemeId = themeId;
+            const theme = trainingData[subjectId].themes[themeId];
+            if (!theme) return;
             contentDiv.style.display = 'block';
-            loadModule(training[0], training);
+            loadModule(theme.modules[0], theme.modules);
             modulesDiv.innerHTML = '';
-            training.forEach((mod, index) => {
+            theme.modules.forEach((mod, index) => {
                 const div = document.createElement('div');
                 div.className = 'module';
                 div.textContent = mod.title;
                 div.onclick = () => {
                     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                     div.classList.add('active');
-                    loadModule(mod, training);
+                    loadModule(mod, theme.modules);
                 };
                 if (index === 0) div.classList.add('active');
                 modulesDiv.appendChild(div);
@@ -716,14 +878,23 @@
                 document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                 assessmentDiv.classList.add('active');
                 video.src = '';
-                loadQuiz(id);
+                pdfContainer.style.display = 'none';
+                loadQuiz(subjectId, themeId);
             };
             modulesDiv.appendChild(assessmentDiv);
         }
 
-        function loadModule(mod, training) {
+        function loadModule(mod, modules) {
             resetContent();
-            video.src = `https://www.youtube.com/embed/${mod.videoId}`;
+            if (mod.pdfUrl) {
+                pdfContainer.style.display = 'block';
+                video.style.display = 'none';
+                loadPDF(mod.pdfUrl);
+            } else {
+                video.src = `https://www.youtube.com/embed/${mod.videoId}`;
+                video.style.display = 'block';
+                pdfContainer.style.display = 'none';
+            }
             titleEl.textContent = mod.title;
             captionEl.textContent = mod.caption;
             attachmentContainer.innerHTML = '';
@@ -736,20 +907,23 @@
                     attachmentContainer.appendChild(btn);
                 });
             }
-            video.style.display = 'block';
             titleEl.style.display = 'block';
             captionEl.style.display = 'block';
             attachmentContainer.style.display = mod.attachments.length > 0 ? 'flex' : 'none';
         }
 
-        function loadQuiz(id) {
-            // Rolar até o topo da página de forma fluida
+        function loadQuiz(subjectId, themeId) {
             window.scrollTo({
                 top: 0,
                 behavior: 'smooth'
             });
             resetContent();
-            const questions = quizData[id];
+            const quizKey = `${subjectId}_${themeId}`;
+            const questions = quizData[quizKey];
+            if (!questions) {
+                showWarning('Nenhuma avaliação disponível para este tema.');
+                return;
+            }
             quizContainer.innerHTML = '';
             selectedAnswers = {};
             questions.forEach((q, index) => {
@@ -780,11 +954,12 @@
             });
             quizContainer.appendChild(quizSubmit);
             quizContainer.style.display = 'flex';
-            quizSubmit.onclick = calculateScore;
+            quizSubmit.onclick = () => calculateScore(subjectId, themeId);
         }
 
-        function calculateScore() {
-            const questions = quizData[currentTrainingId];
+        function calculateScore(subjectId, themeId) {
+            const quizKey = `${subjectId}_${themeId}`;
+            const questions = quizData[quizKey];
             let allAnswered = true;
             questions.forEach((q, index) => {
                 if (!(index in selectedAnswers)) {
@@ -800,7 +975,6 @@
                 showWarning('Por favor, responda todas as questões antes de enviar.');
                 return;
             }
-            // Rolar até o topo da página de forma fluida
             window.scrollTo({
                 top: 0,
                 behavior: 'smooth'
@@ -871,7 +1045,7 @@
             const retryBtn = document.createElement('button');
             retryBtn.id = 'retry-btn';
             retryBtn.textContent = 'Tentar Novamente';
-            retryBtn.onclick = () => loadQuiz(currentTrainingId);
+            retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
             if (score < 7) {
                 p.textContent = 'Reprovado. Tente novamente!';
                 resultContainer.appendChild(p);
@@ -889,6 +1063,10 @@
         function resetContent() {
             video.src = '';
             video.style.display = 'none';
+            pdfContainer.style.display = 'none';
+            pdfCanvas.width = 0;
+            pdfCanvas.height = 0;
+            pdfNavigation.innerHTML = '';
             titleEl.style.display = 'none';
             captionEl.style.display = 'none';
             attachmentContainer.style.display = 'none';
@@ -897,6 +1075,7 @@
             formContainer.style.display = 'none';
             warningMessage.style.display = 'none';
             if (document.getElementById('retry-btn')) document.getElementById('retry-btn').style.display = 'none';
+            themeDropdownContent.style.display = 'none';
         }
     </script>
 </body>
