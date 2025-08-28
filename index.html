@@ -1261,6 +1261,9 @@
             resetContent();
             currentModuleIndex = moduleIndex;
             if (mod.pdfUrl) {
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+                    ytPlayer.pauseVideo();
+                }
                 pdfContainer.style.display = 'block';
                 video.style.display = 'none';
                 customPlayerContainer.style.display = 'none';
