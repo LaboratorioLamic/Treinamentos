@@ -619,6 +619,23 @@
                 flex: 1;
             }
         }
+
+        .loading-spinner {
+        display: none;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #1a2b49;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
     </style>
 </head>
 <body>
@@ -689,6 +706,7 @@
                     <label for="email">Email</label>
                     <input type="email" id="email" placeholder="Digite seu email">
                     <button id="submit-form">Enviar</button>
+                    <div id="loading-spinner" class="loading-spinner"></div>
                 </div>
             </div>
             <div class="sidebar">
@@ -1380,54 +1398,80 @@
         }
 
         function submitForm(score) {
-            const name = document.getElementById('name');
-            const email = document.getElementById('email');
-            name.classList.remove('invalid');
-            email.classList.remove('invalid');
+    const name = document.getElementById('name');
+    const email = document.getElementById('email');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const submitButton = document.getElementById('submit-form');
+    
+    name.classList.remove('invalid');
+    email.classList.remove('invalid');
 
-            if (!name.value) {
-                name.classList.add('invalid');
-                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, preencha o campo Nome.');
-                return;
-            }
-            if (!email.value) {
-                email.classList.add('invalid');
-                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, preencha o campo Email.');
-                return;
-            }
-            if (!validateEmail(email.value)) {
-                email.classList.add('invalid');
-                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, insira um email válido.');
-                return;
-            }
+    if (!name.value) {
+        name.classList.add('invalid');
+        name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, preencha o campo Nome.');
+        return;
+    }
+    if (!email.value) {
+        email.classList.add('invalid');
+        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, preencha o campo Email.');
+        return;
+    }
+    if (!validateEmail(email.value)) {
+        email.classList.add('invalid');
+        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, insira um email válido.');
+        return;
+    }
 
-            const dateTime = new Date().toLocaleString('pt-BR');
-            const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') ? themeBtn.textContent : '';
-            const data = { 
-                'dateTime': dateTime, 
-                'email': email.value, 
-                'assunto': assuntoSelecionado,
-                'nome': name.value, 
-                'nota': score 
-            };
-            const url = 'URL_DO_SEU_WEBAPP_DO_APPS_SCRIPT';
-            fetch(url, {
-                method: 'POST',
-                mode: 'no-cors',
-                cache: 'no-cache',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams(data)
-            }).then(() => {
-                showResult(score);
-            }).catch(error => {
-                console.error('Erro ao enviar:', error);
-                showResult(score);
-            });
-        }
+    // Show loading spinner and disable button
+    loadingSpinner.style.display = 'block';
+    submitButton.disabled = true;
+    submitButton.style.opacity = '0.6';
 
+    const dateTime = new Date().toLocaleString('pt-BR');
+    const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') 
+        ? themeBtn.textContent 
+        : '';
+    const temaSelecionado = (typeof btn !== 'undefined' && btn && btn.textContent !== 'Escolha um Tema') 
+        ? btn.textContent 
+        : '';
+
+    const data = { 
+        'dateTime': dateTime, 
+        'email': email.value, 
+        'tema': temaSelecionado, // Added tema field
+        'assunto': assuntoSelecionado,
+        'nome': name.value, 
+        'nota': score 
+    };
+
+    const url = 'https://script.google.com/macros/s/AKfycbzuEgPZX-P0Xbe0UXTFqM2PCQorUmwdczWClLXcWmJImqCEnhtEvaU3Yo4rwFBSZJxl/exec';
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(data).toString()
+    })
+    .then(response => response.text())
+    .then(result => {
+        console.log('Resposta do servidor:', result);
+        // Hide loading spinner and re-enable button
+        loadingSpinner.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+        showResult(score);
+    })
+    .catch(error => {
+        console.error('Erro ao enviar:', error);
+        // Hide loading spinner and re-enable button
+        loadingSpinner.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+        showResult(score);
+    });
+}
         function showResult(score) {
             resetContent();
             resultContainer.innerHTML = '';
