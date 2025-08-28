@@ -1019,8 +1019,15 @@
             }
 
             const dateTime = new Date().toLocaleString('pt-BR');
-            const data = { dateTime, email: email.value, name: name.value, score };
-            const url = 'YOUR_APPS_SCRIPT_URL';
+            const assunto = (trainingData[currentTrainingId] && trainingData[currentTrainingId].themes && trainingData[currentTrainingId].themes[currentThemeId]) ? trainingData[currentTrainingId].themes[currentThemeId].name : '';
+            const data = { 
+                'dateTime': dateTime, 
+                'email': email.value, 
+                'assunto': assunto,
+                'nome': name.value, 
+                'nota': score 
+            };
+            const url = 'URL_DO_SEU_WEBAPP_DO_APPS_SCRIPT';
             fetch(url, {
                 method: 'POST',
                 mode: 'no-cors',
