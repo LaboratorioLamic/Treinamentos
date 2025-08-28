@@ -1019,11 +1019,11 @@
             }
 
             const dateTime = new Date().toLocaleString('pt-BR');
-            const assunto = (trainingData[currentTrainingId] && trainingData[currentTrainingId].themes && trainingData[currentTrainingId].themes[currentThemeId]) ? trainingData[currentTrainingId].themes[currentThemeId].name : '';
+            const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') ? themeBtn.textContent : '';
             const data = { 
                 'dateTime': dateTime, 
                 'email': email.value, 
-                'assunto': assunto,
+                'assunto': assuntoSelecionado,
                 'nome': name.value, 
                 'nota': score 
             };
