@@ -287,6 +287,11 @@
                 flex-shrink: 0;
             }
 
+            /* Elementos apenas para mobile */
+            .mobile-only {
+                display: none;
+            }
+
 /* Media query para telas menores (móveis) */
 @media (max-width: 600px) {
     .player-controls {
@@ -309,6 +314,13 @@
 
     .time-labels {
         min-width: 70px; /* Menor largura para tempo */
+    }
+
+    /* Mostrar apenas no mobile */
+    .mobile-only {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 }
         #cinema-overlay {
@@ -739,6 +751,9 @@
                             <option value="1.75">1.75x</option>
                             <option value="2">2x</option>
                         </select>
+                        <button id="fullscreen-btn" class="mobile-only" aria-label="Tela cheia">
+                            <i class="fas fa-expand"></i>
+                        </button>
                     </div>
                 </div>
                 <div id="pdf-container" class="pdf-container">
@@ -1040,6 +1055,41 @@
                 if (!ytPlayer) return;
                 ytPlayer.setPlaybackRate(parseFloat(speedSelect.value));
             };
+            const fullscreenBtn = document.getElementById('fullscreen-btn');
+            if (fullscreenBtn) {
+                fullscreenBtn.onclick = () => {
+                    const container = document.getElementById('custom-player');
+                    const iframe = document.querySelector('#yt-frame iframe');
+                    const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || container.classList.contains('is-fullscreen'));
+                    if (!isFs) {
+                        // Try request fullscreen on container first, fall back to iframe
+                        const req = container.requestFullscreen || container.webkitRequestFullscreen || container.mozRequestFullScreen || container.msRequestFullscreen;
+                        if (req) {
+                            req.call(container).catch(() => {
+                                if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
+                            });
+                        } else if (iframe && iframe.requestFullscreen) {
+                            iframe.requestFullscreen();
+                        } else {
+                            container.classList.add('is-fullscreen');
+                        }
+                        fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+                    } else {
+                        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+                        if (exit) {
+                            exit.call(document);
+                        }
+                        container.classList.remove('is-fullscreen');
+                        fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+                    }
+                };
+                document.addEventListener('fullscreenchange', () => {
+                    const fullscreenBtn = document.getElementById('fullscreen-btn');
+                    if (!fullscreenBtn) return;
+                    const active = !!document.fullscreenElement;
+                    fullscreenBtn.innerHTML = active ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+                });
+            }
             if (cinemaBtn) {
                 cinemaBtn.onclick = () => {
                     const isActive = document.body.classList.toggle('cinema-active');
