@@ -224,7 +224,7 @@
                 align-items: center;
                 gap: 8px; /* Reduzido para economizar espaço */
                 flex-wrap: nowrap; /* Impede quebras de linha */
-                overflow-x: auto; /* Permite rolagem horizontal se necessário */
+                overflow-x: hidden; /* Evita rolagem horizontal */
                 width: 100%; /* Garante que o contêiner use toda a largura disponível */
                 white-space: nowrap; /* Evita quebras de linha nos elementos filhos */
                 padding: 8px 0; /* Adiciona padding vertical */
@@ -295,28 +295,43 @@
 /* Media query para telas menores (móveis) */
 @media (max-width: 600px) {
     .player-controls {
-        gap: 6px; /* Menor espaçamento em telas pequenas */
+        gap: 4px; /* Menor espaçamento em telas pequenas */
         padding: 6px 0; /* Menor padding */
     }
 
     .player-controls button, .player-controls select {
-        padding: 5px 8px; /* Ainda menor para telas pequenas */
-        font-size: clamp(0.65em, 1.6vw, 0.75em);
+        padding: 4px 6px; /* Ainda menor para telas pequenas */
+        font-size: clamp(0.6em, 1.5vw, 0.72em);
     }
 
     .player-controls input#volume-range {
-        width: 60px; /* Menor largura para volume */
+        width: 40px; /* Menor largura para volume */
     }
 
     .player-controls select#speed-select {
-        max-width: 60px; /* Menor largura para select */
+        max-width: 56px; /* Menor largura para select */
     }
 
     .time-labels {
-        min-width: 70px; /* Menor largura para tempo */
+        min-width: 50px; /* Menor largura para tempo */
+    }
+
+    /* Permite que a barra de progresso encolha para caber na mesma linha */
+    .player-controls #progress-range {
+        min-width: 0 !important;
+        flex: 1 1 0% !important;
     }
 
     /* Mostrar apenas no mobile */
+    .mobile-only {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Mostrar o botão de tela cheia também em celulares na horizontal */
+@media (orientation: landscape) and (max-height: 500px) {
     .mobile-only {
         display: inline-flex;
         align-items: center;
