@@ -659,6 +659,13 @@
         #assessment-module:hover {
             background: #ffca2c;
         }
+        #assessment-module.completed {
+            background: #28a745;
+            color: #ffffff;
+        }
+        #assessment-module.completed:hover {
+            background: #34c759;
+        }
         .warning-message {
             display: none;
             background: linear-gradient(135deg, #dc3545, #e4606d);
@@ -950,6 +957,7 @@
         let currentModuleIndex = null;
         const completionStatus = {};
         let currentVideoId = null; // track current video id for native fullscreen
+        let assessmentResults = {}; // store assessment results
 
         function loadYouTubeAPI() {
             return new Promise((resolve) => {
@@ -1033,7 +1041,8 @@
             if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
                 const theme = trainingData[currentTrainingId].themes[currentThemeId];
                 if (!theme) return;
-                if (!completionStatus[currentTrainingId] || !completionStatus[currentTrainingId][currentThemeId]) return;
+                if (!completionStatus[currentTrainingId]) completionStatus[currentTrainingId] = {};
+                if (!completionStatus[currentTrainingId][currentThemeId]) completionStatus[currentTrainingId][currentThemeId] = [];
                 if (!completionStatus[currentTrainingId][currentThemeId][currentModuleIndex]) {
                     completionStatus[currentTrainingId][currentThemeId][currentModuleIndex] = true;
                     const moduleTiles = modulesDiv.querySelectorAll('.module');
@@ -1371,6 +1380,12 @@
             assessmentDiv.onclick = () => {
                 document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                 assessmentDiv.classList.add('active');
+                // Check if assessment was already completed
+                if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
+                    showAssessmentResult(assessmentResults[subjectId][themeId]);
+                    return;
+                }
+                // Check if all modules are completed
                 const allDone = completionStatus[subjectId][themeId].every(Boolean);
                 if (!allDone) {
                     showWarning('Assista todos os modulos');
@@ -1614,7 +1629,40 @@
                 successDiv.className = 'success-message';
                 successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
                 resultContainer.appendChild(successDiv);
+                // Mark assessment as completed and update the module
+                if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
+                assessmentResults[currentTrainingId][currentThemeId] = score;
+                const assessmentModule = document.getElementById('assessment-module');
+                if (assessmentModule) {
+                    assessmentModule.classList.add('completed');
+                    assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
+                }
             }
+            resultContainer.style.display = 'flex';
+        }
+
+        function showAssessmentResult(score) {
+            resetContent();
+            // Hide any active media players and content
+            if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+                ytPlayer.stopVideo();
+            }
+            customPlayerContainer.style.display = 'none';
+            video.style.display = 'none';
+            video.src = '';
+            pdfContainer.style.display = 'none';
+            titleEl.style.display = 'none';
+            captionEl.style.display = 'none';
+            attachmentContainer.style.display = 'none';
+            
+            resultContainer.innerHTML = '';
+            const h2 = document.createElement('h2');
+            h2.textContent = `Sua nota: ${score}/10`;
+            resultContainer.appendChild(h2);
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+            resultContainer.appendChild(successDiv);
             resultContainer.style.display = 'flex';
         }
 
