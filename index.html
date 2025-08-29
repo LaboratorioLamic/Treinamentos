@@ -1377,6 +1377,11 @@
             assessmentDiv.className = 'module';
             assessmentDiv.id = 'assessment-module';
             assessmentDiv.textContent = 'Avaliação';
+            // Check if assessment was previously completed and restore its state
+            if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
+                assessmentDiv.classList.add('completed');
+                assessmentDiv.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
+            }
             assessmentDiv.onclick = () => {
                 document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                 assessmentDiv.classList.add('active');
