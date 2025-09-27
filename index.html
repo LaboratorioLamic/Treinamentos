@@ -812,105 +812,37 @@
     <div id="cinema-overlay"></div>
 
     <script>
-        const trainingData = {
-            1: {
-                name: "Atendimento",
-                themes: {
-                    1: {
-                        name: "Sistema UniLab",
-                        modules: [
-                            {
-                                videoId: 'IuuwZY2Q0Lo',
-                                title: 'Módulo 1: Fundamentos da Função Renal',
-                                caption: 'Aprofunde-se nas técnicas de avaliação renal.',
-                                attachments: [
-                                    { title: 'Guia Prático', url: 'https://example.com/guia2.pdf' },
-                                    { title: 'Estudo de Caso', url: 'https://example.com/caso2.pdf' }
-                                ]
-                            },
-                            {
-                                pdfUrl: 'https://raw.githubusercontent.com/LaboratorioLamic/EAD/main/assents/pdfhvp1.pdf',
-                                title: 'Material de Apoio',
-                                caption: 'Explore os fundamentos da função renal através do material.',
-                                attachments: [
-                                    { title: 'Material de Apoio 1', url: 'https://example.com/anexo1.pdf' },
-                                    { title: 'Slides do Módulo 1', url: 'https://example.com/slides1.pdf' }
-                                ]
-                            }
-                        ]
-                    },
-                    2: {
-                        name: "Autorização de Convênios",
-                        modules: [
-                            {
-                                videoId: 'LbDt4l10LjE',
-                                title: 'Módulo 1: Introdução aos Biomarcadores',
-                                caption: 'Conheça os principais biomarcadores usados na avaliação renal.',
-                                attachments: [
-                                    { title: 'Resumo do Módulo 1', url: 'https://example.com/resumo1.pdf' }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            },
-            2: {
-                name: "Coleta",
-                themes: {
-                    1: {
-                        name: "Procedimento de Coleta",
-                        modules: [
-                            {
-                                videoId: 'LbDt4l10LjE',
-                                title: 'Módulo 1: Fundamentos do Treinamento2',
-                                caption: 'Introdução ao conteúdo do Treinamento2.',
-                                attachments: [
-                                    { title: 'Resumo do Módulo 1', url: 'https://example.com/resumo1.pdf' },
-                                    { title: 'Ferramentas', url: 'https://example.com/ferramentas1.pdf' }
-                                ]
-                            }
-                        ]
-                    },
-                    2: {
-                        name: "Materiais biológicos",
-                        modules: [
-                            {
-                                videoId: 'LbDt4l10LjE',
-                                title: 'Módulo 2: Ferramentas Essenciais',
-                                caption: 'Conheça as ferramentas do Treinamento2.',
-                                attachments: [
-                                    { title: 'Manual de Ferramentas', url: 'https://example.com/manual2.pdf' },
-                                    { title: 'Tutorial', url: 'https://example.com/tutorial2.pdf' }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }
-        };
+        // Variáveis globais para armazenar os dados do JSONBin
+        let trainingData = {};
+        let quizData = {};
 
-        const quizData = {
-            '1_1': [ // Função Renal -> Fundamentos da Função Renal
-                { question: "Qual é a principal função dos rins?", options: ["Digestão", "Filtração do sangue", "Produção de insulina", "Regulação cardíaca"], correct: 1 },
-                { question: "O que mede a taxa de filtração glomerular?", options: ["Volume de urina", "Velocidade de filtração do plasma", "Frequência cardíaca", "Nível de glicose"], correct: 1 },
-                { question: "Qual é um marcador da função renal?", options: ["Glicose", "Creatinina", "Colesterol", "Hemoglobina"], correct: 1 }
-            ],
-            '1_2': [ // Função Renal -> Biomarcadores Renais
-                { question: "O que é cistatina C?", options: ["Hormônio", "Proteína marcador renal", "Célula na urina", "Medicamento"], correct: 1 },
-                { question: "Por que cistatina C é útil?", options: ["Mais barata", "Menos influenciada por massa muscular", "Produzida só pelos rins", "Fácil de coletar"], correct: 1 },
-                { question: "Qual exame monitora a função renal?", options: ["Hemograma", "Dosagem de creatinina", "Raio-X", "Teste hepático"], correct: 1 }
-            ],
-            '2_1': [ // Treinamento2 -> Fundamentos do Treinamento2
-                { question: "Qual é o foco do Treinamento2?", options: ["Programação", "Fundamentos teóricos", "Design gráfico", "Marketing"], correct: 1 },
-                { question: "O que é essencial no Treinamento2?", options: ["Teoria básica", "Prática intensiva", "Estudo de caso", "Simulação"], correct: 1 },
-                { question: "Qual é um objetivo do Treinamento2?", options: ["Vendas", "Compreensão teórica", "Produção", "Publicidade"], correct: 1 }
-            ],
-            '2_2': [ // Treinamento2 -> Ferramentas Essenciais
-                { question: "Qual ferramenta é usada no Treinamento2?", options: ["Editor de texto", "Ferramenta específica", "Planilha", "Navegador"], correct: 1 },
-                { question: "Qual é o propósito da ferramenta?", options: ["Facilitar aprendizado", "Editar vídeos", "Gerar relatórios", "Criar gráficos"], correct: 0 },
-                { question: "Como a ferramenta ajuda?", options: ["Automatiza tarefas", "Ensina teoria", "Cria apresentações", "Gerencia projetos"], correct: 0 }
-            ]
-        };
+        // Função para buscar dados do JSONBin
+        async function fetchJSONBinData() {
+            const binId = '68d7d3e5ae596e708ffdae68';
+            const masterKey = '$2a$10$cREwumm/vr2Mj149sDZkKuXLp.pxT0D6PMgkf.yMEWR7YmIlrHJtm';
+            const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': masterKey
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                trainingData = data.record.trainingData || {};
+                quizData = data.record.quizData || {};
+                populateDropdown();
+            } catch (error) {
+                console.error('Erro ao carregar dados do JSONBin:', error);
+                showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
+            }
+        }
 
         const btn = document.getElementById('dropdownBtn');
         const dropdownContent = document.getElementById('dropdownContent');
@@ -1166,7 +1098,7 @@
         window.onload = () => {
             warningMessage.style.display = 'none';
             resetContent();
-            populateDropdown();
+            fetchJSONBinData();
             themeDropdownContent.style.display = 'none';
             themeDropdownList.innerHTML = '';
             themeBtn.textContent = 'Escolha um Assunto';
