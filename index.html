@@ -811,17 +811,16 @@
 
     <div id="cinema-overlay"></div>
 
-    <script>
-        // Variáveis globais para armazenar os dados do JSONBin
+    <script>// Variáveis globais para armazenar os dados do JSONBin
         let trainingData = {};
         let quizData = {};
-
+        
         // Função para buscar dados do JSONBin
         async function fetchJSONBinData() {
             const binId = '68d7d3e5ae596e708ffdae68';
             const masterKey = '$2a$10$cREwumm/vr2Mj149sDZkKuXLp.pxT0D6PMgkf.yMEWR7YmIlrHJtm';
             const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
-
+        
             try {
                 const response = await fetch(url, {
                     method: 'GET',
@@ -829,11 +828,11 @@
                         'X-Master-Key': masterKey
                     }
                 });
-
+        
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
-
+        
                 const data = await response.json();
                 trainingData = data.record.trainingData || {};
                 quizData = data.record.quizData || {};
@@ -843,7 +842,7 @@
                 showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
             }
         }
-
+        
         const btn = document.getElementById('dropdownBtn');
         const dropdownContent = document.getElementById('dropdownContent');
         const dropdownList = document.getElementById('dropdownList');
@@ -877,7 +876,7 @@
         const quizSubmit = document.createElement('button');
         quizSubmit.id = 'quiz-submit';
         quizSubmit.textContent = 'Enviar Avaliação';
-
+        
         let currentTrainingId = null;
         let currentThemeId = null;
         let selectedAnswers = {};
@@ -890,7 +889,7 @@
         const completionStatus = {};
         let currentVideoId = null; // track current video id for native fullscreen
         let assessmentResults = {}; // store assessment results
-
+        
         function loadYouTubeAPI() {
             return new Promise((resolve) => {
                 if (window.YT && window.YT.Player) {
@@ -904,14 +903,14 @@
                 window.onYouTubeIframeAPIReady = () => resolve();
             });
         }
-
+        
         function formatTime(seconds) {
             seconds = Math.max(0, Math.floor(seconds || 0));
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = (seconds % 60).toString().padStart(2, '0');
             return `${m}:${s}`;
         }
-
+        
         function initOrLoadVideo(videoId) {
             loadYouTubeAPI().then(() => {
                 customPlayerContainer.style.display = 'block';
@@ -939,7 +938,7 @@
                 }
             });
         }
-
+        
         function onPlayerReady() {
             bindControls();
             updateTimeUI();
@@ -952,7 +951,7 @@
                 }
             }
         }
-
+        
         function onPlayerStateChange(event) {
             const YT_STATE = window.YT.PlayerState;
             if (event.data === YT_STATE.PLAYING) {
@@ -968,7 +967,7 @@
                 }
             }
         }
-
+        
         function markCurrentModuleCompleted() {
             if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
                 const theme = trainingData[currentTrainingId].themes[currentThemeId];
@@ -982,11 +981,15 @@
                     if (tile) {
                         tile.innerHTML = renderModuleTitle(theme.modules[currentModuleIndex].title, true);
                         tile.classList.add('completed');
+                        // Re-enable progress range when module is completed
+                        if (progressRange) {
+                            progressRange.disabled = false;
+                        }
                     }
                 }
             }
         }
-
+        
         function bindControls() {
             playPauseBtn.onclick = () => {
                 if (!ytPlayer) return;
@@ -1008,6 +1011,13 @@
             };
             progressRange.oninput = () => {
                 if (!ytPlayer) return;
+                if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                        showWarning('Você deve assistir o vídeo inteiro antes de avançar.');
+                        progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
+                        return;
+                    }
+                }
                 const duration = ytPlayer.getDuration() || 0;
                 const seekTo = (parseFloat(progressRange.value) / 100) * duration;
                 ytPlayer.seekTo(seekTo, true);
@@ -1066,7 +1076,7 @@
                 }
             }
         }
-
+        
         function startProgressTimer() {
             stopProgressTimer();
             progressTimer = setInterval(() => {
@@ -1079,21 +1089,21 @@
                 updateTimeUI();
             }, 250);
         }
-
+        
         function stopProgressTimer() {
             if (progressTimer) {
                 clearInterval(progressTimer);
                 progressTimer = null;
             }
         }
-
+        
         function updateTimeUI() {
             if (!ytPlayer) { timeLabels.textContent = '00:00 / 00:00'; return; }
             const current = ytPlayer.getCurrentTime() || 0;
             const duration = ytPlayer.getDuration() || 0;
             timeLabels.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
         }
-
+        
         // Ensure warning message is hidden and theme dropdown is reset on page load
         window.onload = () => {
             warningMessage.style.display = 'none';
@@ -1104,7 +1114,7 @@
             themeBtn.textContent = 'Escolha um Assunto';
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
         };
-
+        
         // Populate subject dropdown
         function populateDropdown() {
             dropdownList.innerHTML = '';
@@ -1127,7 +1137,7 @@
                 dropdownList.appendChild(subjectLi);
             });
         }
-
+        
         // Populate theme dropdown based on selected subject
         function populateThemeDropdown(subjectId) {
             themeDropdownList.innerHTML = '';
@@ -1147,13 +1157,13 @@
                 themeDropdownList.appendChild(themeLi);
             });
         }
-
+        
         // Email validation
         function validateEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
         }
-
+        
         // Email input event listener
         document.getElementById('email').addEventListener('input', function() {
             const emailInput = this;
@@ -1163,7 +1173,7 @@
                 emailInput.classList.remove('invalid');
             }
         });
-
+        
         // Show warning message
         function showWarning(message) {
             warningText.textContent = message;
@@ -1172,7 +1182,7 @@
                 warningMessage.style.display = 'none';
             }, 3000);
         }
-
+        
         // Render PDF page
         function renderPage(pageNum) {
             pdfDoc.getPage(pageNum).then(page => {
@@ -1188,18 +1198,18 @@
                 }
             });
         }
-
+        
         // Render pagination buttons
         function renderPagination() {
             pdfNavigation.innerHTML = '';
             const maxButtons = 3;
             let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
             let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-
+        
             if (endPage - startPage + 1 < maxButtons) {
                 startPage = Math.max(1, endPage - maxButtons + 1);
             }
-
+        
             // First page button
             const firstBtn = document.createElement('button');
             firstBtn.innerHTML = '<i class="fas fa-fast-backward"></i>';
@@ -1210,7 +1220,7 @@
                 }
             };
             pdfNavigation.appendChild(firstBtn);
-
+        
             // Numbered page buttons
             for (let i = startPage; i <= endPage; i++) {
                 const btn = document.createElement('button');
@@ -1219,27 +1229,37 @@
                 btn.onclick = () => renderPage(i);
                 pdfNavigation.appendChild(btn);
             }
-
+        
             // Last page button
             const lastBtn = document.createElement('button');
             lastBtn.innerHTML = '<i class="fas fa-fast-forward"></i>';
-            lastBtn.disabled = currentPage === totalPages;
+            lastBtn.disabled = currentPage === totalPages || 
+                (currentTrainingId && currentThemeId != null && currentModuleIndex != null && 
+                !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]);
             lastBtn.onclick = () => {
                 if (currentPage !== totalPages) {
+                    if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                        if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                            showWarning('Você deve visualizar todas as páginas antes de usar o atalho para a última.');
+                            return;
+                        }
+                    }
                     renderPage(totalPages);
                 }
             };
             pdfNavigation.appendChild(lastBtn);
         }
-
+        
         // Load PDF
-        function loadPDF(url) {
-            fetch(url, { method: 'HEAD' })
+        function loadPDF(pdfPath) {
+            const baseUrl = 'https://raw.githubusercontent.com/LaboratorioLamic/Treinamentos/main/';
+            const fullUrl = `${baseUrl}${pdfPath}`;
+            fetch(fullUrl, { method: 'HEAD' })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    return pdfjsLib.getDocument(url).promise;
+                    return pdfjsLib.getDocument(fullUrl).promise;
                 })
                 .then(doc => {
                     pdfDoc = doc;
@@ -1252,13 +1272,13 @@
                     showWarning('Não foi possível carregar o PDF. Verifique se o arquivo existe e é acessível.');
                 });
         }
-
+        
         // Subject dropdown toggle
         btn.onclick = (e) => {
             e.stopPropagation();
             dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
         };
-
+        
         // Theme dropdown toggle
         themeBtn.onclick = (e) => {
             e.stopPropagation();
@@ -1268,7 +1288,7 @@
             }
             themeDropdownContent.style.display = themeDropdownContent.style.display === 'block' ? 'none' : 'block';
         };
-
+        
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) {
@@ -1278,7 +1298,7 @@
                 themeDropdownContent.style.display = 'none';
             }
         });
-
+        
         function loadTraining(subjectId, themeId) {
             if (!subjectId || !themeId) return;
             currentTrainingId = subjectId;
@@ -1343,11 +1363,11 @@
             };
             modulesDiv.appendChild(assessmentDiv);
         }
-
+        
         function renderModuleTitle(title, completed) {
             return completed ? `${title} <i class=\"fas fa-circle-check status-icon\" aria-hidden=\"true\"></i>` : title;
         }
-
+        
         function loadModule(mod, modules, moduleIndex) {
             resetContent();
             currentModuleIndex = moduleIndex;
@@ -1364,6 +1384,10 @@
                 customPlayerContainer.style.display = 'block';
                 video.style.display = 'none';
                 pdfContainer.style.display = 'none';
+                // Disable progress range until video is completed
+                if (progressRange && !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                    progressRange.disabled = true;
+                }
             }
             titleEl.textContent = mod.title;
             captionEl.textContent = mod.caption;
@@ -1381,7 +1405,7 @@
             captionEl.style.display = 'block';
             attachmentContainer.style.display = mod.attachments.length > 0 ? 'flex' : 'none';
         }
-
+        
         function loadQuiz(subjectId, themeId) {
             window.scrollTo({
                 top: 0,
@@ -1433,7 +1457,7 @@
             quizContainer.style.display = 'flex';
             quizSubmit.onclick = () => calculateScore(subjectId, themeId);
         }
-
+        
         function calculateScore(subjectId, themeId) {
             const quizKey = `${subjectId}_${themeId}`;
             const questions = quizData[quizKey];
@@ -1463,88 +1487,89 @@
             const score = Math.round((correctCount / questions.length) * 10);
             showForm(score);
         }
-
+        
         function showForm(score) {
             resetContent();
             formContainer.style.display = 'flex';
             document.getElementById('submit-form').onclick = () => submitForm(score);
         }
-
+        
         function submitForm(score) {
-    const name = document.getElementById('name');
-    const email = document.getElementById('email');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const submitButton = document.getElementById('submit-form');
-    
-    name.classList.remove('invalid');
-    email.classList.remove('invalid');
-
-    if (!name.value) {
-        name.classList.add('invalid');
-        name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        showWarning('Por favor, preencha o campo Nome.');
-        return;
-    }
-    if (!email.value) {
-        email.classList.add('invalid');
-        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        showWarning('Por favor, preencha o campo Email.');
-        return;
-    }
-    if (!validateEmail(email.value)) {
-        email.classList.add('invalid');
-        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        showWarning('Por favor, insira um email válido.');
-        return;
-    }
-
-    // Show loading spinner and disable button
-    loadingSpinner.style.display = 'block';
-    submitButton.disabled = true;
-    submitButton.style.opacity = '0.6';
-
-    const dateTime = new Date().toLocaleString('pt-BR');
-    const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') 
-        ? themeBtn.textContent 
-        : '';
-    const temaSelecionado = (typeof btn !== 'undefined' && btn && btn.textContent !== 'Escolha um Tema') 
-        ? btn.textContent 
-        : '';
-
-    const data = { 
-        'dateTime': dateTime, 
-        'email': email.value, 
-        'tema': temaSelecionado, // Added tema field
-        'assunto': assuntoSelecionado,
-        'nome': name.value, 
-        'nota': score 
-    };
-
-    const url = 'https://script.google.com/macros/s/AKfycbzuEgPZX-P0Xbe0UXTFqM2PCQorUmwdczWClLXcWmJImqCEnhtEvaU3Yo4rwFBSZJxl/exec';
-
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(data).toString()
-    })
-    .then(response => response.text())
-    .then(result => {
-        console.log('Resposta do servidor:', result);
-        // Hide loading spinner and re-enable button
-        loadingSpinner.style.display = 'none';
-        submitButton.disabled = false;
-        submitButton.style.opacity = '1';
-        showResult(score);
-    })
-    .catch(error => {
-        console.error('Erro ao enviar:', error);
-        // Hide loading spinner and re-enable button
-        loadingSpinner.style.display = 'none';
-        submitButton.disabled = false;
-        submitButton.style.opacity = '1';
-        showResult(score);
-    });
-}
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const submitButton = document.getElementById('submit-form');
+            
+            name.classList.remove('invalid');
+            email.classList.remove('invalid');
+        
+            if (!name.value) {
+                name.classList.add('invalid');
+                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, preencha o campo Nome.');
+                return;
+            }
+            if (!email.value) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, preencha o campo Email.');
+                return;
+            }
+            if (!validateEmail(email.value)) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, insira um email válido.');
+                return;
+            }
+        
+            // Show loading spinner and disable button
+            loadingSpinner.style.display = 'block';
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.6';
+        
+            const dateTime = new Date().toLocaleString('pt-BR');
+            const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') 
+                ? themeBtn.textContent 
+                : '';
+            const temaSelecionado = (typeof btn !== 'undefined' && btn && btn.textContent !== 'Escolha um Tema') 
+                ? btn.textContent 
+                : '';
+        
+            const data = { 
+                'dateTime': dateTime, 
+                'email': email.value, 
+                'tema': temaSelecionado, // Added tema field
+                'assunto': assuntoSelecionado,
+                'nome': name.value, 
+                'nota': score 
+            };
+        
+            const url = 'https://script.google.com/macros/s/AKfycbzuEgPZX-P0Xbe0UXTFqM2PCQorUmwdczWClLXcWmJImqCEnhtEvaU3Yo4rwFBSZJxl/exec';
+        
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(data).toString()
+            })
+            .then(response => response.text())
+            .then(result => {
+                console.log('Resposta do servidor:', result);
+                // Hide loading spinner and re-enable button
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                showResult(score);
+            })
+            .catch(error => {
+                console.error('Erro ao enviar:', error);
+                // Hide loading spinner and re-enable button
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                showResult(score);
+            });
+        }
+        
         function showResult(score) {
             resetContent();
             resultContainer.innerHTML = '';
@@ -1577,7 +1602,7 @@
             }
             resultContainer.style.display = 'flex';
         }
-
+        
         function showAssessmentResult(score) {
             resetContent();
             // Hide any active media players and content
@@ -1602,7 +1627,7 @@
             resultContainer.appendChild(successDiv);
             resultContainer.style.display = 'flex';
         }
-
+        
         function resetContent() {
             video.src = '';
             video.style.display = 'none';
@@ -1620,6 +1645,6 @@
             if (document.getElementById('retry-btn')) document.getElementById('retry-btn').style.display = 'none';
             themeDropdownContent.style.display = 'none';
         }
-    </script>
+        </script>
 </body>
 </html>
