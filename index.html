@@ -1571,38 +1571,65 @@
         }
         
         function showResult(score) {
-            resetContent();
-            resultContainer.innerHTML = '';
-            const h2 = document.createElement('h2');
-            h2.textContent = `Sua nota: ${score}/10`;
-            resultContainer.appendChild(h2);
-            const p = document.createElement('p');
-            const retryBtn = document.createElement('button');
-            retryBtn.id = 'retry-btn';
-            retryBtn.textContent = 'Tentar Novamente';
-            retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-            if (score < 7) {
-                p.textContent = 'Reprovado. Tente novamente!';
-                resultContainer.appendChild(p);
-                resultContainer.appendChild(retryBtn);
-                retryBtn.style.display = 'block';
-            } else {
-                const successDiv = document.createElement('div');
-                successDiv.className = 'success-message';
-                successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
-                resultContainer.appendChild(successDiv);
-                // Mark assessment as completed and update the module
-                if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
-                assessmentResults[currentTrainingId][currentThemeId] = score;
-                const assessmentModule = document.getElementById('assessment-module');
-                if (assessmentModule) {
-                    assessmentModule.classList.add('completed');
-                    assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
-                }
-            }
-            resultContainer.style.display = 'flex';
+    resetContent();
+    resultContainer.innerHTML = '';
+    const h2 = document.createElement('h2');
+    h2.textContent = `Sua nota: ${score}/10`;
+    resultContainer.appendChild(h2);
+    const p = document.createElement('p');
+    const retryBtn = document.createElement('button');
+    retryBtn.id = 'retry-btn';
+    retryBtn.textContent = 'Tentar Novamente';
+    retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+    if (score < 7) {
+        p.textContent = 'Reprovado. Tente novamente!';
+        resultContainer.appendChild(p);
+        resultContainer.appendChild(retryBtn);
+        retryBtn.style.display = 'block';
+    } else {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+        resultContainer.appendChild(successDiv);
+        // Mark assessment as completed and update the module
+        if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
+        assessmentResults[currentTrainingId][currentThemeId] = score;
+        const assessmentModule = document.getElementById('assessment-module');
+        if (assessmentModule) {
+            assessmentModule.classList.add('completed');
+            assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
         }
-        
+        // Botão para refazer a avaliação (apenas para aprovados)
+        const refazerBtn = document.createElement('button');
+        refazerBtn.id = 'refazer-btn';
+        refazerBtn.textContent = 'Refazer Avaliação';
+        refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+        refazerBtn.style.cssText = `
+            background-color: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            display: block;
+            margin-top: 10px;
+        `;
+        refazerBtn.addEventListener('mouseenter', () => {
+            refazerBtn.style.backgroundColor = '#218838';
+            refazerBtn.style.transform = 'scale(1.05)';
+        });
+        refazerBtn.addEventListener('mouseleave', () => {
+            refazerBtn.style.backgroundColor = '#28a745';
+            refazerBtn.style.transform = 'scale(1)';
+        });
+        resultContainer.appendChild(refazerBtn);
+    }
+    resultContainer.style.display = 'flex';
+}
+
         function showAssessmentResult(score) {
             resetContent();
             // Hide any active media players and content
