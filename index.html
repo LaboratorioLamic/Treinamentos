@@ -726,7 +726,33 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+.form-container select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: clamp(0.9em, 2.5vw, 1em);
+    transition: border-color 0.3s ease;
+    width: 100%;
+    background: white;
+    cursor: pointer;
+}
 
+.form-container select:focus {
+    border-color: #1a2b49;
+    outline: none;
+}
+
+.form-container select.invalid {
+    border-color: #dc3545;
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Ajuste para telas menores, se necessário */
+@media (max-width: 600px) {
+    .form-container select {
+        font-size: clamp(0.8em, 2vw, 0.9em);
+    }
+}
     </style>
 </head>
 <body>
@@ -795,7 +821,9 @@
                 <div id="result-container" class="result-container"></div>
                 <div id="form-container" class="form-container">
                     <label for="name">Nome</label>
-                    <input type="text" id="name" placeholder="Digite seu nome">
+                    <select id="name">
+                        <option value="">Selecione seu nome</option>
+                    </select>
                     <label for="email">Email</label>
                     <input type="email" id="email" placeholder="Digite seu email">
                     <button id="submit-form">Enviar</button>
@@ -811,9 +839,37 @@
 
     <div id="cinema-overlay"></div>
 
-    <script>// Variáveis globais para armazenar os dados do JSONBin
+    <script>
+        // Variáveis globais para armazenar os dados do JSONBin
         let trainingData = {};
         let quizData = {};
+        
+        let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
+        
+        // Função para buscar nomes da planilha (Google Apps Script)
+        async function fetchNames() {
+            const url = 'https://script.google.com/macros/s/AKfycbzUd6efhfzkCmYd88_eIIL6dGIQxIINsw-6Y_qM3PRemUbZ06obtF9xKY1S8WRfvXyq9Q/exec';
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const names = await response.json();
+                nameOptions = names; // Armazena globalmente
+                const select = document.getElementById('name');
+                if (select) {
+                    names.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar nomes da planilha:', error);
+                // Opcional: showWarning('Não foi possível carregar a lista de nomes. Tente novamente.');
+            }
+        }
         
         // Função para buscar dados do JSONBin
         async function fetchJSONBinData() {
@@ -1109,6 +1165,7 @@
             warningMessage.style.display = 'none';
             resetContent();
             fetchJSONBinData();
+            fetchNames(); // Carrega os nomes da planilha
             themeDropdownContent.style.display = 'none';
             themeDropdownList.innerHTML = '';
             themeBtn.textContent = 'Escolha um Assunto';
@@ -1506,7 +1563,7 @@
             if (!name.value) {
                 name.classList.add('invalid');
                 name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, preencha o campo Nome.');
+                showWarning('Por favor, selecione o Nome.');
                 return;
             }
             if (!email.value) {
@@ -1571,65 +1628,65 @@
         }
         
         function showResult(score) {
-    resetContent();
-    resultContainer.innerHTML = '';
-    const h2 = document.createElement('h2');
-    h2.textContent = `Sua nota: ${score}/10`;
-    resultContainer.appendChild(h2);
-    const p = document.createElement('p');
-    const retryBtn = document.createElement('button');
-    retryBtn.id = 'retry-btn';
-    retryBtn.textContent = 'Tentar Novamente';
-    retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-    if (score < 7) {
-        p.textContent = 'Reprovado. Tente novamente!';
-        resultContainer.appendChild(p);
-        resultContainer.appendChild(retryBtn);
-        retryBtn.style.display = 'block';
-    } else {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'success-message';
-        successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
-        resultContainer.appendChild(successDiv);
-        // Mark assessment as completed and update the module
-        if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
-        assessmentResults[currentTrainingId][currentThemeId] = score;
-        const assessmentModule = document.getElementById('assessment-module');
-        if (assessmentModule) {
-            assessmentModule.classList.add('completed');
-            assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
+            resetContent();
+            resultContainer.innerHTML = '';
+            const h2 = document.createElement('h2');
+            h2.textContent = `Sua nota: ${score}/10`;
+            resultContainer.appendChild(h2);
+            const p = document.createElement('p');
+            const retryBtn = document.createElement('button');
+            retryBtn.id = 'retry-btn';
+            retryBtn.textContent = 'Tentar Novamente';
+            retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+            if (score < 7) {
+                p.textContent = 'Reprovado. Tente novamente!';
+                resultContainer.appendChild(p);
+                resultContainer.appendChild(retryBtn);
+                retryBtn.style.display = 'block';
+            } else {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success-message';
+                successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+                resultContainer.appendChild(successDiv);
+                // Mark assessment as completed and update the module
+                if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
+                assessmentResults[currentTrainingId][currentThemeId] = score;
+                const assessmentModule = document.getElementById('assessment-module');
+                if (assessmentModule) {
+                    assessmentModule.classList.add('completed');
+                    assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
+                }
+                // Botão para refazer a avaliação (apenas para aprovados)
+                const refazerBtn = document.createElement('button');
+                refazerBtn.id = 'refazer-btn';
+                refazerBtn.textContent = 'Refazer Avaliação';
+                refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+                refazerBtn.style.cssText = `
+                    background-color: #28a745;
+                    color: white;
+                    padding: 10px 15px;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 1em;
+                    font-weight: 600;
+                    transition: background-color 0.3s ease, transform 0.2s ease;
+                    display: block;
+                    margin-top: 10px;
+                `;
+                refazerBtn.addEventListener('mouseenter', () => {
+                    refazerBtn.style.backgroundColor = '#218838';
+                    refazerBtn.style.transform = 'scale(1.05)';
+                });
+                refazerBtn.addEventListener('mouseleave', () => {
+                    refazerBtn.style.backgroundColor = '#28a745';
+                    refazerBtn.style.transform = 'scale(1)';
+                });
+                resultContainer.appendChild(refazerBtn);
+            }
+            resultContainer.style.display = 'flex';
         }
-        // Botão para refazer a avaliação (apenas para aprovados)
-        const refazerBtn = document.createElement('button');
-        refazerBtn.id = 'refazer-btn';
-        refazerBtn.textContent = 'Refazer Avaliação';
-        refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-        refazerBtn.style.cssText = `
-            background-color: #28a745;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            display: block;
-            margin-top: 10px;
-        `;
-        refazerBtn.addEventListener('mouseenter', () => {
-            refazerBtn.style.backgroundColor = '#218838';
-            refazerBtn.style.transform = 'scale(1.05)';
-        });
-        refazerBtn.addEventListener('mouseleave', () => {
-            refazerBtn.style.backgroundColor = '#28a745';
-            refazerBtn.style.transform = 'scale(1)';
-        });
-        resultContainer.appendChild(refazerBtn);
-    }
-    resultContainer.style.display = 'flex';
-}
-
+        
         function showAssessmentResult(score) {
             resetContent();
             // Hide any active media players and content
