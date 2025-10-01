@@ -1688,30 +1688,57 @@
         }
         
         function showAssessmentResult(score) {
-            resetContent();
-            // Hide any active media players and content
-            if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
-                ytPlayer.stopVideo();
-            }
-            customPlayerContainer.style.display = 'none';
-            video.style.display = 'none';
-            video.src = '';
-            pdfContainer.style.display = 'none';
-            titleEl.style.display = 'none';
-            captionEl.style.display = 'none';
-            attachmentContainer.style.display = 'none';
-            
-            resultContainer.innerHTML = '';
-            const h2 = document.createElement('h2');
-            h2.textContent = `Sua nota: ${score}/10`;
-            resultContainer.appendChild(h2);
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
-            resultContainer.appendChild(successDiv);
-            resultContainer.style.display = 'flex';
-        }
-        
+    resetContent();
+    // Hide any active media players and content
+    if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+        ytPlayer.stopVideo();
+    }
+    customPlayerContainer.style.display = 'none';
+    video.style.display = 'none';
+    video.src = '';
+    pdfContainer.style.display = 'none';
+    titleEl.style.display = 'none';
+    captionEl.style.display = 'none';
+    attachmentContainer.style.display = 'none';
+    
+    resultContainer.innerHTML = '';
+    const h2 = document.createElement('h2');
+    h2.textContent = `Sua nota: ${score}/10`;
+    resultContainer.appendChild(h2);
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+    resultContainer.appendChild(successDiv);
+    // Botão para refazer a avaliação (apenas para aprovados)
+    const refazerBtn = document.createElement('button');
+    refazerBtn.id = 'refazer-btn';
+    refazerBtn.textContent = 'Refazer Avaliação';
+    refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+    refazerBtn.style.cssText = `
+        background-color: #28a745;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 600;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+        display: block;
+        margin-top: 10px;
+    `;
+    refazerBtn.addEventListener('mouseenter', () => {
+        refazerBtn.style.backgroundColor = '#218838';
+        refazerBtn.style.transform = 'scale(1.05)';
+    });
+    refazerBtn.addEventListener('mouseleave', () => {
+        refazerBtn.style.backgroundColor = '#28a745';
+        refazerBtn.style.transform = 'scale(1)';
+    });
+    resultContainer.appendChild(refazerBtn);
+    resultContainer.style.display = 'flex';
+}
+
         function resetContent() {
             video.src = '';
             video.style.display = 'none';
