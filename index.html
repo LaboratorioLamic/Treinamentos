@@ -1638,7 +1638,7 @@
             retryBtn.id = 'retry-btn';
             retryBtn.textContent = 'Tentar Novamente';
             retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-            if (score < 7) {
+            if (score < 8) {
                 p.textContent = 'Reprovado. Tente novamente!';
                 resultContainer.appendChild(p);
                 resultContainer.appendChild(retryBtn);
