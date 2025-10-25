@@ -1336,7 +1336,7 @@
             }
             
             function loadPDF(pdfPath) {
-                const baseUrl = '';
+                const baseUrl = 'https://dl.dropboxusercontent.com/s/';
                 const fullUrl = `${baseUrl}${pdfPath}`;
                 fetch(fullUrl, { method: 'HEAD' })
                     .then(response => {
