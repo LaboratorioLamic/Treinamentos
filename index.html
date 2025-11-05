@@ -1649,8 +1649,8 @@ function getDetailedIncorrectAnswers(subjectId, themeId) {
             const correctAnswer = q.options[q.correct];
             errors.push(
                 `${index + 1}) ${q.question}\n: ` +
-                `R: ${userAnswer}\n - ` +
-                `Gabarito: ${correctAnswer}\n` +
+                `;Resposta: ${userAnswer}\n` +
+                `;Gabarito: ${correctAnswer}\n` +
                 `---`
             );
         }
@@ -1746,7 +1746,7 @@ function submitForm(score, erros = '') {
     // Sanitizar erros para envio seguro
     const errosSeguros = erros
         .replace(/\n/g, '')
-        .replace(/---/g, ',');
+        .replace(/---/g, ';');
 
     const data = {
         'dateTime': new Date().toLocaleString('pt-BR'),
@@ -1762,7 +1762,7 @@ function submitForm(score, erros = '') {
 
     console.log("Enviando dados:", data); // DEBUG
 
-    fetch('https://script.google.com/macros/s/AKfycbzPn0EPCunoh1BMh1evnovkGT2_CYqGLM1EKZ-6dT4L7hFM3hNCZD0aamVmpiA5RPwU/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbzks7XbkiFoLJyCptsDht7e6K5ZYODkV3oD8xYm6gfHCxdpCrSivjol2tLIQPcemFat/exec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(data).toString()
