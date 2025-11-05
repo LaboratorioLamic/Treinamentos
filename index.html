@@ -219,78 +219,78 @@
             display: block;
         }
         .player-controls {
-                margin-top: 10px;
-                display: flex;
-                align-items: center;
-                gap: 8px; /* Reduzido para economizar espaço */
-                flex-wrap: nowrap; /* Impede quebras de linha */
-                overflow-x: hidden; /* Evita rolagem horizontal */
-                width: 100%; /* Garante que o contêiner use toda a largura disponível */
-                white-space: nowrap; /* Evita quebras de linha nos elementos filhos */
-                padding: 8px 0; /* Adiciona padding vertical */
-            }
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px; /* Reduzido para economizar espaço */
+            flex-wrap: nowrap; /* Impede quebras de linha */
+            overflow-x: hidden; /* Evita rolagem horizontal */
+            width: 100%; /* Garante que o contêiner use toda a largura disponível */
+            white-space: nowrap; /* Evita quebras de linha nos elementos filhos */
+            padding: 8px 0; /* Adiciona padding vertical */
+        }
 
-            /* Ajuste os botões para tamanhos menores */
-            .player-controls button, .player-controls select {
-                background-color: #1a2b49;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 10px; /* Reduzido para telas menores */
-                cursor: pointer;
-                font-size: clamp(0.7em, 1.8vw, 0.8em); /* Tamanho de fonte reduzido */
-                transition: background-color 0.3s ease, transform 0.2s ease;
-                flex-shrink: 0; /* Impede que botões encolham demais */
-            }
+        /* Ajuste os botões para tamanhos menores */
+        .player-controls button, .player-controls select {
+            background-color: #1a2b49;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px; /* Reduzido para telas menores */
+            cursor: pointer;
+            font-size: clamp(0.7em, 1.8vw, 0.8em); /* Tamanho de fonte reduzido */
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            flex-shrink: 0; /* Impede que botões encolham demais */
+        }
 
-            /* Ajuste o controle de progresso para ocupar espaço restante */
-            .player-controls input[type="range"] {
-                -webkit-appearance: none;
-                appearance: none;
-                height: 6px;
-                border-radius: 3px;
-                background: #e0e6ef;
-                outline: none;
-                flex: 1 1 auto; /* Ocupa espaço restante */
-                min-width: 40px; /* Garante um tamanho mínimo */
-            }
+        /* Ajuste o controle de progresso para ocupar espaço restante */
+        .player-controls input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e6ef;
+            outline: none;
+            flex: 1 1 auto; /* Ocupa espaço restante */
+            min-width: 40px; /* Garante um tamanho mínimo */
+        }
 
-            /* Estilo do thumb do range */
-            .player-controls input[type="range"]::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                width: 12px; /* Reduzido para telas menores */
-                height: 12px;
-                border-radius: 50%;
-                background: #1a2b49;
-                cursor: pointer;
-            }
+        /* Estilo do thumb do range */
+        .player-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; /* Reduzido para telas menores */
+            height: 12px;
+            border-radius: 50%;
+            background: #1a2b49;
+            cursor: pointer;
+        }
 
-            /* Ajuste o controle de volume */
-            .player-controls input#volume-range {
-                width: 30px; /* Reduzido para economizar espaço */
-                min-width: 5px;
-                flex-shrink: 0;
-            }
+        /* Ajuste o controle de volume */
+        .player-controls input#volume-range {
+            width: 30px; /* Reduzido para economizar espaço */
+            min-width: 5px;
+            flex-shrink: 0;
+        }
 
-            /* Ajuste o select de velocidade */
-            .player-controls select#speed-select {
-                max-width: 70px; /* Limita a largura do select */
-                padding: 6px; /* Reduz padding */
-            }
+        /* Ajuste o select de velocidade */
+        .player-controls select#speed-select {
+            max-width: 70px; /* Limita a largura do select */
+            padding: 6px; /* Reduz padding */
+        }
 
-            /* Ajuste o texto de tempo */
-            .time-labels {
-                font-size: clamp(0.7em, 1.8vw, 0.8em); /* Tamanho reduzido */
-                color: #4a5b7a;
-                min-width: 40px; /* Reduzido para economizar espaço */
-                text-align: center;
-                flex-shrink: 0;
-            }
+        /* Ajuste o texto de tempo */
+        .time-labels {
+            font-size: clamp(0.7em, 1.8vw, 0.8em); /* Tamanho reduzido */
+            color: #4a5b7a;
+            min-width: 40px; /* Reduzido para economizar espaço */
+            text-align: center;
+            flex-shrink: 0;
+        }
 
-            /* Elementos apenas para mobile */
-            .mobile-only {
-                display: none;
-            }
+        /* Elementos apenas para mobile */
+        .mobile-only {
+            display: none;
+        }
 
 /* Media query para telas menores (móveis) */
 @media (max-width: 600px) {
@@ -580,18 +580,21 @@
             font-weight: 600;
             color: #1a2b49;
         }
-        .form-container input {
+        .form-container input, .form-container select, .form-container textarea {
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: clamp(0.9em, 2.5vw, 1em);
             transition: border-color 0.3s ease;
+            width: 95%;
+            background: white;
+            cursor: pointer;
         }
-        .form-container input:focus {
+        .form-container input:focus, .form-container select:focus, .form-container textarea:focus {
             border-color: #1a2b49;
             outline: none;
         }
-        .form-container input.invalid {
+        .form-container input.invalid, .form-container select.invalid {
             border-color: #dc3545;
             animation: shake 0.5s ease-in-out;
         }
@@ -712,47 +715,99 @@
         }
 
         .loading-spinner {
-        display: none;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #1a2b49;
-        border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
-}
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1a2b49;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-.form-container select {
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: clamp(0.9em, 2.5vw, 1em);
-    transition: border-color 0.3s ease;
-    width: 100%;
-    background: white;
-    cursor: pointer;
-}
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
-.form-container select:focus {
-    border-color: #1a2b49;
-    outline: none;
-}
+        /* Estrelas de avaliação */
+        .rating-container {
+            margin: 15px 0;
+            text-align: center;
+        }
+        .rating-container label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .star-rating {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            direction: rtl;
+            unicode-bidi: bidi-override;
+        }
+        .star-rating input {
+            display: none;
+        }
+        .star-rating label {
+            font-size: 1.8em;
+            color: #ddd;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .star-rating label:hover,
+        .star-rating label:hover ~ label,
+        .star-rating input:checked ~ label {
+            color: #ffc107;
+        }
+        .star-rating input:checked ~ label {
+            color: #ffc107;
+        }
 
-.form-container select.invalid {
-    border-color: #dc3545;
-    animation: shake 0.5s ease-in-out;
-}
+        /* Botão de comentário */
+        .comment-toggle-btn {
+            background-color: #f8f9fa;
+            color: #1a2b49;
+            border: 1px solid #1a2b49;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+        .comment-toggle-btn:hover {
+            background-color: #1a2b49;
+            color: white;
+        }
 
-/* Ajuste para telas menores, se necessário */
-@media (max-width: 600px) {
-    .form-container select {
-        font-size: clamp(0.8em, 2vw, 0.9em);
-    }
-}
+        /* Campo de comentário */
+        .comment-section {
+            display: none;
+            margin-top: 15px;
+            animation: fadeIn 0.4s ease;
+        }
+        .comment-section textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .comment-section label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            .star-rating label {
+                font-size: 1.5em;
+            }
+        }
     </style>
 </head>
 <body>
@@ -826,6 +881,28 @@
                     </select>
                     <label for="email">Email</label>
                     <input type="email" id="email" placeholder="Digite seu email">
+
+                    <!-- Avaliação com estrelas (apenas se aprovado) -->
+                    <div class="rating-container" id="rating-container" style="display: none;">
+                        <label>Avalie o Curso:</label>
+                        <div class="star-rating">
+                            <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 estrelas">★</label>
+                            <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 estrelas">★</label>
+                            <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 estrelas">★</label>
+                            <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 estrelas">★</label>
+                            <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 estrela">★</label>
+                        </div>
+                    </div>
+
+                    <!-- Botão para abrir comentário -->
+                    <button type="button" class="comment-toggle-btn" id="comment-toggle-btn" style="display: none;">Deixe um Comentário</button>
+
+                    <!-- Seção de comentário -->
+                    <div class="comment-section" id="comment-section" style="display: none;">
+                        <label for="comment">Deixe sua crítica, elogio ou sugestões abaixo:</label>
+                        <textarea id="comment" placeholder="Escreva aqui... (opcional)"></textarea>
+                    </div>
+
                     <button id="submit-form">Enviar</button>
                     <div id="loading-spinner" class="loading-spinner"></div>
                 </div>
@@ -841,729 +918,725 @@
 
     <script>
         // Variáveis globais para armazenar os dados do JSONBin
-            let trainingData = {};
-            let quizData = {};
-            
-            let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
-            
-            // Função para buscar nomes da planilha (Google Apps Script)
-            async function fetchNames() {
-                const url = 'https://script.google.com/macros/s/AKfycbzUd6efhfzkCmYd88_eIIL6dGIQxIINsw-6Y_qM3PRemUbZ06obtF9xKY1S8WRfvXyq9Q/exec';
-                try {
-                    const response = await fetch(url);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    const names = await response.json();
-                    nameOptions = names; // Armazena globalmente
-                    const select = document.getElementById('name');
-                    if (select) {
-                        names.forEach(name => {
-                            const option = document.createElement('option');
-                            option.value = name;
-                            option.textContent = name;
-                            select.appendChild(option);
-                        });
-                    }
-                } catch (error) {
-                    console.error('Erro ao carregar nomes da planilha:', error);
+        let trainingData = {};
+        let quizData = {};
+        
+        let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
+        
+        // Função para buscar nomes da planilha (Google Apps Script)
+        async function fetchNames() {
+            const url = 'https://script.google.com/macros/s/AKfycbzUd6efhfzkCmYd88_eIIL6dGIQxIINsw-6Y_qM3PRemUbZ06obtF9xKY1S8WRfvXyq9Q/exec';
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
+                const names = await response.json();
+                nameOptions = names; // Armazena globalmente
+                const select = document.getElementById('name');
+                if (select) {
+                    names.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar nomes da planilha:', error);
             }
-            
-            // Função para buscar dados do JSONBin
-            async function fetchJSONBinData() {
-                const binId = '68d7d3e5ae596e708ffdae68';
-                const masterKey = '$2a$10$2elKW8TT6o.K3V176efqwu7kOfD1PnS3D/F0s4Tczc3MYmaU.N1bi';
-                const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
-            
-                try {
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'X-Master-Key': masterKey
+        }
+        
+        // Função para buscar dados do JSONBin
+        async function fetchJSONBinData() {
+            const binId = '68d7d3e5ae596e708ffdae68';
+            const masterKey = '$2a$10$2elKW8TT6o.K3V176efqwu7kOfD1PnS3D/F0s4Tczc3MYmaU.N1bi';
+            const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
+        
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': masterKey
+                    }
+                });
+        
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+        
+                const data = await response.json();
+                trainingData = data.record.trainingData || {};
+                quizData = data.record.quizData || {};
+                populateDropdown();
+                // Load saved progression from localStorage after fetching data
+                loadProgression();
+            } catch (error) {
+                console.error('Erro ao carregar dados do JSONBin:', error);
+                showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
+            }
+        }
+        
+        const btn = document.getElementById('dropdownBtn');
+        const dropdownContent = document.getElementById('dropdownContent');
+        const dropdownList = document.getElementById('dropdownList');
+        const themeBtn = document.getElementById('themeBtn');
+        const themeDropdown = document.getElementById('themeDropdown');
+        const themeDropdownContent = document.getElementById('themeDropdownContent');
+        const themeDropdownList = document.getElementById('themeDropdownList');
+        const contentDiv = document.getElementById('content');
+        const video = document.getElementById('video');
+        const customPlayerContainer = document.getElementById('custom-player');
+        const ytFrameContainer = document.getElementById('yt-frame');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const muteBtn = document.getElementById('mute-btn');
+        const progressRange = document.getElementById('progress-range');
+        const volumeRange = document.getElementById('volume-range');
+        const speedSelect = document.getElementById('speed-select');
+        const timeLabels = document.getElementById('time-labels');
+        const pdfContainer = document.getElementById('pdf-container');
+        const pdfCanvas = document.getElementById('pdf-canvas');
+        const pdfNavigation = document.getElementById('pdf-navigation');
+        const titleEl = document.getElementById('title');
+        const captionEl = document.getElementById('caption');
+        const attachmentContainer = document.getElementById('attachment-container');
+        const modulesDiv = document.getElementById('modules');
+        const quizContainer = document.getElementById('quiz-container');
+        const resultContainer = document.getElementById('result-container');
+        const formContainer = document.getElementById('form-container');
+        const warningMessage = document.getElementById('warning-message');
+        const warningText = document.getElementById('warning-text');
+        const quizSubmit = document.createElement('button');
+        quizSubmit.id = 'quiz-submit';
+        quizSubmit.textContent = 'Enviar Avaliação';
+        
+        let currentTrainingId = null;
+        let currentThemeId = null;
+        let selectedAnswers = {};
+        let pdfDoc = null;
+        let currentPage = 1;
+        let totalPages = 0;
+        let ytPlayer = null;
+        let progressTimer = null;
+        let currentModuleIndex = null;
+        const completionStatus = {};
+        let currentVideoId = null;
+        let assessmentResults = {};
+        
+        // Load progression from localStorage
+        function loadProgression() {
+            const savedCompletion = localStorage.getItem('completionStatus');
+            const savedAssessments = localStorage.getItem('assessmentResults');
+            if (savedCompletion) {
+                Object.assign(completionStatus, JSON.parse(savedCompletion));
+            }
+            if (savedAssessments) {
+                Object.assign(assessmentResults, JSON.parse(savedAssessments));
+            }
+        }
+        
+        // Save progression to localStorage
+        function saveProgression() {
+            localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
+            localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
+        }
+        
+        // Reset course progression
+        function resetCourseProgression() {
+            if (currentTrainingId && currentThemeId) {
+                if (completionStatus[currentTrainingId]) {
+                    delete completionStatus[currentTrainingId][currentThemeId];
+                    if (Object.keys(completionStatus[currentTrainingId]).length === 0) {
+                        delete completionStatus[currentTrainingId];
+                    }
+                }
+                if (assessmentResults[currentTrainingId]) {
+                    delete assessmentResults[currentTrainingId][currentThemeId];
+                    if (Object.keys(assessmentResults[currentTrainingId]).length === 0) {
+                        delete assessmentResults[currentTrainingId];
+                    }
+                }
+                saveProgression();
+                loadTraining(currentTrainingId, currentThemeId); // Reload the current training to reflect reset
+                showWarning('Progressão do curso reiniciada com sucesso.');
+            }
+        }
+        
+        function loadYouTubeAPI() {
+            return new Promise((resolve) => {
+                if (window.YT && window.YT.Player) {
+                    resolve();
+                    return;
+                }
+                const tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                window.onYouTubeIframeAPIReady = () => resolve();
+            });
+        }
+        
+        function formatTime(seconds) {
+            seconds = Math.max(0, Math.floor(seconds || 0));
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+        
+        function initOrLoadVideo(videoId) {
+            loadYouTubeAPI().then(() => {
+                customPlayerContainer.style.display = 'block';
+                video.style.display = 'none';
+                currentVideoId = videoId;
+                if (!ytPlayer) {
+                    ytPlayer = new YT.Player('yt-frame', {
+                        height: '390',
+                        width: '640',
+                        videoId: videoId,
+                        playerVars: {
+                            controls: 0,
+                            modestbranding: 1,
+                            rel: 0,
+                            fs: 1,
+                            iv_load_policy: 3
+                        },
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
                         }
                     });
-            
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-            
-                    const data = await response.json();
-                    trainingData = data.record.trainingData || {};
-                    quizData = data.record.quizData || {};
-                    populateDropdown();
-                    // Load saved progression from localStorage after fetching data
-                    loadProgression();
-                } catch (error) {
-                    console.error('Erro ao carregar dados do JSONBin:', error);
-                    showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
+                } else {
+                    ytPlayer.cueVideoById(videoId);
+                }
+            });
+        }
+        
+        function onPlayerReady() {
+            bindControls();
+            updateTimeUI();
+            const ytInnerIframe = document.querySelector('#yt-frame iframe');
+            if (ytInnerIframe) {
+                ytInnerIframe.setAttribute('allowfullscreen', '');
+                const currentAllow = ytInnerIframe.getAttribute('allow') || '';
+                if (!/fullscreen/i.test(currentAllow)) {
+                    ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
                 }
             }
-            
-            const btn = document.getElementById('dropdownBtn');
-            const dropdownContent = document.getElementById('dropdownContent');
-            const dropdownList = document.getElementById('dropdownList');
-            const themeBtn = document.getElementById('themeBtn');
-            const themeDropdown = document.getElementById('themeDropdown');
-            const themeDropdownContent = document.getElementById('themeDropdownContent');
-            const themeDropdownList = document.getElementById('themeDropdownList');
-            const contentDiv = document.getElementById('content');
-            const video = document.getElementById('video');
-            const customPlayerContainer = document.getElementById('custom-player');
-            const ytFrameContainer = document.getElementById('yt-frame');
-            const playPauseBtn = document.getElementById('play-pause-btn');
-            const muteBtn = document.getElementById('mute-btn');
-            const progressRange = document.getElementById('progress-range');
-            const volumeRange = document.getElementById('volume-range');
-            const speedSelect = document.getElementById('speed-select');
-            const timeLabels = document.getElementById('time-labels');
-            const cinemaBtn = document.getElementById('cinema-btn');
-            const pdfContainer = document.getElementById('pdf-container');
-            const pdfCanvas = document.getElementById('pdf-canvas');
-            const pdfNavigation = document.getElementById('pdf-navigation');
-            const titleEl = document.getElementById('title');
-            const captionEl = document.getElementById('caption');
-            const attachmentContainer = document.getElementById('attachment-container');
-            const modulesDiv = document.getElementById('modules');
-            const quizContainer = document.getElementById('quiz-container');
-            const resultContainer = document.getElementById('result-container');
-            const formContainer = document.getElementById('form-container');
-            const warningMessage = document.getElementById('warning-message');
-            const warningText = document.getElementById('warning-text');
-            const quizSubmit = document.createElement('button');
-            quizSubmit.id = 'quiz-submit';
-            quizSubmit.textContent = 'Enviar Avaliação';
-            
-            let currentTrainingId = null;
-            let currentThemeId = null;
-            let selectedAnswers = {};
-            let pdfDoc = null;
-            let currentPage = 1;
-            let totalPages = 0;
-            let ytPlayer = null;
-            let progressTimer = null;
-            let currentModuleIndex = null;
-            const completionStatus = {};
-            let currentVideoId = null;
-            let assessmentResults = {};
-            
-            // Load progression from localStorage
-            function loadProgression() {
-                const savedCompletion = localStorage.getItem('completionStatus');
-                const savedAssessments = localStorage.getItem('assessmentResults');
-                if (savedCompletion) {
-                    Object.assign(completionStatus, JSON.parse(savedCompletion));
-                }
-                if (savedAssessments) {
-                    Object.assign(assessmentResults, JSON.parse(savedAssessments));
+        }
+        
+        function onPlayerStateChange(event) {
+            const YT_STATE = window.YT.PlayerState;
+            if (event.data === YT_STATE.PLAYING) {
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                startProgressTimer();
+            } else if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                stopProgressTimer();
+                if (event.data === YT_STATE.ENDED) {
+                    progressRange.value = 100;
+                    updateTimeUI();
+                    markCurrentModuleCompleted();
                 }
             }
-            
-            // Save progression to localStorage
-            function saveProgression() {
-                localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
-                localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
-            }
-            
-            // Reset course progression
-            function resetCourseProgression() {
-                if (currentTrainingId && currentThemeId) {
-                    if (completionStatus[currentTrainingId]) {
-                        delete completionStatus[currentTrainingId][currentThemeId];
-                        if (Object.keys(completionStatus[currentTrainingId]).length === 0) {
-                            delete completionStatus[currentTrainingId];
+        }
+        
+        function markCurrentModuleCompleted() {
+            if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                const theme = trainingData[currentTrainingId].themes[currentThemeId];
+                if (!theme) return;
+                if (!completionStatus[currentTrainingId]) completionStatus[currentTrainingId] = {};
+                if (!completionStatus[currentTrainingId][currentThemeId]) completionStatus[currentTrainingId][currentThemeId] = [];
+                if (!completionStatus[currentTrainingId][currentThemeId][currentModuleIndex]) {
+                    completionStatus[currentTrainingId][currentThemeId][currentModuleIndex] = true;
+                    saveProgression(); // Save to localStorage
+                    const moduleTiles = modulesDiv.querySelectorAll('.module');
+                    const tile = moduleTiles[currentModuleIndex];
+                    if (tile) {
+                        tile.innerHTML = renderModuleTitle(theme.modules[currentModuleIndex].title, true);
+                        tile.classList.add('completed');
+                        if (progressRange) {
+                            progressRange.disabled = false;
                         }
                     }
-                    if (assessmentResults[currentTrainingId]) {
-                        delete assessmentResults[currentTrainingId][currentThemeId];
-                        if (Object.keys(assessmentResults[currentTrainingId]).length === 0) {
-                            delete assessmentResults[currentTrainingId];
-                        }
-                    }
-                    saveProgression();
-                    loadTraining(currentTrainingId, currentThemeId); // Reload the current training to reflect reset
-                    showWarning('Progressão do curso reiniciada com sucesso.');
                 }
             }
-            
-            function loadYouTubeAPI() {
-                return new Promise((resolve) => {
-                    if (window.YT && window.YT.Player) {
-                        resolve();
+        }
+        
+        function bindControls() {
+            playPauseBtn.onclick = () => {
+                if (!ytPlayer) return;
+                const state = ytPlayer.getPlayerState();
+                const YT_STATE = window.YT.PlayerState;
+                if (state !== YT_STATE.PLAYING) ytPlayer.playVideo(); else ytPlayer.pauseVideo();
+            };
+            muteBtn.onclick = () => {
+                if (!ytPlayer) return;
+                if (ytPlayer.isMuted()) { ytPlayer.unMute(); muteBtn.innerHTML = '<i class="fas fa-volume-high"></i>'; } else { ytPlayer.mute(); muteBtn.innerHTML = '<i class="fas fa-volume-xmark"></i>'; }
+            };
+            volumeRange.oninput = () => {
+                if (!ytPlayer) return;
+                ytPlayer.setVolume(parseInt(volumeRange.value, 10));
+                if (ytPlayer.isMuted() && parseInt(volumeRange.value, 10) > 0) {
+                    ytPlayer.unMute();
+                    muteBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
+                }
+            };
+            progressRange.oninput = () => {
+                if (!ytPlayer) return;
+                if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                        showWarning('Você deve assistir o vídeo inteiro antes de avançar.');
+                        progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
                         return;
                     }
-                    const tag = document.createElement('script');
-                    tag.src = 'https://www.youtube.com/iframe_api';
-                    const firstScriptTag = document.getElementsByTagName('script')[0];
-                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-                    window.onYouTubeIframeAPIReady = () => resolve();
-                });
-            }
-            
-            function formatTime(seconds) {
-                seconds = Math.max(0, Math.floor(seconds || 0));
-                const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-                const s = (seconds % 60).toString().padStart(2, '0');
-                return `${m}:${s}`;
-            }
-            
-            function initOrLoadVideo(videoId) {
-                loadYouTubeAPI().then(() => {
-                    customPlayerContainer.style.display = 'block';
-                    video.style.display = 'none';
-                    currentVideoId = videoId;
-                    if (!ytPlayer) {
-                        ytPlayer = new YT.Player('yt-frame', {
-                            height: '390',
-                            width: '640',
-                            videoId: videoId,
-                            playerVars: {
-                                controls: 0,
-                                modestbranding: 1,
-                                rel: 0,
-                                fs: 1,
-                                iv_load_policy: 3
-                            },
-                            events: {
-                                'onReady': onPlayerReady,
-                                'onStateChange': onPlayerStateChange
-                            }
-                        });
-                    } else {
-                        ytPlayer.cueVideoById(videoId);
-                    }
-                });
-            }
-            
-            function onPlayerReady() {
-                bindControls();
+                }
+                const duration = ytPlayer.getDuration() || 0;
+                const seekTo = (parseFloat(progressRange.value) / 100) * duration;
+                ytPlayer.seekTo(seekTo, true);
                 updateTimeUI();
-                const ytInnerIframe = document.querySelector('#yt-frame iframe');
-                if (ytInnerIframe) {
-                    ytInnerIframe.setAttribute('allowfullscreen', '');
-                    const currentAllow = ytInnerIframe.getAttribute('allow') || '';
-                    if (!/fullscreen/i.test(currentAllow)) {
-                        ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
-                    }
-                }
-            }
-            
-            function onPlayerStateChange(event) {
-                const YT_STATE = window.YT.PlayerState;
-                if (event.data === YT_STATE.PLAYING) {
-                    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                    startProgressTimer();
-                } else if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
-                    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    stopProgressTimer();
-                    if (event.data === YT_STATE.ENDED) {
-                        progressRange.value = 100;
-                        updateTimeUI();
-                        markCurrentModuleCompleted();
-                    }
-                }
-            }
-            
-            function markCurrentModuleCompleted() {
-                if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
-                    const theme = trainingData[currentTrainingId].themes[currentThemeId];
-                    if (!theme) return;
-                    if (!completionStatus[currentTrainingId]) completionStatus[currentTrainingId] = {};
-                    if (!completionStatus[currentTrainingId][currentThemeId]) completionStatus[currentTrainingId][currentThemeId] = [];
-                    if (!completionStatus[currentTrainingId][currentThemeId][currentModuleIndex]) {
-                        completionStatus[currentTrainingId][currentThemeId][currentModuleIndex] = true;
-                        saveProgression(); // Save to localStorage
-                        const moduleTiles = modulesDiv.querySelectorAll('.module');
-                        const tile = moduleTiles[currentModuleIndex];
-                        if (tile) {
-                            tile.innerHTML = renderModuleTitle(theme.modules[currentModuleIndex].title, true);
-                            tile.classList.add('completed');
-                            if (progressRange) {
-                                progressRange.disabled = false;
-                            }
+            };
+            speedSelect.onchange = () => {
+                if (!ytPlayer) return;
+                ytPlayer.setPlaybackRate(parseFloat(speedSelect.value));
+            };
+            const fullscreenBtn = document.getElementById('fullscreen-btn');
+            if (fullscreenBtn) {
+                fullscreenBtn.onclick = () => {
+                    const container = document.getElementById('custom-player');
+                    const iframe = document.querySelector('#yt-frame iframe');
+                    const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || container.classList.contains('is-fullscreen'));
+                    if (!isFs) {
+                        const req = container.requestFullscreen || container.webkitRequestFullscreen || container.mozRequestFullScreen || container.msRequestFullscreen;
+                        if (req) {
+                            req.call(container).catch(() => {
+                                if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
+                            });
+                        } else if (iframe && iframe.requestFullscreen) {
+                            iframe.requestFullscreen();
+                        } else {
+                            container.classList.add('is-fullscreen');
                         }
+                        fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+                    } else {
+                        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+                        if (exit) {
+                            exit.call(document);
+                        }
+                        container.classList.remove('is-fullscreen');
+                        fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
                     }
-                }
+                };
+                document.addEventListener('fullscreenchange', () => {
+                    const fullscreenBtn = document.getElementById('fullscreen-btn');
+                    if (!fullscreenBtn) return;
+                    const active = !!document.fullscreenElement;
+                    fullscreenBtn.innerHTML = active ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+                });
             }
-            
-            function bindControls() {
-                playPauseBtn.onclick = () => {
-                    if (!ytPlayer) return;
-                    const state = ytPlayer.getPlayerState();
-                    const YT_STATE = window.YT.PlayerState;
-                    if (state !== YT_STATE.PLAYING) ytPlayer.playVideo(); else ytPlayer.pauseVideo();
+        }
+        
+        function startProgressTimer() {
+            stopProgressTimer();
+            progressTimer = setInterval(() => {
+                if (!ytPlayer) return;
+                const current = ytPlayer.getCurrentTime() || 0;
+                const duration = ytPlayer.getDuration() || 0;
+                if (duration > 0) {
+                    progressRange.value = (current / duration) * 100;
+                }
+                updateTimeUI();
+            }, 250);
+        }
+        
+        function stopProgressTimer() {
+            if (progressTimer) {
+                clearInterval(progressTimer);
+                progressTimer = null;
+            }
+        }
+        
+        function updateTimeUI() {
+            if (!ytPlayer) { timeLabels.textContent = '00:00 / 00:00'; return; }
+            const current = ytPlayer.getCurrentTime() || 0;
+            const duration = ytPlayer.getDuration() || 0;
+            timeLabels.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+        }
+        
+        window.onload = () => {
+            warningMessage.style.display = 'none';
+            resetContent();
+            fetchJSONBinData();
+            fetchNames();
+            themeDropdownContent.style.display = 'none';
+            themeDropdownList.innerHTML = '';
+            themeBtn.textContent = 'Escolha um Assunto';
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+            // Botão de comentário
+            const commentToggleBtn = document.getElementById('comment-toggle-btn');
+            const commentSection = document.getElementById('comment-section');
+            if (commentToggleBtn) {
+                commentToggleBtn.onclick = () => {
+                    const isVisible = commentSection.style.display === 'block';
+                    commentSection.style.display = isVisible ? 'none' : 'block';
+                    commentToggleBtn.textContent = isVisible ? 'Deixe um Comentário' : 'Fechar Comentário';
                 };
-                muteBtn.onclick = () => {
-                    if (!ytPlayer) return;
-                    if (ytPlayer.isMuted()) { ytPlayer.unMute(); muteBtn.innerHTML = '<i class="fas fa-volume-high"></i>'; } else { ytPlayer.mute(); muteBtn.innerHTML = '<i class="fas fa-volume-xmark"></i>'; }
+            }
+        };
+        
+        function populateDropdown() {
+            dropdownList.innerHTML = '';
+            Object.keys(trainingData).forEach(subjectId => {
+                const subject = trainingData[subjectId];
+                const subjectLi = document.createElement('li');
+                subjectLi.className = 'subject';
+                subjectLi.dataset.subjectId = subjectId;
+                subjectLi.textContent = subject.name;
+                subjectLi.onclick = (e) => {
+                    e.stopPropagation();
+                    btn.textContent = subject.name;
+                    dropdownContent.style.display = 'none';
+                    currentTrainingId = subjectId;
+                    populateThemeDropdown(subjectId);
+                    themeBtn.textContent = 'Escolha um Assunto';
+                    contentDiv.style.display = 'none';
+                    resetContent();
                 };
-                volumeRange.oninput = () => {
-                    if (!ytPlayer) return;
-                    ytPlayer.setVolume(parseInt(volumeRange.value, 10));
-                    if (ytPlayer.isMuted() && parseInt(volumeRange.value, 10) > 0) {
-                        ytPlayer.unMute();
-                        muteBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
-                    }
+                dropdownList.appendChild(subjectLi);
+            });
+        }
+        
+        function populateThemeDropdown(subjectId) {
+            themeDropdownList.innerHTML = '';
+            const themes = trainingData[subjectId].themes;
+            Object.keys(themes).forEach(themeId => {
+                const theme = themes[themeId];
+                const themeLi = document.createElement('li');
+                themeLi.className = 'theme';
+                themeLi.dataset.themeId = themeId;
+                themeLi.textContent = theme.name;
+                themeLi.onclick = (e) => {
+                    e.stopPropagation();
+                    themeBtn.textContent = theme.name;
+                    themeDropdownContent.style.display = 'none';
+                    loadTraining(subjectId, themeId);
                 };
-                progressRange.oninput = () => {
-                    if (!ytPlayer) return;
+                themeDropdownList.appendChild(themeLi);
+            });
+        }
+        
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+        
+        document.getElementById('email').addEventListener('input', function() {
+            const emailInput = this;
+            if (!validateEmail(emailInput.value)) {
+                emailInput.classList.add('invalid');
+            } else {
+                emailInput.classList.remove('invalid');
+            }
+        });
+        
+        function showWarning(message) {
+            warningText.textContent = message;
+            warningMessage.style.display = 'flex';
+            setTimeout(() => {
+                warningMessage.style.display = 'none';
+            }, 3000);
+        }
+        
+        function renderPage(pageNum) {
+            pdfDoc.getPage(pageNum).then(page => {
+                const viewport = page.getViewport({ scale: 1.5 });
+                pdfCanvas.height = viewport.height;
+                pdfCanvas.width = viewport.width;
+                const context = pdfCanvas.getContext('2d');
+                page.render({ canvasContext: context, viewport: viewport });
+                currentPage = pageNum;
+                renderPagination();
+                if (currentPage === totalPages) {
+                    markCurrentModuleCompleted();
+                }
+            });
+        }
+        
+        function renderPagination() {
+            pdfNavigation.innerHTML = '';
+            const maxButtons = 3;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+        
+            const firstBtn = document.createElement('button');
+            firstBtn.innerHTML = '<i class="fas fa-fast-backward"></i>';
+            firstBtn.disabled = currentPage === 1;
+            firstBtn.onclick = () => {
+                if (currentPage !== 1) {
+                    renderPage(1);
+                }
+            };
+            pdfNavigation.appendChild(firstBtn);
+        
+            for (let i = startPage; i <= endPage; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = i === currentPage ? 'active' : '';
+                btn.onclick = () => renderPage(i);
+                pdfNavigation.appendChild(btn);
+            }
+        
+            const lastBtn = document.createElement('button');
+            lastBtn.innerHTML = '<i class="fas fa-fast-forward"></i>';
+            lastBtn.disabled = currentPage === totalPages || 
+                (currentTrainingId && currentThemeId != null && currentModuleIndex != null && 
+                !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]);
+            lastBtn.onclick = () => {
+                if (currentPage !== totalPages) {
                     if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
                         if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
-                            showWarning('Você deve assistir o vídeo inteiro antes de avançar.');
-                            progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
+                            showWarning('Você deve visualizar todas as páginas antes de usar o atalho para a última.');
                             return;
                         }
                     }
-                    const duration = ytPlayer.getDuration() || 0;
-                    const seekTo = (parseFloat(progressRange.value) / 100) * duration;
-                    ytPlayer.seekTo(seekTo, true);
-                    updateTimeUI();
-                };
-                speedSelect.onchange = () => {
-                    if (!ytPlayer) return;
-                    ytPlayer.setPlaybackRate(parseFloat(speedSelect.value));
-                };
-                const fullscreenBtn = document.getElementById('fullscreen-btn');
-                if (fullscreenBtn) {
-                    fullscreenBtn.onclick = () => {
-                        const container = document.getElementById('custom-player');
-                        const iframe = document.querySelector('#yt-frame iframe');
-                        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || container.classList.contains('is-fullscreen'));
-                        if (!isFs) {
-                            const req = container.requestFullscreen || container.webkitRequestFullscreen || container.mozRequestFullScreen || container.msRequestFullscreen;
-                            if (req) {
-                                req.call(container).catch(() => {
-                                    if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
-                                });
-                            } else if (iframe && iframe.requestFullscreen) {
-                                iframe.requestFullscreen();
-                            } else {
-                                container.classList.add('is-fullscreen');
-                            }
-                            fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
-                        } else {
-                            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
-                            if (exit) {
-                                exit.call(document);
-                            }
-                            container.classList.remove('is-fullscreen');
-                            fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-                        }
-                    };
-                    document.addEventListener('fullscreenchange', () => {
-                        const fullscreenBtn = document.getElementById('fullscreen-btn');
-                        if (!fullscreenBtn) return;
-                        const active = !!document.fullscreenElement;
-                        fullscreenBtn.innerHTML = active ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
-                    });
+                    renderPage(totalPages);
                 }
-                if (cinemaBtn) {
-                    cinemaBtn.onclick = () => {
-                        const isActive = document.body.classList.toggle('cinema-active');
-                        cinemaBtn.innerHTML = isActive ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-                    };
-                    const cinemaOverlay = document.getElementById('cinema-overlay');
-                    if (cinemaOverlay) {
-                        cinemaOverlay.onclick = () => {
-                            document.body.classList.remove('cinema-active');
-                            cinemaBtn.innerHTML = '<i class="fas fa-moon"></i>';
-                        };
+            };
+            pdfNavigation.appendChild(lastBtn);
+        }
+        
+        function loadPDF(pdfPath) {
+            const baseUrl = 'https://dl.dropboxusercontent.com/s/';
+            const fullUrl = `${baseUrl}${pdfPath}`;
+            fetch(fullUrl, { method: 'HEAD' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                }
+                    return pdfjsLib.getDocument(fullUrl).promise;
+                })
+                .then(doc => {
+                    pdfDoc = doc;
+                    totalPages = doc.numPages;
+                    currentPage = 1;
+                    renderPage(currentPage);
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar PDF:', error);
+                    showWarning('Não foi possível carregar o PDF. Verifique se o arquivo existe e é acessível.');
+                });
+        }
+        
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+        };
+        
+        themeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (!currentTrainingId) {
+                showWarning('Selecione o Tema.');
+                return;
             }
-            
-            function startProgressTimer() {
-                stopProgressTimer();
-                progressTimer = setInterval(() => {
-                    if (!ytPlayer) return;
-                    const current = ytPlayer.getCurrentTime() || 0;
-                    const duration = ytPlayer.getDuration() || 0;
-                    if (duration > 0) {
-                        progressRange.value = (current / duration) * 100;
-                    }
-                    updateTimeUI();
-                }, 250);
+            themeDropdownContent.style.display = themeDropdownContent.style.display === 'block' ? 'none' : 'block';
+        };
+        
+        document.addEventListener('click', (e) => {
+            if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) {
+                dropdownContent.style.display = 'none';
             }
-            
-            function stopProgressTimer() {
-                if (progressTimer) {
-                    clearInterval(progressTimer);
-                    progressTimer = null;
-                }
-            }
-            
-            function updateTimeUI() {
-                if (!ytPlayer) { timeLabels.textContent = '00:00 / 00:00'; return; }
-                const current = ytPlayer.getCurrentTime() || 0;
-                const duration = ytPlayer.getDuration() || 0;
-                timeLabels.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
-            }
-            
-            window.onload = () => {
-                warningMessage.style.display = 'none';
-                resetContent();
-                fetchJSONBinData();
-                fetchNames();
+            if (!themeBtn.contains(e.target) && !themeDropdownContent.contains(e.target)) {
                 themeDropdownContent.style.display = 'none';
-                themeDropdownList.innerHTML = '';
-                themeBtn.textContent = 'Escolha um Assunto';
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
-            };
-            
-            function populateDropdown() {
-                dropdownList.innerHTML = '';
-                Object.keys(trainingData).forEach(subjectId => {
-                    const subject = trainingData[subjectId];
-                    const subjectLi = document.createElement('li');
-                    subjectLi.className = 'subject';
-                    subjectLi.dataset.subjectId = subjectId;
-                    subjectLi.textContent = subject.name;
-                    subjectLi.onclick = (e) => {
-                        e.stopPropagation();
-                        btn.textContent = subject.name;
-                        dropdownContent.style.display = 'none';
-                        currentTrainingId = subjectId;
-                        populateThemeDropdown(subjectId);
-                        themeBtn.textContent = 'Escolha um Assunto';
-                        contentDiv.style.display = 'none';
-                        resetContent();
-                    };
-                    dropdownList.appendChild(subjectLi);
-                });
             }
-            
-            function populateThemeDropdown(subjectId) {
-                themeDropdownList.innerHTML = '';
-                const themes = trainingData[subjectId].themes;
-                Object.keys(themes).forEach(themeId => {
-                    const theme = themes[themeId];
-                    const themeLi = document.createElement('li');
-                    themeLi.className = 'theme';
-                    themeLi.dataset.themeId = themeId;
-                    themeLi.textContent = theme.name;
-                    themeLi.onclick = (e) => {
-                        e.stopPropagation();
-                        themeBtn.textContent = theme.name;
-                        themeDropdownContent.style.display = 'none';
-                        loadTraining(subjectId, themeId);
-                    };
-                    themeDropdownList.appendChild(themeLi);
-                });
+        });
+        
+        function loadTraining(subjectId, themeId) {
+            if (!subjectId || !themeId) return;
+            currentTrainingId = subjectId;
+            currentThemeId = themeId;
+            const theme = trainingData[subjectId].themes[themeId];
+            if (!theme) return;
+            contentDiv.style.display = 'block';
+            if (!completionStatus[subjectId]) completionStatus[subjectId] = {};
+            if (!completionStatus[subjectId][themeId] || completionStatus[subjectId][themeId].length !== theme.modules.length) {
+                completionStatus[subjectId][themeId] = new Array(theme.modules.length).fill(false);
+                saveProgression();
             }
-            
-            function validateEmail(email) {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                return emailRegex.test(email);
-            }
-            
-            document.getElementById('email').addEventListener('input', function() {
-                const emailInput = this;
-                if (!validateEmail(emailInput.value)) {
-                    emailInput.classList.add('invalid');
-                } else {
-                    emailInput.classList.remove('invalid');
-                }
-            });
-            
-            function showWarning(message) {
-                warningText.textContent = message;
-                warningMessage.style.display = 'flex';
-                setTimeout(() => {
-                    warningMessage.style.display = 'none';
-                }, 3000);
-            }
-            
-            function renderPage(pageNum) {
-                pdfDoc.getPage(pageNum).then(page => {
-                    const viewport = page.getViewport({ scale: 1.5 });
-                    pdfCanvas.height = viewport.height;
-                    pdfCanvas.width = viewport.width;
-                    const context = pdfCanvas.getContext('2d');
-                    page.render({ canvasContext: context, viewport: viewport });
-                    currentPage = pageNum;
-                    renderPagination();
-                    if (currentPage === totalPages) {
-                        markCurrentModuleCompleted();
-                    }
-                });
-            }
-            
-            function renderPagination() {
-                pdfNavigation.innerHTML = '';
-                const maxButtons = 3;
-                let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-            
-                if (endPage - startPage + 1 < maxButtons) {
-                    startPage = Math.max(1, endPage - maxButtons + 1);
-                }
-            
-                const firstBtn = document.createElement('button');
-                firstBtn.innerHTML = '<i class="fas fa-fast-backward"></i>';
-                firstBtn.disabled = currentPage === 1;
-                firstBtn.onclick = () => {
-                    if (currentPage !== 1) {
-                        renderPage(1);
-                    }
-                };
-                pdfNavigation.appendChild(firstBtn);
-            
-                for (let i = startPage; i <= endPage; i++) {
-                    const btn = document.createElement('button');
-                    btn.textContent = i;
-                    btn.className = i === currentPage ? 'active' : '';
-                    btn.onclick = () => renderPage(i);
-                    pdfNavigation.appendChild(btn);
-                }
-            
-                const lastBtn = document.createElement('button');
-                lastBtn.innerHTML = '<i class="fas fa-fast-forward"></i>';
-                lastBtn.disabled = currentPage === totalPages || 
-                    (currentTrainingId && currentThemeId != null && currentModuleIndex != null && 
-                    !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]);
-                lastBtn.onclick = () => {
-                    if (currentPage !== totalPages) {
-                        if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
-                            if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
-                                showWarning('Você deve visualizar todas as páginas antes de usar o atalho para a última.');
-                                return;
-                            }
-                        }
-                        renderPage(totalPages);
-                    }
-                };
-                pdfNavigation.appendChild(lastBtn);
-            }
-            
-            function loadPDF(pdfPath) {
-                const baseUrl = 'https://dl.dropboxusercontent.com/s/';
-                const fullUrl = `${baseUrl}${pdfPath}`;
-                fetch(fullUrl, { method: 'HEAD' })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return pdfjsLib.getDocument(fullUrl).promise;
-                    })
-                    .then(doc => {
-                        pdfDoc = doc;
-                        totalPages = doc.numPages;
-                        currentPage = 1;
-                        renderPage(currentPage);
-                    })
-                    .catch(error => {
-                        console.error('Erro ao carregar PDF:', error);
-                        showWarning('Não foi possível carregar o PDF. Verifique se o arquivo existe e é acessível.');
-                    });
-            }
-            
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
-            };
-            
-            themeBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (!currentTrainingId) {
-                    showWarning('Selecione o Tema.');
-                    return;
-                }
-                themeDropdownContent.style.display = themeDropdownContent.style.display === 'block' ? 'none' : 'block';
-            };
-            
-            document.addEventListener('click', (e) => {
-                if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) {
-                    dropdownContent.style.display = 'none';
-                }
-                if (!themeBtn.contains(e.target) && !themeDropdownContent.contains(e.target)) {
-                    themeDropdownContent.style.display = 'none';
-                }
-            });
-            
-            function loadTraining(subjectId, themeId) {
-                if (!subjectId || !themeId) return;
-                currentTrainingId = subjectId;
-                currentThemeId = themeId;
-                const theme = trainingData[subjectId].themes[themeId];
-                if (!theme) return;
-                contentDiv.style.display = 'block';
-                if (!completionStatus[subjectId]) completionStatus[subjectId] = {};
-                if (!completionStatus[subjectId][themeId] || completionStatus[subjectId][themeId].length !== theme.modules.length) {
-                    completionStatus[subjectId][themeId] = new Array(theme.modules.length).fill(false);
-                    saveProgression();
-                }
-                loadModule(theme.modules[0], theme.modules, 0);
-                modulesDiv.innerHTML = '';
-                theme.modules.forEach((mod, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'module';
-                    div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][index]);
-                    if (completionStatus[subjectId][themeId][index]) div.classList.add('completed');
-                    div.onclick = () => {
-                        document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
-                        div.classList.add('active');
-                        loadModule(mod, theme.modules, index);
-                    };
-                    if (index === 0) div.classList.add('active');
-                    modulesDiv.appendChild(div);
-                });
-                const assessmentDiv = document.createElement('div');
-                assessmentDiv.className = 'module';
-                assessmentDiv.id = 'assessment-module';
-                assessmentDiv.textContent = 'Avaliação';
-                if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
-                    assessmentDiv.classList.add('completed');
-                    assessmentDiv.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
-                }
-                assessmentDiv.onclick = () => {
+            loadModule(theme.modules[0], theme.modules, 0);
+            modulesDiv.innerHTML = '';
+            theme.modules.forEach((mod, index) => {
+                const div = document.createElement('div');
+                div.className = 'module';
+                div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][index]);
+                if (completionStatus[subjectId][themeId][index]) div.classList.add('completed');
+                div.onclick = () => {
                     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
-                    assessmentDiv.classList.add('active');
-                    if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
-                        showAssessmentResult(assessmentResults[subjectId][themeId]);
-                        return;
-                    }
-                    const allDone = completionStatus[subjectId][themeId].every(Boolean);
-                    if (!allDone) {
-                        showWarning('Conclua todos os modulos');
-                        return;
-                    }
-                    if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
-                        ytPlayer.stopVideo();
-                    }
-                    customPlayerContainer.style.display = 'none';
-                    video.style.display = 'none';
-                    video.src = '';
-                    pdfContainer.style.display = 'none';
-                    document.body.classList.remove('cinema-active');
-                    if (cinemaBtn) cinemaBtn.innerHTML = '<i class="fas fa-moon"></i>';
-                    loadQuiz(subjectId, themeId);
+                    div.classList.add('active');
+                    loadModule(mod, theme.modules, index);
                 };
-                modulesDiv.appendChild(assessmentDiv);
+                if (index === 0) div.classList.add('active');
+                modulesDiv.appendChild(div);
+            });
+            const assessmentDiv = document.createElement('div');
+            assessmentDiv.className = 'module';
+            assessmentDiv.id = 'assessment-module';
+            assessmentDiv.textContent = 'Avaliação';
+            if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
+                assessmentDiv.classList.add('completed');
+                assessmentDiv.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
             }
-            
-            function renderModuleTitle(title, completed) {
-                return completed ? `${title} <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>` : title;
+            assessmentDiv.onclick = () => {
+                document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+                assessmentDiv.classList.add('active');
+                if (assessmentResults[subjectId] && assessmentResults[subjectId][themeId]) {
+                    showAssessmentResult(assessmentResults[subjectId][themeId]);
+                    return;
+                }
+                const allDone = completionStatus[subjectId][themeId].every(Boolean);
+                if (!allDone) {
+                    showWarning('Conclua todos os modulos');
+                    return;
+                }
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+                    ytPlayer.stopVideo();
+                }
+                customPlayerContainer.style.display = 'none';
+                video.style.display = 'none';
+                video.src = '';
+                pdfContainer.style.display = 'none';
+                document.body.classList.remove('cinema-active');
+                loadQuiz(subjectId, themeId);
+            };
+            modulesDiv.appendChild(assessmentDiv);
+        }
+        
+        function renderModuleTitle(title, completed) {
+            return completed ? `${title} <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>` : title;
+        }
+        
+        function loadModule(mod, modules, moduleIndex) {
+            resetContent();
+            currentModuleIndex = moduleIndex;
+            if (mod.pdfUrl) {
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+                    ytPlayer.pauseVideo();
+                }
+                pdfContainer.style.display = 'block';
+                video.style.display = 'none';
+                customPlayerContainer.style.display = 'none';
+                loadPDF(mod.pdfUrl);
+            } else {
+                initOrLoadVideo(mod.videoId);
+                customPlayerContainer.style.display = 'block';
+                video.style.display = 'none';
+                pdfContainer.style.display = 'none';
+                if (progressRange && !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                    progressRange.disabled = true;
+                }
             }
-            
-            function loadModule(mod, modules, moduleIndex) {
-                resetContent();
-                currentModuleIndex = moduleIndex;
-                if (mod.pdfUrl) {
-                    if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
-                        ytPlayer.pauseVideo();
-                    }
-                    pdfContainer.style.display = 'block';
-                    video.style.display = 'none';
-                    customPlayerContainer.style.display = 'none';
-                    loadPDF(mod.pdfUrl);
+            titleEl.textContent = mod.title;
+            captionEl.textContent = mod.caption;
+            attachmentContainer.innerHTML = '';
+            if (mod.attachments && mod.attachments.length > 0) {
+                mod.attachments.forEach(attachment => {
+                    const btn = document.createElement('button');
+                    btn.className = 'attachment-btn';
+                    btn.textContent = attachment.title;
+                    btn.onclick = () => window.open(attachment.url, '_blank');
+                    attachmentContainer.appendChild(btn);
+                });
+            }
+            titleEl.style.display = 'block';
+            captionEl.style.display = 'block';
+            attachmentContainer.style.display = mod.attachments.length > 0 ? 'flex' : 'none';
+        }
+        
+        function loadQuiz(subjectId, themeId) {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            resetContent();
+            const quizKey = `${subjectId}_${themeId}`;
+            const questions = quizData[quizKey];
+            if (!questions) {
+                showWarning('Nenhuma avaliação disponível para este tema.');
+                return;
+            }
+            quizContainer.innerHTML = '';
+            selectedAnswers = {};
+            questions.forEach((q, index) => {
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                card.id = `quiz-card-${index}`;
+                const h3 = document.createElement('h3');
+                h3.textContent = q.question;
+                card.appendChild(h3);
+                const order = Array.from({ length: q.options.length }, (_, i) => i);
+                for (let i = order.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [order[i], order[j]] = [order[j], order[i]];
+                }
+                order.forEach((optIndex) => {
+                    const opt = q.options[optIndex];
+                    const label = document.createElement('label');
+                    label.className = 'quiz-option';
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = `q${index}`;
+                    input.value = optIndex;
+                    input.onchange = () => {
+                        selectedAnswers[index] = parseInt(input.value, 10);
+                        card.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+                        label.classList.add('selected');
+                        card.classList.remove('missing');
+                    };
+                    label.appendChild(input);
+                    label.appendChild(document.createTextNode(` ${opt}`));
+                    card.appendChild(label);
+                });
+                quizContainer.appendChild(card);
+            });
+            quizContainer.appendChild(quizSubmit);
+            quizContainer.style.display = 'flex';
+            quizSubmit.onclick = () => calculateScore(subjectId, themeId);
+        }
+        
+        function calculateScore(subjectId, themeId) {
+            const quizKey = `${subjectId}_${themeId}`;
+            const questions = quizData[quizKey];
+            let allAnswered = true;
+            questions.forEach((q, index) => {
+                if (!(index in selectedAnswers)) {
+                    allAnswered = false;
+                    const card = document.getElementById(`quiz-card-${index}`);
+                    card.classList.add('missing');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } else {
-                    initOrLoadVideo(mod.videoId);
-                    customPlayerContainer.style.display = 'block';
-                    video.style.display = 'none';
-                    pdfContainer.style.display = 'none';
-                    if (progressRange && !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
-                        progressRange.disabled = true;
-                    }
+                    document.getElementById(`quiz-card-${index}`).classList.remove('missing');
                 }
-                titleEl.textContent = mod.title;
-                captionEl.textContent = mod.caption;
-                attachmentContainer.innerHTML = '';
-                if (mod.attachments && mod.attachments.length > 0) {
-                    mod.attachments.forEach(attachment => {
-                        const btn = document.createElement('button');
-                        btn.className = 'attachment-btn';
-                        btn.textContent = attachment.title;
-                        btn.onclick = () => window.open(attachment.url, '_blank');
-                        attachmentContainer.appendChild(btn);
-                    });
-                }
-                titleEl.style.display = 'block';
-                captionEl.style.display = 'block';
-                attachmentContainer.style.display = mod.attachments.length > 0 ? 'flex' : 'none';
+            });
+            if (!allAnswered) {
+                showWarning('Por favor, responda todas as questões antes de enviar.');
+                return;
             }
-            
-            function loadQuiz(subjectId, themeId) {
-                window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
-                resetContent();
-                const quizKey = `${subjectId}_${themeId}`;
-                const questions = quizData[quizKey];
-                if (!questions) {
-                    showWarning('Nenhuma avaliação disponível para este tema.');
-                    return;
-                }
-                quizContainer.innerHTML = '';
-                selectedAnswers = {};
-                questions.forEach((q, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'quiz-card';
-                    card.id = `quiz-card-${index}`;
-                    const h3 = document.createElement('h3');
-                    h3.textContent = q.question;
-                    card.appendChild(h3);
-                    const order = Array.from({ length: q.options.length }, (_, i) => i);
-                    for (let i = order.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [order[i], order[j]] = [order[j], order[i]];
-                    }
-                    order.forEach((optIndex) => {
-                        const opt = q.options[optIndex];
-                        const label = document.createElement('label');
-                        label.className = 'quiz-option';
-                        const input = document.createElement('input');
-                        input.type = 'radio';
-                        input.name = `q${index}`;
-                        input.value = optIndex;
-                        input.onchange = () => {
-                            selectedAnswers[index] = parseInt(input.value, 10);
-                            card.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
-                            label.classList.add('selected');
-                            card.classList.remove('missing');
-                        };
-                        label.appendChild(input);
-                        label.appendChild(document.createTextNode(` ${opt}`));
-                        card.appendChild(label);
-                    });
-                    quizContainer.appendChild(card);
-                });
-                quizContainer.appendChild(quizSubmit);
-                quizContainer.style.display = 'flex';
-                quizSubmit.onclick = () => calculateScore(subjectId, themeId);
-            }
-            
-            function calculateScore(subjectId, themeId) {
-                const quizKey = `${subjectId}_${themeId}`;
-                const questions = quizData[quizKey];
-                let allAnswered = true;
-                questions.forEach((q, index) => {
-                    if (!(index in selectedAnswers)) {
-                        allAnswered = false;
-                        const card = document.getElementById(`quiz-card-${index}`);
-                        card.classList.add('missing');
-                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    } else {
-                        document.getElementById(`quiz-card-${index}`).classList.remove('missing');
-                    }
-                });
-                if (!allAnswered) {
-                    showWarning('Por favor, responda todas as questões antes de enviar.');
-                    return;
-                }
-                window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
-                let correctCount = 0;
-                questions.forEach((q, index) => {
-                    if (selectedAnswers[index] === q.correct) correctCount++;
-                });
-                const score = Math.round((correctCount / questions.length) * 10);
-                showForm(score);
-            }
-            
-            function showForm(score) {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            let correctCount = 0;
+            questions.forEach((q, index) => {
+                if (selectedAnswers[index] === q.correct) correctCount++;
+            });
+            const score = Math.round((correctCount / questions.length) * 10);
+            showForm(score);
+        }
+        
+        function showForm(score) {
     resetContent();
     formContainer.style.display = 'flex';
 
@@ -1579,174 +1652,302 @@
     newSubmitButton.disabled = false;
     newSubmitButton.style.opacity = '1';
 
+    // Mostra avaliação apenas se aprovado
+    const ratingContainer = document.getElementById('rating-container');
+    const commentToggleBtn = document.getElementById('comment-toggle-btn');
+    const commentSection = document.getElementById('comment-section');
+    const commentTextarea = document.getElementById('comment');
+
+    if (score >= 8) {
+        ratingContainer.style.display = 'block';
+        commentToggleBtn.style.display = 'block';
+        // Reseta e fecha o campo de comentário ao carregar o formulário
+        commentSection.style.display = 'none';
+        commentToggleBtn.textContent = 'Deixe um Comentário';
+        if (commentTextarea) commentTextarea.value = '';
+    } else {
+        ratingContainer.style.display = 'none';
+        commentToggleBtn.style.display = 'none';
+        commentSection.style.display = 'none';
+        if (commentTextarea) commentTextarea.value = '';
+    }
+
     // Adiciona novo listener com o score correto
     newSubmitButton.onclick = function(e) {
         e.preventDefault();
         submitForm(score);
     };
 }
-            
-            function submitForm(score) {
-                const name = document.getElementById('name');
-                const email = document.getElementById('email');
-                const loadingSpinner = document.getElementById('loading-spinner');
-                const submitButton = document.getElementById('submit-form');
-                
-                name.classList.remove('invalid');
-                email.classList.remove('invalid');
-            
-                if (!name.value) {
-                    name.classList.add('invalid');
-                    name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    showWarning('Por favor, selecione o Nome.');
-                    return;
-                }
-                if (!email.value) {
-                    email.classList.add('invalid');
-                    email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    showWarning('Por favor, preencha o campo Email.');
-                    return;
-                }
-                if (!validateEmail(email.value)) {
-                    email.classList.add('invalid');
-                    email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    showWarning('Por favor, insira um email válido.');
-                    return;
-                }
-            
-                loadingSpinner.style.display = 'block';
-                submitButton.disabled = true;
-                submitButton.style.opacity = '0.6';
-            
-                const dateTime = new Date().toLocaleString('pt-BR');
-                const assuntoSelecionado = (typeof themeBtn !== 'undefined' && themeBtn && themeBtn.textContent !== 'Escolha um Assunto') 
-                    ? themeBtn.textContent 
-                    : '';
-                const temaSelecionado = (typeof btn !== 'undefined' && btn && btn.textContent !== 'Escolha um Tema') 
-                    ? btn.textContent 
-                    : '';
-            
-                const data = { 
-                    'dateTime': dateTime, 
-                    'email': email.value, 
-                    'tema': temaSelecionado,
-                    'assunto': assuntoSelecionado,
-                    'nome': name.value, 
-                    'nota': score 
-                };
-            
-                const url = 'https://script.google.com/macros/s/AKfycbzuEgPZX-P0Xbe0UXTFqM2PCQorUmwdczWClLXcWmJImqCEnhtEvaU3Yo4rwFBSZJxl/exec';
-            
-                fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams(data).toString()
-                })
-                .then(response => response.text())
-                .then(result => {
-                    console.log('Resposta do servidor:', result);
-                    loadingSpinner.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.style.opacity = '1';
-                    showResult(score);
-                })
-                .catch(error => {
-                    console.error('Erro ao enviar:', error);
-                    loadingSpinner.style.display = 'none';
-                    submitButton.disabled = false;
-                    submitButton.style.opacity = '1';
-                    showResult(score);
-                });
-            }
-            
-            function showResult(score) {
-    resetContent();
-    contentDiv.style.display = 'block';
-    resultContainer.innerHTML = '';
 
-    const h2 = document.createElement('h2');
-    h2.textContent = `Sua nota: ${score}/10`;
-    resultContainer.appendChild(h2);
+function submitForm(score) {
+    const name = document.getElementById('name');
+    const email = document.getElementById('email');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const submitButton = document.getElementById('submit-form');
+    const ratingContainer = document.getElementById('rating-container');
+    const commentTextarea = document.getElementById('comment');
+    const commentSection = document.getElementById('comment-section');
+    const commentToggleBtn = document.getElementById('comment-toggle-btn');
+    
+    name.classList.remove('invalid');
+    email.classList.remove('invalid');
 
-    // Mensagem de aprovação ou reprovação
-    if (score < 8) {
-        const p = document.createElement('p');
-        p.textContent = 'Reprovado. Tente novamente!';
-        resultContainer.appendChild(p);
+    if (!name.value) {
+        name.classList.add('invalid');
+        name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, selecione o Nome.');
+        return;
+    }
+    if (!email.value) {
+        email.classList.add('invalid');
+        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, preencha o campo Email.');
+        return;
+    }
+    if (!validateEmail(email.value)) {
+        email.classList.add('invalid');
+        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showWarning('Por favor, insira um email válido.');
+        return;
+    }
 
-        // Botão "Tentar Novamente" (só para reprovados)
-        const retryBtn = document.createElement('button');
-        retryBtn.id = 'retry-btn';
-        retryBtn.textContent = 'Tentar Novamente';
-        retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-        resultContainer.appendChild(retryBtn);
-    } else {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'success-message';
-        successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
-        resultContainer.appendChild(successDiv);
-
-        // Salva a nota
-        if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
-        assessmentResults[currentTrainingId][currentThemeId] = score;
-        saveProgression();
-
-        // Marca o módulo como concluído
-        const assessmentModule = document.getElementById('assessment-module');
-        if (assessmentModule) {
-            assessmentModule.classList.add('completed');
-            assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon"></i>';
+    // Validação obrigatória da avaliação apenas se aprovado
+    if (score >= 8) {
+        const rating = document.querySelector('input[name="rating"]:checked');
+        if (!rating) {
+            showWarning('Por favor, avalie o curso com estrelas.');
+            ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
         }
     }
 
-    // SEMPRE mostra os dois botões finais (se avaliação já foi feita)
-    addFinalButtons();
+    loadingSpinner.style.display = 'block';
+    submitButton.disabled = true;
+    submitButton.style.opacity = '0.6';
 
-    resultContainer.style.display = 'flex';
+    const dateTime = new Date().toLocaleString('pt-BR');
+    const assuntoSelecionado = themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '';
+    const temaSelecionado = btn.textContent !== 'Escolha um Tema' ? btn.textContent : '';
+    const rating = document.querySelector('input[name="rating"]:checked')?.value || '';
+    const comment = commentTextarea?.value.trim() || '';
+
+    const data = { 
+        'dateTime': dateTime, 
+        'email': email.value, 
+        'tema': temaSelecionado,
+        'assunto': assuntoSelecionado,
+        'nome': name.value, 
+        'nota': score,
+        'rating': rating,
+        'comentario': comment
+    };
+
+    const url = 'https://script.google.com/macros/s/AKfycbw_gj11QQ7wAwKmTydunQS44OMDQgaC0j5N49vGDdaX1MCdZFln5x1agwFug5HkbDoS/exec';
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(data).toString()
+    })
+    .then(response => response.text())
+    .then(result => {
+        console.log('Resposta do servidor:', result);
+        loadingSpinner.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+
+        // Reseta e fecha o comentário após envio
+        if (commentSection) commentSection.style.display = 'none';
+        if (commentToggleBtn) commentToggleBtn.textContent = 'Deixe um Comentário';
+        if (commentTextarea) commentTextarea.value = '';
+
+        showResult(score);
+    })
+    .catch(error => {
+        console.error('Erro ao enviar:', error);
+        loadingSpinner.style.display = 'none';
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+
+        // Mesmo em caso de erro, reseta o campo de comentário
+        if (commentSection) commentSection.style.display = 'none';
+        if (commentToggleBtn) commentToggleBtn.textContent = 'Deixe um Comentário';
+        if (commentTextarea) commentTextarea.value = '';
+
+        showResult(score);
+    });
 }
 
-            function showAssessmentResult(score) {
-                resetContent();
-                contentDiv.style.display = 'block';
-                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
-                    ytPlayer.stopVideo();
+        function submitForm(score) {
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const submitButton = document.getElementById('submit-form');
+            const ratingContainer = document.getElementById('rating-container');
+            
+            name.classList.remove('invalid');
+            email.classList.remove('invalid');
+        
+            if (!name.value) {
+                name.classList.add('invalid');
+                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, selecione o Nome.');
+                return;
+            }
+            if (!email.value) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, preencha o campo Email.');
+                return;
+            }
+            if (!validateEmail(email.value)) {
+                email.classList.add('invalid');
+                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showWarning('Por favor, insira um email válido.');
+                return;
+            }
+
+            // Validação obrigatória da avaliação apenas se aprovado
+            if (score >= 8) {
+                const rating = document.querySelector('input[name="rating"]:checked');
+                if (!rating) {
+                    showWarning('Por favor, avalie o curso com estrelas.');
+                    ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
                 }
-                customPlayerContainer.style.display = 'none';
-                video.style.display = 'none';
-                video.src = '';
-                pdfContainer.style.display = 'none';
-                titleEl.style.display = 'none';
-                captionEl.style.display = 'none';
-                attachmentContainer.style.display = 'none';
-                
-                resultContainer.innerHTML = '';
-                const h2 = document.createElement('h2');
-                h2.textContent = `Sua nota: ${score}/10`;
-                resultContainer.appendChild(h2);
+            }
+        
+            loadingSpinner.style.display = 'block';
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.6';
+        
+            const dateTime = new Date().toLocaleString('pt-BR');
+            const assuntoSelecionado = themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '';
+            const temaSelecionado = btn.textContent !== 'Escolha um Tema' ? btn.textContent : '';
+            const rating = document.querySelector('input[name="rating"]:checked')?.value || '';
+            const comment = document.getElementById('comment')?.value.trim() || '';
+        
+            const data = { 
+                'dateTime': dateTime, 
+                'email': email.value, 
+                'tema': temaSelecionado,
+                'assunto': assuntoSelecionado,
+                'nome': name.value, 
+                'nota': score,
+                'rating': rating,
+                'comentario': comment
+            };
+        
+            const url = 'https://script.google.com/macros/s/AKfycbw_gj11QQ7wAwKmTydunQS44OMDQgaC0j5N49vGDdaX1MCdZFln5x1agwFug5HkbDoS/exec';
+        
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(data).toString()
+            })
+            .then(response => response.text())
+            .then(result => {
+                console.log('Resposta do servidor:', result);
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                showResult(score);
+            })
+            .catch(error => {
+                console.error('Erro ao enviar:', error);
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                showResult(score);
+            });
+        }
+        
+        function showResult(score) {
+            resetContent();
+            contentDiv.style.display = 'block';
+            resultContainer.innerHTML = '';
+
+            const h2 = document.createElement('h2');
+            h2.textContent = `Sua nota: ${score}/10`;
+            resultContainer.appendChild(h2);
+
+            if (score < 8) {
+                const p = document.createElement('p');
+                p.textContent = 'Reprovado. Tente novamente!';
+                resultContainer.appendChild(p);
+
+                const retryBtn = document.createElement('button');
+                retryBtn.id = 'retry-btn';
+                retryBtn.textContent = 'Tentar Novamente';
+                retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+                resultContainer.appendChild(retryBtn);
+            } else {
                 const successDiv = document.createElement('div');
                 successDiv.className = 'success-message';
                 successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
                 resultContainer.appendChild(successDiv);
-                addFinalButtons();
-                resultContainer.style.display = 'flex';
-            }
-            
 
-            function resetContent() {
-                video.src = '';
-                video.style.display = 'none';
-                pdfContainer.style.display = 'none';
-                pdfCanvas.width = 0;
-                pdfCanvas.height = 0;
-                pdfNavigation.innerHTML = '';
-                titleEl.style.display = 'none';
-                captionEl.style.display = 'none';
-                attachmentContainer.style.display = 'none';
-                quizContainer.style.display = 'none';
-                resultContainer.style.display = 'none';
-                formContainer.style.display = 'none';
-                warningMessage.style.display = 'none';
+                if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
+                assessmentResults[currentTrainingId][currentThemeId] = score;
+                saveProgression();
+
+                const assessmentModule = document.getElementById('assessment-module');
+                if (assessmentModule) {
+                    assessmentModule.classList.add('completed');
+                    assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon"></i>';
+                }
             }
+
+            addFinalButtons();
+            resultContainer.style.display = 'flex';
+        }
+
+        function showAssessmentResult(score) {
+            resetContent();
+            contentDiv.style.display = 'block';
+            if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+                ytPlayer.stopVideo();
+            }
+            customPlayerContainer.style.display = 'none';
+            video.style.display = 'none';
+            video.src = '';
+            pdfContainer.style.display = 'none';
+            titleEl.style.display = 'none';
+            captionEl.style.display = 'none';
+            attachmentContainer.style.display = 'none';
+            
+            resultContainer.innerHTML = '';
+            const h2 = document.createElement('h2');
+            h2.textContent = `Sua nota: ${score}/10`;
+            resultContainer.appendChild(h2);
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+            resultContainer.appendChild(successDiv);
+            addFinalButtons();
+            resultContainer.style.display = 'flex';
+        }
+        
+        function resetContent() {
+            video.src = '';
+            video.style.display = 'none';
+            pdfContainer.style.display = 'none';
+            pdfCanvas.width = 0;
+            pdfCanvas.height = 0;
+            pdfNavigation.innerHTML = '';
+            titleEl.style.display = 'none';
+            captionEl.style.display = 'none';
+            attachmentContainer.style.display = 'none';
+            quizContainer.style.display = 'none';
+            resultContainer.style.display = 'none';
+            formContainer.style.display = 'none';
+            warningMessage.style.display = 'none';
+            document.getElementById('rating-container').style.display = 'none';
+            document.getElementById('comment-toggle-btn').style.display = 'none';
+            document.getElementById('comment-section').style.display = 'none';
+        }
+
+
             function addFinalButtons() {
     // Botão "Refazer Avaliação"
     let refazerBtn = document.getElementById('refazer-btn');
