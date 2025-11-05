@@ -1606,161 +1606,173 @@
             quizSubmit.onclick = () => calculateScore(subjectId, themeId);
         }
         
-        function calculateScore(subjectId, themeId) {
-            const quizKey = `${subjectId}_${themeId}`;
-            const questions = quizData[quizKey];
-            let allAnswered = true;
-            questions.forEach((q, index) => {
-                if (!(index in selectedAnswers)) {
-                    allAnswered = false;
-                    const card = document.getElementById(`quiz-card-${index}`);
-                    card.classList.add('missing');
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else {
-                    document.getElementById(`quiz-card-${index}`).classList.remove('missing');
-                }
-            });
-            if (!allAnswered) {
-                showWarning('Por favor, responda todas as questões antes de enviar.');
-                return;
-            }
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-            let correctCount = 0;
-            questions.forEach((q, index) => {
-                if (selectedAnswers[index] === q.correct) correctCount++;
-            });
-            const score = Math.round((correctCount / questions.length) * 10);
-            showForm(score);
+function calculateScore(subjectId, themeId) {
+    const quizKey = `${subjectId}_${themeId}`;
+    const questions = quizData[quizKey];
+    let allAnswered = true;
+
+    questions.forEach((q, index) => {
+        if (!(index in selectedAnswers)) {
+            allAnswered = false;
+            const card = document.getElementById(`quiz-card-${index}`);
+            card.classList.add('missing');
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            document.getElementById(`quiz-card-${index}`).classList.remove('missing');
         }
-        
-        function showForm(score) {
+    });
+
+    if (!allAnswered) {
+        showWarning('Por favor, responda todas as questões antes de enviar.');
+        return;
+    }
+
+    let correctCount = 0;
+    questions.forEach((q, index) => {
+        if (selectedAnswers[index] === q.correct) correctCount++;
+    });
+    const score = Math.round((correctCount / questions.length) * 10);
+
+    // Gera relatório detalhado
+    const erros = getDetailedIncorrectAnswers(subjectId, themeId);
+
+    showForm(score, erros);
+}
+function getDetailedIncorrectAnswers(subjectId, themeId) {
+    const quizKey = `${subjectId}_${themeId}`;
+    const questions = quizData[quizKey];
+    const errors = [];
+
+    questions.forEach((q, index) => {
+        if (selectedAnswers[index] !== q.correct) {
+            const userAnswer = q.options[selectedAnswers[index]] || '(não respondido)';
+            const correctAnswer = q.options[q.correct];
+            errors.push(
+                `${index + 1}) ${q.question}\n: ` +
+                `R: ${userAnswer}\n - ` +
+                `Gabarito: ${correctAnswer}\n` +
+                `---`
+            );
+        }
+    });
+
+    return errors.length > 0 ? errors.join('\n') : 'Nenhum erro';
+}
+function getIncorrectQuestions(subjectId, themeId) {
+    const quizKey = `${subjectId}_${themeId}`;
+    const questions = quizData[quizKey];
+    const incorrect = [];
+
+    questions.forEach((q, index) => {
+        if (selectedAnswers[index] !== q.correct) {
+            incorrect.push(q.question.trim()); // Usa o título da pergunta
+        }
+    });
+
+    return incorrect.length > 0 ? incorrect.join('\n') : ''; // Quebra de linha entre erros
+}
+
+function showForm(score, erros = '') {
     resetContent();
     formContainer.style.display = 'flex';
 
     const submitButton = document.getElementById('submit-form');
     const loadingSpinner = document.getElementById('loading-spinner');
 
-    // Remove qualquer listener anterior
-    submitButton.replaceWith(submitButton.cloneNode(true));
-    const newSubmitButton = document.getElementById('submit-form');
+    // Clona botão para remover listeners antigos
+    const newSubmitButton = submitButton.cloneNode(true);
+    submitButton.parentNode.replaceChild(newSubmitButton, submitButton);
 
-    // Reseta estado visual
     loadingSpinner.style.display = 'none';
     newSubmitButton.disabled = false;
     newSubmitButton.style.opacity = '1';
 
-    // Mostra avaliação apenas se aprovado
+    // Avaliação e comentário
     const ratingContainer = document.getElementById('rating-container');
     const commentToggleBtn = document.getElementById('comment-toggle-btn');
     const commentSection = document.getElementById('comment-section');
-    const commentTextarea = document.getElementById('comment');
 
-    if (score >= 8) {
-        ratingContainer.style.display = 'block';
-        commentToggleBtn.style.display = 'block';
-        // Reseta e fecha o campo de comentário ao carregar o formulário
-        commentSection.style.display = 'none';
-        commentToggleBtn.textContent = 'Deixe um Comentário';
-        if (commentTextarea) commentTextarea.value = '';
-    } else {
-        ratingContainer.style.display = 'none';
-        commentToggleBtn.style.display = 'none';
-        commentSection.style.display = 'none';
-        if (commentTextarea) commentTextarea.value = '';
-    }
+    ratingContainer.style.display = 'block';
+    commentToggleBtn.style.display = 'block';
+    commentSection.style.display = 'none';
+    commentToggleBtn.textContent = 'Deixe um Comentário';
+    document.getElementById('comment').value = '';
 
-    // Adiciona novo listener com o score correto
+    // Listener único com erros
     newSubmitButton.onclick = function(e) {
         e.preventDefault();
-        submitForm(score);
+        submitForm(score, erros);
     };
 }
 
-function submitForm(score) {
+function submitForm(score, erros = '') {
     const name = document.getElementById('name');
     const email = document.getElementById('email');
     const loadingSpinner = document.getElementById('loading-spinner');
     const submitButton = document.getElementById('submit-form');
     const ratingContainer = document.getElementById('rating-container');
-    const commentTextarea = document.getElementById('comment');
-    const commentSection = document.getElementById('comment-section');
-    const commentToggleBtn = document.getElementById('comment-toggle-btn');
-    
+
+    // Reset de erros
     name.classList.remove('invalid');
     email.classList.remove('invalid');
 
+    // Validações
     if (!name.value) {
         name.classList.add('invalid');
         name.scrollIntoView({ behavior: 'smooth', block: 'center' });
         showWarning('Por favor, selecione o Nome.');
         return;
     }
-    if (!email.value) {
-        email.classList.add('invalid');
-        email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        showWarning('Por favor, preencha o campo Email.');
-        return;
-    }
-    if (!validateEmail(email.value)) {
+    if (!email.value || !validateEmail(email.value)) {
         email.classList.add('invalid');
         email.scrollIntoView({ behavior: 'smooth', block: 'center' });
         showWarning('Por favor, insira um email válido.');
         return;
     }
 
-    // Validação obrigatória da avaliação apenas se aprovado
-    if (score >= 8) {
-        const rating = document.querySelector('input[name="rating"]:checked');
-        if (!rating) {
-            showWarning('Por favor, avalie o curso com estrelas.');
-            ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
-        }
+    // Avaliação obrigatória
+    const rating = document.querySelector('input[name="rating"]:checked');
+    if (!rating) {
+        showWarning('Por favor, avalie o curso com estrelas.');
+        ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
     }
 
+    // Mostrar spinner
     loadingSpinner.style.display = 'block';
     submitButton.disabled = true;
     submitButton.style.opacity = '0.6';
 
-    const dateTime = new Date().toLocaleString('pt-BR');
-    const assuntoSelecionado = themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '';
-    const temaSelecionado = btn.textContent !== 'Escolha um Tema' ? btn.textContent : '';
-    const rating = document.querySelector('input[name="rating"]:checked')?.value || '';
-    const comment = commentTextarea?.value.trim() || '';
+    // Sanitizar erros para envio seguro
+    const errosSeguros = erros
+        .replace(/\n/g, '')
+        .replace(/---/g, ',');
 
-    const data = { 
-        'dateTime': dateTime, 
-        'email': email.value, 
-        'tema': temaSelecionado,
-        'assunto': assuntoSelecionado,
-        'nome': name.value, 
+    const data = {
+        'dateTime': new Date().toLocaleString('pt-BR'),
+        'email': email.value,
+        'tema': themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '',
+        'assunto': btn.textContent !== 'Escolha um Tema' ? btn.textContent : '',
+        'nome': name.value,
         'nota': score,
-        'rating': rating,
-        'comentario': comment
+        'erros': errosSeguros,
+        'rating': rating.value,
+        'comentario': document.getElementById('comment')?.value.trim() || ''
     };
 
-    const url = 'https://script.google.com/macros/s/AKfycbw_gj11QQ7wAwKmTydunQS44OMDQgaC0j5N49vGDdaX1MCdZFln5x1agwFug5HkbDoS/exec';
+    console.log("Enviando dados:", data); // DEBUG
 
-    fetch(url, {
+    fetch('https://script.google.com/macros/s/AKfycbzPn0EPCunoh1BMh1evnovkGT2_CYqGLM1EKZ-6dT4L7hFM3hNCZD0aamVmpiA5RPwU/exec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(data).toString()
     })
     .then(response => response.text())
     .then(result => {
-        console.log('Resposta do servidor:', result);
+        console.log('Resposta do Apps Script:', result);
         loadingSpinner.style.display = 'none';
         submitButton.disabled = false;
         submitButton.style.opacity = '1';
-
-        // Reseta e fecha o comentário após envio
-        if (commentSection) commentSection.style.display = 'none';
-        if (commentToggleBtn) commentToggleBtn.textContent = 'Deixe um Comentário';
-        if (commentTextarea) commentTextarea.value = '';
-
         showResult(score);
     })
     .catch(error => {
@@ -1768,100 +1780,10 @@ function submitForm(score) {
         loadingSpinner.style.display = 'none';
         submitButton.disabled = false;
         submitButton.style.opacity = '1';
-
-        // Mesmo em caso de erro, reseta o campo de comentário
-        if (commentSection) commentSection.style.display = 'none';
-        if (commentToggleBtn) commentToggleBtn.textContent = 'Deixe um Comentário';
-        if (commentTextarea) commentTextarea.value = '';
-
         showResult(score);
     });
 }
 
-        function submitForm(score) {
-            const name = document.getElementById('name');
-            const email = document.getElementById('email');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const submitButton = document.getElementById('submit-form');
-            const ratingContainer = document.getElementById('rating-container');
-            
-            name.classList.remove('invalid');
-            email.classList.remove('invalid');
-        
-            if (!name.value) {
-                name.classList.add('invalid');
-                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, selecione o Nome.');
-                return;
-            }
-            if (!email.value) {
-                email.classList.add('invalid');
-                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, preencha o campo Email.');
-                return;
-            }
-            if (!validateEmail(email.value)) {
-                email.classList.add('invalid');
-                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, insira um email válido.');
-                return;
-            }
-
-            // Validação obrigatória da avaliação apenas se aprovado
-            if (score >= 8) {
-                const rating = document.querySelector('input[name="rating"]:checked');
-                if (!rating) {
-                    showWarning('Por favor, avalie o curso com estrelas.');
-                    ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    return;
-                }
-            }
-        
-            loadingSpinner.style.display = 'block';
-            submitButton.disabled = true;
-            submitButton.style.opacity = '0.6';
-        
-            const dateTime = new Date().toLocaleString('pt-BR');
-            const assuntoSelecionado = themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '';
-            const temaSelecionado = btn.textContent !== 'Escolha um Tema' ? btn.textContent : '';
-            const rating = document.querySelector('input[name="rating"]:checked')?.value || '';
-            const comment = document.getElementById('comment')?.value.trim() || '';
-        
-            const data = { 
-                'dateTime': dateTime, 
-                'email': email.value, 
-                'tema': temaSelecionado,
-                'assunto': assuntoSelecionado,
-                'nome': name.value, 
-                'nota': score,
-                'rating': rating,
-                'comentario': comment
-            };
-        
-            const url = 'https://script.google.com/macros/s/AKfycbw_gj11QQ7wAwKmTydunQS44OMDQgaC0j5N49vGDdaX1MCdZFln5x1agwFug5HkbDoS/exec';
-        
-            fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams(data).toString()
-            })
-            .then(response => response.text())
-            .then(result => {
-                console.log('Resposta do servidor:', result);
-                loadingSpinner.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.style.opacity = '1';
-                showResult(score);
-            })
-            .catch(error => {
-                console.error('Erro ao enviar:', error);
-                loadingSpinner.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.style.opacity = '1';
-                showResult(score);
-            });
-        }
-        
         function showResult(score) {
             resetContent();
             contentDiv.style.display = 'block';
@@ -2017,6 +1939,8 @@ function submitForm(score) {
         resultContainer.appendChild(resetCourseBtn);
     }
 }
-        </script>
+
+
+</script>
 </body>
 </html>
