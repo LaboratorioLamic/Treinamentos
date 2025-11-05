@@ -1656,7 +1656,7 @@ function getDetailedIncorrectAnswers(subjectId, themeId) {
         }
     });
 
-    return errors.length > 0 ? errors.join('\n') : 'Nenhum erro';
+    return errors.length > 0 ? errors.join('\n') : '';
 }
 function getIncorrectQuestions(subjectId, themeId) {
     const quizKey = `${subjectId}_${themeId}`;
