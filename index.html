@@ -1564,10 +1564,27 @@
             }
             
             function showForm(score) {
-                resetContent();
-                formContainer.style.display = 'flex';
-                document.getElementById('submit-form').onclick = () => submitForm(score);
-            }
+    resetContent();
+    formContainer.style.display = 'flex';
+
+    const submitButton = document.getElementById('submit-form');
+    const loadingSpinner = document.getElementById('loading-spinner');
+
+    // Remove qualquer listener anterior
+    submitButton.replaceWith(submitButton.cloneNode(true));
+    const newSubmitButton = document.getElementById('submit-form');
+
+    // Reseta estado visual
+    loadingSpinner.style.display = 'none';
+    newSubmitButton.disabled = false;
+    newSubmitButton.style.opacity = '1';
+
+    // Adiciona novo listener com o score correto
+    newSubmitButton.onclick = function(e) {
+        e.preventDefault();
+        submitForm(score);
+    };
+}
             
             function submitForm(score) {
                 const name = document.getElementById('name');
