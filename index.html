@@ -1660,97 +1660,54 @@
             }
             
             function showResult(score) {
-                resetContent();
-                resultContainer.innerHTML = '';
-                const h2 = document.createElement('h2');
-                h2.textContent = `Sua nota: ${score}/10`;
-                resultContainer.appendChild(h2);
-                const p = document.createElement('p');
-                const retryBtn = document.createElement('button');
-                retryBtn.id = 'retry-btn';
-                retryBtn.textContent = 'Tentar Novamente';
-                retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-                if (score < 8) {
-                    p.textContent = 'Reprovado. Tente novamente!';
-                    resultContainer.appendChild(p);
-                    resultContainer.appendChild(retryBtn);
-                    retryBtn.style.display = 'block';
-                } else {
-                    const successDiv = document.createElement('div');
-                    successDiv.className = 'success-message';
-                    successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
-                    resultContainer.appendChild(successDiv);
-                    if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
-                    assessmentResults[currentTrainingId][currentThemeId] = score;
-                    saveProgression();
-                    const assessmentModule = document.getElementById('assessment-module');
-                    if (assessmentModule) {
-                        assessmentModule.classList.add('completed');
-                        assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>';
-                    }
-                    const refazerBtn = document.createElement('button');
-                    refazerBtn.id = 'refazer-btn';
-                    refazerBtn.textContent = 'Refazer Avaliação';
-                    refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-                    refazerBtn.style.cssText = `
-                        background-color: #28a745;
-                        color: white;
-                        padding: 10px 15px;
-                        border: none;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 1em;
-                        font-weight: 600;
-                        transition: background-color 0.3s ease, transform 0.2s ease;
-                        display: block;
-                        margin-top: 10px;
-                    `;
-                    refazerBtn.addEventListener('mouseenter', () => {
-                        refazerBtn.style.backgroundColor = '#218838';
-                        refazerBtn.style.transform = 'scale(1.05)';
-                    });
-                    refazerBtn.addEventListener('mouseleave', () => {
-                        refazerBtn.style.backgroundColor = '#28a745';
-                        refazerBtn.style.transform = 'scale(1)';
-                    });
-                    resultContainer.appendChild(refazerBtn);
-                    // Add "Reiniciar Curso" button
-                    const resetCourseBtn = document.createElement('button');
-                    resetCourseBtn.id = 'reset-course-btn';
-                    resetCourseBtn.textContent = 'Reiniciar Curso';
-                    resetCourseBtn.style.cssText = `
-                        background-color: #dc3545;
-                        color: white;
-                        padding: 10px 15px;
-                        border: none;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 1em;
-                        font-weight: 600;
-                        transition: background-color 0.3s ease, transform 0.2s ease;
-                        display: block;
-                        margin-top: 10px;
-                    `;
-                    resetCourseBtn.addEventListener('mouseenter', () => {
-                        resetCourseBtn.style.backgroundColor = '#c82333';
-                        resetCourseBtn.style.transform = 'scale(1.05)';
-                    });
-                    resetCourseBtn.addEventListener('mouseleave', () => {
-                        resetCourseBtn.style.backgroundColor = '#dc3545';
-                        resetCourseBtn.style.transform = 'scale(1)';
-                    });
-                    resetCourseBtn.onclick = () => {
-                        if (confirm('Tem certeza que deseja reiniciar o curso? Todo o progresso será perdido.')) {
-                            resetCourseProgression();
-                        }
-                    };
-                    resultContainer.appendChild(resetCourseBtn);
-                }
-                resultContainer.style.display = 'flex';
-            }
-            
+    resetContent();
+    contentDiv.style.display = 'block';
+    resultContainer.innerHTML = '';
+
+    const h2 = document.createElement('h2');
+    h2.textContent = `Sua nota: ${score}/10`;
+    resultContainer.appendChild(h2);
+
+    // Mensagem de aprovação ou reprovação
+    if (score < 8) {
+        const p = document.createElement('p');
+        p.textContent = 'Reprovado. Tente novamente!';
+        resultContainer.appendChild(p);
+
+        // Botão "Tentar Novamente" (só para reprovados)
+        const retryBtn = document.createElement('button');
+        retryBtn.id = 'retry-btn';
+        retryBtn.textContent = 'Tentar Novamente';
+        retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+        resultContainer.appendChild(retryBtn);
+    } else {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
+        resultContainer.appendChild(successDiv);
+
+        // Salva a nota
+        if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
+        assessmentResults[currentTrainingId][currentThemeId] = score;
+        saveProgression();
+
+        // Marca o módulo como concluído
+        const assessmentModule = document.getElementById('assessment-module');
+        if (assessmentModule) {
+            assessmentModule.classList.add('completed');
+            assessmentModule.innerHTML = 'Avaliação <i class="fas fa-circle-check status-icon"></i>';
+        }
+    }
+
+    // SEMPRE mostra os dois botões finais (se avaliação já foi feita)
+    addFinalButtons();
+
+    resultContainer.style.display = 'flex';
+}
+
             function showAssessmentResult(score) {
                 resetContent();
+                contentDiv.style.display = 'block';
                 if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') {
                     ytPlayer.stopVideo();
                 }
@@ -1770,66 +1727,11 @@
                 successDiv.className = 'success-message';
                 successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
                 resultContainer.appendChild(successDiv);
-                const refazerBtn = document.createElement('button');
-                refazerBtn.id = 'refazer-btn';
-                refazerBtn.textContent = 'Refazer Avaliação';
-                refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-                refazerBtn.style.cssText = `
-                    background-color: #28a745;
-                    color: white;
-                    padding: 10px 15px;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 1em;
-                    font-weight: 600;
-                    transition: background-color 0.3s ease, transform 0.2s ease;
-                    display: block;
-                    margin-top: 10px;
-                `;
-                refazerBtn.addEventListener('mouseenter', () => {
-                    refazerBtn.style.backgroundColor = '#218838';
-                    refazerBtn.style.transform = 'scale(1.05)';
-                });
-                refazerBtn.addEventListener('mouseleave', () => {
-                    refazerBtn.style.backgroundColor = '#28a745';
-                    refazerBtn.style.transform = 'scale(1)';
-                });
-                resultContainer.appendChild(refazerBtn);
-                // Add "Reiniciar Curso" button
-                const resetCourseBtn = document.createElement('button');
-                resetCourseBtn.id = 'reset-course-btn';
-                resetCourseBtn.textContent = 'Reiniciar Curso';
-                resetCourseBtn.style.cssText = `
-                    background-color: #dc3545;
-                    color: white;
-                    padding: 10px 15px;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 1em;
-                    font-weight: 600;
-                    transition: background-color 0.3s ease, transform 0.2s ease;
-                    display: block;
-                    margin-top: 10px;
-                `;
-                resetCourseBtn.addEventListener('mouseenter', () => {
-                    resetCourseBtn.style.backgroundColor = '#c82333';
-                    resetCourseBtn.style.transform = 'scale(1.05)';
-                });
-                resetCourseBtn.addEventListener('mouseleave', () => {
-                    resetCourseBtn.style.backgroundColor = '#dc3545';
-                    resetCourseBtn.style.transform = 'scale(1)';
-                });
-                resetCourseBtn.onclick = () => {
-                    if (confirm('Tem certeza que deseja reiniciar o curso? Todo o progresso será perdido.')) {
-                        resetCourseProgression();
-                    }
-                };
-                resultContainer.appendChild(resetCourseBtn);
+                addFinalButtons();
                 resultContainer.style.display = 'flex';
             }
             
+
             function resetContent() {
                 video.src = '';
                 video.style.display = 'none';
@@ -1844,9 +1746,76 @@
                 resultContainer.style.display = 'none';
                 formContainer.style.display = 'none';
                 warningMessage.style.display = 'none';
-                if (document.getElementById('retry-btn')) document.getElementById('retry-btn').Style.display = 'none';
-                themeDropdownContent.style.display = 'none';
             }
+            function addFinalButtons() {
+    // Botão "Refazer Avaliação"
+    let refazerBtn = document.getElementById('refazer-btn');
+    if (!refazerBtn) {
+        refazerBtn = document.createElement('button');
+        refazerBtn.id = 'refazer-btn';
+        refazerBtn.textContent = 'Refazer Avaliação';
+        refazerBtn.style.cssText = `
+            background-color: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 10px auto 0;
+            width: fit-content;
+        `;
+        refazerBtn.onmouseenter = () => {
+            refazerBtn.style.backgroundColor = '#218838';
+            refazerBtn.style.transform = 'scale(1.05)';
+        };
+        refazerBtn.onmouseleave = () => {
+            refazerBtn.style.backgroundColor = '#28a745';
+            refazerBtn.style.transform = 'scale(1)';
+        };
+        refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+        resultContainer.appendChild(refazerBtn);
+    }
+
+    // Botão "Reiniciar Curso"
+    let resetCourseBtn = document.getElementById('reset-course-btn');
+    if (!resetCourseBtn) {
+        resetCourseBtn = document.createElement('button');
+        resetCourseBtn.id = 'reset-course-btn';
+        resetCourseBtn.textContent = 'Reiniciar Curso';
+        resetCourseBtn.style.cssText = `
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 10px auto 0;
+            width: fit-content;
+        `;
+        resetCourseBtn.onmouseenter = () => {
+            resetCourseBtn.style.backgroundColor = '#c82333';
+            resetCourseBtn.style.transform = 'scale(1.05)';
+        };
+        resetCourseBtn.onmouseleave = () => {
+            resetCourseBtn.style.backgroundColor = '#dc3545';
+            resetCourseBtn.style.transform = 'scale(1)';
+        };
+        resetCourseBtn.onclick = () => {
+            if (confirm('Tem certeza que deseja reiniciar o curso? Todo o progresso será perdido.')) {
+                resetCourseProgression();
+            }
+        };
+        resultContainer.appendChild(resetCourseBtn);
+    }
+}
         </script>
 </body>
 </html>
