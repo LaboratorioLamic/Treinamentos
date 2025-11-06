@@ -1648,7 +1648,7 @@ function getDetailedIncorrectAnswers(subjectId, themeId) {
             const userAnswer = q.options[selectedAnswers[index]] || '(não respondido)';
             const correctAnswer = q.options[q.correct];
             errors.push(
-                `${index + 1}) ${q.question}\n: ` +
+                `${index + 1}) ${q.question}\n ` +
                 `;Resposta: ${userAnswer}\n` +
                 `;Gabarito: ${correctAnswer}\n` +
                 `---`
