@@ -1084,94 +1084,50 @@
         }
         
         function initOrLoadVideo(videoId) {
-            loadYouTubeAPI().then(() => {
-                customPlayerContainer.style.display = 'block';
-                video.style.display = 'none';
-                currentVideoId = videoId;
-                if (!ytPlayer) {
-                    ytPlayer = new YT.Player('yt-frame', {
-                        height: '390',
-                        width: '640',
-                        videoId: videoId,
-                        playerVars: {
-                            controls: 0,
-                            modestbranding: 1,
-                            rel: 0,
-                            fs: 1,
-                            iv_load_policy: 3
-                        },
-                        events: {
-                            'onReady': onPlayerReady,
-                            'onStateChange': onPlayerStateChange
-                        }
-                    });
-                } else {
-                    ytPlayer.cueVideoById(videoId);
-                }
-            });
-        }
-        
-        function initOrLoadVideo(videoId) {
-    const saveKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
-    const savedTime = parseFloat(localStorage.getItem(saveKey)) || 0;
-
     loadYouTubeAPI().then(() => {
         customPlayerContainer.style.display = 'block';
         video.style.display = 'none';
         currentVideoId = videoId;
 
-        // Pausar o vídeo anterior (se existir)
-        if (ytPlayer && ytPlayer.pauseVideo) {
-            ytPlayer.pauseVideo();
+        // Sempre recarrega o player com o novo vídeo
+        if (ytPlayer) {
+            ytPlayer.destroy(); // Remove o player antigo
+            ytPlayer = null;
         }
 
-        if (!ytPlayer) {
-            ytPlayer = new YT.Player('yt-frame', {
-                height: '390',
-                width: '640',
-                videoId: videoId,
-                playerVars: {
-                    controls: 0,
-                    modestbranding: 1,
-                    rel: 0,
-                    fs: 1,
-                    iv_load_policy: 3
-                },
-                events: {
-                    'onReady': () => {
-                        onPlayerReady();
-                        if (savedTime > 0 && savedTime < ytPlayer.getDuration()) {
-                            ytPlayer.seekTo(savedTime, true);
-                        }
-                        updateTimeUI();
-                    },
-                    'onStateChange': (event) => {
-                        onPlayerStateChange(event);
-                        const YT_STATE = window.YT.PlayerState;
-                        if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
-                            const current = ytPlayer.getCurrentTime() || 0;
-                            localStorage.setItem(saveKey, current.toString());
-                        }
-                    }
-                }
-            });
-        } else {
-            ytPlayer.cueVideoById(videoId);
-            // Após carregar novo vídeo, ajustar tempo salvo
-            const checkDuration = setInterval(() => {
-                const duration = ytPlayer.getDuration();
-                if (duration > 0) {
-                    clearInterval(checkDuration);
-                    if (savedTime > 0 && savedTime < duration) {
-                        ytPlayer.seekTo(savedTime, true);
-                    }
-                    updateTimeUI();
-                }
-            }, 100);
-        }
+        ytPlayer = new YT.Player('yt-frame', {
+            height: '390',
+            width: '640',
+            videoId: videoId,
+            playerVars: {
+                controls: 0,
+                modestbranding: 1,
+                rel: 0,
+                fs: 1,
+                iv_load_policy: 3
+            },
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
+            }
+        });
     });
 }
-        
+
+function onPlayerReady() {
+    bindControls();
+    updateTimeUI(); // Atualiza duração imediatamente
+
+    const ytInnerIframe = document.querySelector('#yt-frame iframe');
+    if (ytInnerIframe) {
+        ytInnerIframe.setAttribute('allowfullscreen', '');
+        const currentAllow = ytInnerIframe.getAttribute('allow') || '';
+        if (!/fullscreen/i.test(currentAllow)) {
+            ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
+        }
+    }
+}
+
         function onPlayerStateChange(event) {
             const YT_STATE = window.YT.PlayerState;
             if (event.data === YT_STATE.PLAYING) {
