@@ -1084,33 +1084,79 @@
         }
         
         function initOrLoadVideo(videoId) {
-            loadYouTubeAPI().then(() => {
-                customPlayerContainer.style.display = 'block';
-                video.style.display = 'none';
-                currentVideoId = videoId;
-                if (!ytPlayer) {
-                    ytPlayer = new YT.Player('yt-frame', {
-                        height: '390',
-                        width: '640',
-                        videoId: videoId,
-                        playerVars: {
-                            controls: 0,
-                            modestbranding: 1,
-                            rel: 0,
-                            fs: 1,
-                            iv_load_policy: 3
-                        },
-                        events: {
-                            'onReady': onPlayerReady,
-                            'onStateChange': onPlayerStateChange
+    loadYouTubeAPI().then(() => {
+        customPlayerContainer.style.display = 'block';
+        video.style.display = 'none';
+        currentVideoId = videoId;
+
+        // Chave única para o módulo atual
+        const storageKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
+        const savedTime = parseFloat(localStorage.getItem(storageKey)) || 0;
+
+        if (!ytPlayer) {
+            ytPlayer = new YT.Player('yt-frame', {
+                height: '390',
+                width: '640',
+                videoId: videoId,
+                playerVars: {
+                    controls: 0,
+                    modestbranding: 1,
+                    rel: 0,
+                    fs: 1,
+                    iv_load_policy: 3
+                },
+                events: {
+                    'onReady': () => {
+                        onPlayerReady();
+                        // Restaura tempo salvo se existir e for válido
+                        if (savedTime > 0 && savedTime < ytPlayer.getDuration()) {
+                            ytPlayer.seekTo(savedTime, true);
                         }
-                    });
-                } else {
-                    ytPlayer.cueVideoById(videoId);
+                        updateTimeUI();
+                    },
+                    'onStateChange': (event) => {
+                        onPlayerStateChange(event);
+                        const YT_STATE = window.YT.PlayerState;
+                        // Salva tempo ao pausar, terminar ou mudar de estado
+                        if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
+                            const current = ytPlayer.getCurrentTime() || 0;
+                            localStorage.setItem(storageKey, current.toFixed(2));
+                        }
+                    }
                 }
             });
+        } else {
+            // Ao trocar de vídeo
+            if (currentVideoId !== videoId) {
+                // Salva o tempo do vídeo anterior
+                if (ytPlayer.getCurrentTime) {
+                    const prevTime = ytPlayer.getCurrentTime() || 0;
+                    const prevKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
+                    localStorage.setItem(prevKey, prevTime.toFixed(2));
+                }
+
+                // Carrega novo vídeo
+                ytPlayer.cueVideoById(videoId);
+                ytPlayer.addEventListener('onReady', function onReadyOnce() {
+                    // Restaura tempo salvo do novo vídeo
+                    if (savedTime > 0 && savedTime < ytPlayer.getDuration()) {
+                        ytPlayer.seekTo(savedTime, true);
+                    }
+                    updateTimeUI();
+                    ytPlayer.removeEventListener('onReady', onReadyOnce);
+                }, { once: true });
+            }
         }
-        
+
+        // Atualiza UI do tempo imediatamente
+        const updateInterval = setInterval(() => {
+            if (ytPlayer && ytPlayer.getDuration) {
+                updateTimeUI();
+                clearInterval(updateInterval);
+            }
+        }, 100);
+    });
+}
         function onPlayerReady() {
             bindControls();
             updateTimeUI();
