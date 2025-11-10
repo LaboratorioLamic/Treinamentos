@@ -1084,14 +1084,46 @@
         }
         
         function initOrLoadVideo(videoId) {
+            loadYouTubeAPI().then(() => {
+                customPlayerContainer.style.display = 'block';
+                video.style.display = 'none';
+                currentVideoId = videoId;
+                if (!ytPlayer) {
+                    ytPlayer = new YT.Player('yt-frame', {
+                        height: '390',
+                        width: '640',
+                        videoId: videoId,
+                        playerVars: {
+                            controls: 0,
+                            modestbranding: 1,
+                            rel: 0,
+                            fs: 1,
+                            iv_load_policy: 3
+                        },
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                } else {
+                    ytPlayer.cueVideoById(videoId);
+                }
+            });
+        }
+        
+        function initOrLoadVideo(videoId) {
+    const saveKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
+    const savedTime = parseFloat(localStorage.getItem(saveKey)) || 0;
+
     loadYouTubeAPI().then(() => {
         customPlayerContainer.style.display = 'block';
         video.style.display = 'none';
         currentVideoId = videoId;
 
-        // Chave única para o módulo atual
-        const storageKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
-        const savedTime = parseFloat(localStorage.getItem(storageKey)) || 0;
+        // Pausar o vídeo anterior (se existir)
+        if (ytPlayer && ytPlayer.pauseVideo) {
+            ytPlayer.pauseVideo();
+        }
 
         if (!ytPlayer) {
             ytPlayer = new YT.Player('yt-frame', {
@@ -1108,7 +1140,6 @@
                 events: {
                     'onReady': () => {
                         onPlayerReady();
-                        // Restaura tempo salvo se existir e for válido
                         if (savedTime > 0 && savedTime < ytPlayer.getDuration()) {
                             ytPlayer.seekTo(savedTime, true);
                         }
@@ -1117,58 +1148,29 @@
                     'onStateChange': (event) => {
                         onPlayerStateChange(event);
                         const YT_STATE = window.YT.PlayerState;
-                        // Salva tempo ao pausar, terminar ou mudar de estado
                         if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
                             const current = ytPlayer.getCurrentTime() || 0;
-                            localStorage.setItem(storageKey, current.toFixed(2));
+                            localStorage.setItem(saveKey, current.toString());
                         }
                     }
                 }
             });
         } else {
-            // Ao trocar de vídeo
-            if (currentVideoId !== videoId) {
-                // Salva o tempo do vídeo anterior
-                if (ytPlayer.getCurrentTime) {
-                    const prevTime = ytPlayer.getCurrentTime() || 0;
-                    const prevKey = `videoTime_${currentTrainingId}_${currentThemeId}_${currentModuleIndex}`;
-                    localStorage.setItem(prevKey, prevTime.toFixed(2));
-                }
-
-                // Carrega novo vídeo
-                ytPlayer.cueVideoById(videoId);
-                ytPlayer.addEventListener('onReady', function onReadyOnce() {
-                    // Restaura tempo salvo do novo vídeo
-                    if (savedTime > 0 && savedTime < ytPlayer.getDuration()) {
+            ytPlayer.cueVideoById(videoId);
+            // Após carregar novo vídeo, ajustar tempo salvo
+            const checkDuration = setInterval(() => {
+                const duration = ytPlayer.getDuration();
+                if (duration > 0) {
+                    clearInterval(checkDuration);
+                    if (savedTime > 0 && savedTime < duration) {
                         ytPlayer.seekTo(savedTime, true);
                     }
                     updateTimeUI();
-                    ytPlayer.removeEventListener('onReady', onReadyOnce);
-                }, { once: true });
-            }
+                }
+            }, 100);
         }
-
-        // Atualiza UI do tempo imediatamente
-        const updateInterval = setInterval(() => {
-            if (ytPlayer && ytPlayer.getDuration) {
-                updateTimeUI();
-                clearInterval(updateInterval);
-            }
-        }, 100);
     });
 }
-        function onPlayerReady() {
-            bindControls();
-            updateTimeUI();
-            const ytInnerIframe = document.querySelector('#yt-frame iframe');
-            if (ytInnerIframe) {
-                ytInnerIframe.setAttribute('allowfullscreen', '');
-                const currentAllow = ytInnerIframe.getAttribute('allow') || '';
-                if (!/fullscreen/i.test(currentAllow)) {
-                    ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
-                }
-            }
-        }
         
         function onPlayerStateChange(event) {
             const YT_STATE = window.YT.PlayerState;
