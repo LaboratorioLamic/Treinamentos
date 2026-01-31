@@ -1071,10 +1071,8 @@
                     resolve();
                     return;
                 }
-                
                 const tag = document.createElement('script');
                 tag.src = 'https://www.youtube.com/iframe_api';
-                tag.crossOrigin = 'anonymous';
                 const firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
                 window.onYouTubeIframeAPIReady = () => resolve();
@@ -1090,19 +1088,21 @@
         
         function initOrLoadVideo(videoId) {
             console.log('Initializing video with ID:', videoId);
+            
+            // Sempre recarrega o player com o novo vídeo
+            if (ytPlayer) {
+                ytPlayer.destroy(); // Remove o player antigo
+                ytPlayer = null;
+            }
+            
+            customPlayerContainer.style.display = 'block';
+            video.style.display = 'none';
+            currentVideoId = videoId;
+
             loadYouTubeAPI().then(() => {
                 console.log('YouTube API loaded successfully');
-                customPlayerContainer.style.display = 'block';
-                video.style.display = 'none';
-                currentVideoId = videoId;
-
-                // Sempre recarrega o player com o novo vídeo
-                if (ytPlayer) {
-                    ytPlayer.destroy(); // Remove o player antigo
-                    ytPlayer = null;
-                }
-
                 console.log('Creating YouTube player with videoId:', videoId);
+                
                 ytPlayer = new YT.Player('yt-frame', {
                     height: '390',
                     width: '640',
@@ -1323,25 +1323,6 @@
             timeLabels.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
         }
         
-        // Global error handler to suppress source map 404 errors
-        window.addEventListener('error', function(event) {
-            if (event.filename && event.filename.includes('youtube.com') && 
-                event.message && event.message.includes('sourcemap')) {
-                event.preventDefault();
-                event.stopPropagation();
-                return false;
-            }
-        }, true);
-
-        // Suppress source map warnings in console
-        const originalConsoleWarn = console.warn;
-        console.warn = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('sourcemap')) {
-                return;
-            }
-            originalConsoleWarn.apply(console, args);
-        };
-
         window.onload = () => {
             warningMessage.style.display = 'none';
             resetContent();
@@ -1458,6 +1439,25 @@
                 emailInput.classList.remove('invalid');
             }
         });
+        
+        // Global error handler to suppress source map 404 errors
+        window.addEventListener('error', function(event) {
+            if (event.filename && event.filename.includes('youtube.com') && 
+                event.message && event.message.includes('sourcemap')) {
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+        }, true);
+
+        // Suppress source map warnings in console
+        const originalConsoleWarn = console.warn;
+        console.warn = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('sourcemap')) {
+                return;
+            }
+            originalConsoleWarn.apply(console, args);
+        };
         
         function showWarning(message) {
             warningText.textContent = message;
