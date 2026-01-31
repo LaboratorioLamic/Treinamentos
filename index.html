@@ -1071,19 +1071,8 @@
                     resolve();
                     return;
                 }
-                
-                // Disable source map loading to prevent 404 errors
-                const originalConsoleError = console.error;
-                console.error = function(...args) {
-                    if (typeof args[0] === 'string' && args[0].includes('sourcemap') && args[0].includes('404')) {
-                        return; // Suppress source map 404 errors
-                    }
-                    originalConsoleError.apply(console, args);
-                };
-                
                 const tag = document.createElement('script');
                 tag.src = 'https://www.youtube.com/iframe_api';
-                tag.crossOrigin = 'anonymous';
                 const firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
                 window.onYouTubeIframeAPIReady = () => resolve();
