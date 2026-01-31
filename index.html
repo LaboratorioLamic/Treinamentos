@@ -920,6 +920,7 @@
         // Variáveis globais para armazenar os dados do JSONBin
         let trainingData = {};
         let quizData = {};
+        let orderData = {}; // Armazena a ordem dos itens
         
         let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
         
@@ -968,6 +969,7 @@
                 const data = await response.json();
                 trainingData = data.record.trainingData || {};
                 quizData = data.record.quizData || {};
+                orderData = data.record.order || {};
                 populateDropdown();
                 // Load saved progression from localStorage after fetching data
                 loadProgression();
@@ -1019,6 +1021,7 @@
         let ytPlayer = null;
         let progressTimer = null;
         let currentModuleIndex = null;
+        let moduleIndexMapping = new Map(); // Mapeia índice de exibição -> índice original
         const completionStatus = {};
         let currentVideoId = null;
         let assessmentResults = {};
@@ -1068,8 +1071,19 @@
                     resolve();
                     return;
                 }
+                
+                // Disable source map loading to prevent 404 errors
+                const originalConsoleError = console.error;
+                console.error = function(...args) {
+                    if (typeof args[0] === 'string' && args[0].includes('sourcemap') && args[0].includes('404')) {
+                        return; // Suppress source map 404 errors
+                    }
+                    originalConsoleError.apply(console, args);
+                };
+                
                 const tag = document.createElement('script');
                 tag.src = 'https://www.youtube.com/iframe_api';
+                tag.crossOrigin = 'anonymous';
                 const firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
                 window.onYouTubeIframeAPIReady = () => resolve();
@@ -1150,13 +1164,28 @@ function onPlayerReady() {
                 if (!theme) return;
                 if (!completionStatus[currentTrainingId]) completionStatus[currentTrainingId] = {};
                 if (!completionStatus[currentTrainingId][currentThemeId]) completionStatus[currentTrainingId][currentThemeId] = [];
-                if (!completionStatus[currentTrainingId][currentThemeId][currentModuleIndex]) {
-                    completionStatus[currentTrainingId][currentThemeId][currentModuleIndex] = true;
+                
+                // Obter índice original através do mapeamento
+                const originalIndex = moduleIndexMapping.has(currentModuleIndex) 
+                    ? moduleIndexMapping.get(currentModuleIndex) 
+                    : currentModuleIndex;
+                
+                if (!completionStatus[currentTrainingId][currentThemeId][originalIndex]) {
+                    completionStatus[currentTrainingId][currentThemeId][originalIndex] = true;
                     saveProgression(); // Save to localStorage
                     const moduleTiles = modulesDiv.querySelectorAll('.module');
                     const tile = moduleTiles[currentModuleIndex];
                     if (tile) {
-                        tile.innerHTML = renderModuleTitle(theme.modules[currentModuleIndex].title, true);
+                        // Obter o módulo correto (pode estar ordenado)
+                        const modules = theme.modules;
+                        let moduleTitle = '';
+                        if (moduleIndexMapping.has(currentModuleIndex)) {
+                            const origIdx = moduleIndexMapping.get(currentModuleIndex);
+                            moduleTitle = modules[origIdx]?.title || '';
+                        } else {
+                            moduleTitle = modules[currentModuleIndex]?.title || '';
+                        }
+                        tile.innerHTML = renderModuleTitle(moduleTitle, true);
                         tile.classList.add('completed');
                         if (progressRange) {
                             progressRange.disabled = false;
@@ -1188,7 +1217,10 @@ function onPlayerReady() {
             progressRange.oninput = () => {
                 if (!ytPlayer) return;
                 if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
-                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                    const originalIndex = moduleIndexMapping.has(currentModuleIndex) 
+                        ? moduleIndexMapping.get(currentModuleIndex) 
+                        : currentModuleIndex;
+                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndex]) {
                         showWarning('Você deve assistir o vídeo inteiro antes de avançar.');
                         progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
                         return;
@@ -1290,7 +1322,27 @@ function onPlayerReady() {
         
         function populateDropdown() {
             dropdownList.innerHTML = '';
-            Object.keys(trainingData).forEach(subjectId => {
+            
+            // Obter todos os subjectIds
+            let subjectIds = Object.keys(trainingData);
+            
+            // Ordenar se houver ordem definida
+            if (orderData.subjects && Array.isArray(orderData.subjects)) {
+                // Criar um mapa de ordem para facilitar a ordenação
+                const orderMap = new Map();
+                orderData.subjects.forEach((id, index) => {
+                    orderMap.set(String(id), index);
+                });
+                
+                // Ordenar: primeiro os que estão na ordem, depois os que não estão
+                subjectIds.sort((a, b) => {
+                    const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
+                    const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
+                    return orderA - orderB;
+                });
+            }
+            
+            subjectIds.forEach(subjectId => {
                 const subject = trainingData[subjectId];
                 const subjectLi = document.createElement('li');
                 subjectLi.className = 'subject';
@@ -1313,7 +1365,27 @@ function onPlayerReady() {
         function populateThemeDropdown(subjectId) {
             themeDropdownList.innerHTML = '';
             const themes = trainingData[subjectId].themes;
-            Object.keys(themes).forEach(themeId => {
+            
+            // Obter todos os themeIds
+            let themeIds = Object.keys(themes);
+            
+            // Ordenar se houver ordem definida para este subject
+            if (orderData.themes && orderData.themes[subjectId] && Array.isArray(orderData.themes[subjectId])) {
+                // Criar um mapa de ordem para facilitar a ordenação
+                const orderMap = new Map();
+                orderData.themes[subjectId].forEach((id, index) => {
+                    orderMap.set(String(id), index);
+                });
+                
+                // Ordenar: primeiro os que estão na ordem, depois os que não estão
+                themeIds.sort((a, b) => {
+                    const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
+                    const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
+                    return orderA - orderB;
+                });
+            }
+            
+            themeIds.forEach(themeId => {
                 const theme = themes[themeId];
                 const themeLi = document.createElement('li');
                 themeLi.className = 'theme';
@@ -1396,13 +1468,22 @@ function onPlayerReady() {
         
             const lastBtn = document.createElement('button');
             lastBtn.innerHTML = '<i class="fas fa-fast-forward"></i>';
+            let originalIndexForPDF = currentModuleIndex;
+            if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                originalIndexForPDF = moduleIndexMapping.has(currentModuleIndex) 
+                    ? moduleIndexMapping.get(currentModuleIndex) 
+                    : currentModuleIndex;
+            }
             lastBtn.disabled = currentPage === totalPages || 
                 (currentTrainingId && currentThemeId != null && currentModuleIndex != null && 
-                !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]);
+                !completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndexForPDF]);
             lastBtn.onclick = () => {
                 if (currentPage !== totalPages) {
                     if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
-                        if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
+                        const origIdx = moduleIndexMapping.has(currentModuleIndex) 
+                            ? moduleIndexMapping.get(currentModuleIndex) 
+                            : currentModuleIndex;
+                        if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[origIdx]) {
                             showWarning('Você deve visualizar todas as páginas antes de usar o atalho para a última.');
                             return;
                         }
@@ -1470,19 +1551,55 @@ function onPlayerReady() {
                 completionStatus[subjectId][themeId] = new Array(theme.modules.length).fill(false);
                 saveProgression();
             }
-            loadModule(theme.modules[0], theme.modules, 0);
+            
+            // Criar array de módulos ordenado
+            let modules = [...theme.modules];
+            moduleIndexMapping.clear(); // Limpar mapeamento anterior
+            
+            // Ordenar módulos se houver ordem definida
+            if (orderData.modules && orderData.modules[subjectId] && orderData.modules[subjectId][themeId] && Array.isArray(orderData.modules[subjectId][themeId])) {
+                // Criar um mapa de ordem para facilitar a ordenação
+                const orderMap = new Map();
+                orderData.modules[subjectId][themeId].forEach((index, orderIndex) => {
+                    orderMap.set(index, orderIndex);
+                });
+                
+                // Criar array de índices com seus módulos correspondentes
+                const indexedModules = theme.modules.map((mod, idx) => ({ mod, idx }));
+                
+                // Ordenar: primeiro os que estão na ordem, depois os que não estão
+                indexedModules.sort((a, b) => {
+                    const orderA = orderMap.has(a.idx) ? orderMap.get(a.idx) : Infinity;
+                    const orderB = orderMap.has(b.idx) ? orderMap.get(b.idx) : Infinity;
+                    return orderA - orderB;
+                });
+                
+                // Reconstruir arrays ordenados
+                modules = indexedModules.map(item => item.mod);
+                indexedModules.forEach((item, newIndex) => {
+                    moduleIndexMapping.set(newIndex, item.idx);
+                });
+            } else {
+                // Se não houver ordem, mapeamento é direto
+                theme.modules.forEach((mod, idx) => {
+                    moduleIndexMapping.set(idx, idx);
+                });
+            }
+            
+            loadModule(modules[0], modules, 0);
             modulesDiv.innerHTML = '';
-            theme.modules.forEach((mod, index) => {
+            modules.forEach((mod, displayIndex) => {
+                const originalIndex = moduleIndexMapping.get(displayIndex);
                 const div = document.createElement('div');
                 div.className = 'module';
-                div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][index]);
-                if (completionStatus[subjectId][themeId][index]) div.classList.add('completed');
+                div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][originalIndex]);
+                if (completionStatus[subjectId][themeId][originalIndex]) div.classList.add('completed');
                 div.onclick = () => {
                     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                     div.classList.add('active');
-                    loadModule(mod, theme.modules, index);
+                    loadModule(mod, modules, displayIndex);
                 };
-                if (index === 0) div.classList.add('active');
+                if (displayIndex === 0) div.classList.add('active');
                 modulesDiv.appendChild(div);
             });
             const assessmentDiv = document.createElement('div');
@@ -1538,8 +1655,13 @@ function onPlayerReady() {
                 customPlayerContainer.style.display = 'block';
                 video.style.display = 'none';
                 pdfContainer.style.display = 'none';
-                if (progressRange && !completionStatus[currentTrainingId]?.[currentThemeId]?.[currentModuleIndex]) {
-                    progressRange.disabled = true;
+                if (progressRange && currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                    const originalIndex = moduleIndexMapping.has(currentModuleIndex) 
+                        ? moduleIndexMapping.get(currentModuleIndex) 
+                        : currentModuleIndex;
+                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndex]) {
+                        progressRange.disabled = true;
+                    }
                 }
             }
             titleEl.textContent = mod.title;
