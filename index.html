@@ -1087,85 +1087,49 @@
         }
         
         function initOrLoadVideo(videoId) {
-            console.log('Initializing video with ID:', videoId);
-            
-            // Sempre recarrega o player com o novo vídeo
-            if (ytPlayer) {
-                ytPlayer.destroy(); // Remove o player antigo
-                ytPlayer = null;
-            }
-            
-            customPlayerContainer.style.display = 'block';
-            video.style.display = 'none';
-            currentVideoId = videoId;
+    loadYouTubeAPI().then(() => {
+        customPlayerContainer.style.display = 'block';
+        video.style.display = 'none';
+        currentVideoId = videoId;
 
-            loadYouTubeAPI().then(() => {
-                console.log('YouTube API loaded successfully');
-                console.log('Creating YouTube player with videoId:', videoId);
-                
-                ytPlayer = new YT.Player('yt-frame', {
-                    height: '390',
-                    width: '640',
-                    videoId: videoId,
-                    playerVars: {
-                        controls: 0,
-                        modestbranding: 1,
-                        rel: 0,
-                        fs: 1,
-                        iv_load_policy: 3,
-                        autoplay: 0,
-                        enablejsapi: 1
-                    },
-                    events: {
-                        'onReady': onPlayerReady,
-                        'onStateChange': onPlayerStateChange,
-                        'onError': onPlayerError
-                    }
-                });
-            }).catch(error => {
-                console.error('Error loading YouTube API:', error);
-                showWarning('Erro ao carregar o vídeo do YouTube. Tente novamente.');
-            });
+        // Sempre recarrega o player com o novo vídeo
+        if (ytPlayer) {
+            ytPlayer.destroy(); // Remove o player antigo
+            ytPlayer = null;
         }
 
-        function onPlayerError(event) {
-            console.error('YouTube player error:', event.data);
-            let errorMessage = 'Erro ao carregar o vídeo.';
-            
-            switch(event.data) {
-                case 2:
-                    errorMessage = 'O vídeo solicitado não foi encontrado.';
-                    break;
-                case 5:
-                    errorMessage = 'Erro ao reproduzir o vídeo no player HTML5.';
-                    break;
-                case 100:
-                    errorMessage = 'O vídeo solicitado não foi encontrado ou foi removido.';
-                    break;
-                case 101:
-                case 150:
-                    errorMessage = 'O proprietário do vídeo não permite reprodução em players incorporados.';
-                    break;
+        ytPlayer = new YT.Player('yt-frame', {
+            height: '390',
+            width: '640',
+            videoId: videoId,
+            playerVars: {
+                controls: 0,
+                modestbranding: 1,
+                rel: 0,
+                fs: 1,
+                iv_load_policy: 3
+            },
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
             }
-            
-            console.error('YouTube error details:', errorMessage);
-            showWarning(errorMessage);
-        }
+        });
+    });
+}
 
-        function onPlayerReady() {
-            console.log('YouTube player is ready');
-            bindControls();
-            updateTimeUI(); // Atualiza duração imediatamente
+function onPlayerReady() {
+    bindControls();
+    updateTimeUI(); // Atualiza duração imediatamente
 
-            const ytInnerIframe = document.querySelector('#yt-frame iframe');
-            if (ytInnerIframe) {
-                ytInnerIframe.setAttribute('allowfullscreen', '');
-                const currentAllow = ytInnerIframe.getAttribute('allow') || '';
-                if (!/fullscreen/i.test(currentAllow)) {
-                    ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
-                }
-            }
+    const ytInnerIframe = document.querySelector('#yt-frame iframe');
+    if (ytInnerIframe) {
+        ytInnerIframe.setAttribute('allowfullscreen', '');
+        const currentAllow = ytInnerIframe.getAttribute('allow') || '';
+        if (!/fullscreen/i.test(currentAllow)) {
+            ytInnerIframe.setAttribute('allow', (currentAllow + '; fullscreen; autoplay').replace(/^;\s*/, ''));
         }
+    }
+}
 
         function onPlayerStateChange(event) {
             const YT_STATE = window.YT.PlayerState;
@@ -1439,25 +1403,6 @@
                 emailInput.classList.remove('invalid');
             }
         });
-        
-        // Global error handler to suppress source map 404 errors
-        window.addEventListener('error', function(event) {
-            if (event.filename && event.filename.includes('youtube.com') && 
-                event.message && event.message.includes('sourcemap')) {
-                event.preventDefault();
-                event.stopPropagation();
-                return false;
-            }
-        }, true);
-
-        // Suppress source map warnings in console
-        const originalConsoleWarn = console.warn;
-        console.warn = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('sourcemap')) {
-                return;
-            }
-            originalConsoleWarn.apply(console, args);
-        };
         
         function showWarning(message) {
             warningText.textContent = message;
