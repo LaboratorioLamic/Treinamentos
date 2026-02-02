@@ -948,6 +948,37 @@
             }
         }
         
+        // Função centralizada para ordenar itens baseado no campo "order"
+        function sortItems(items, orderConfig, itemKey = 'id') {
+            if (!orderConfig || !Array.isArray(orderConfig)) {
+                return items.map((item, index) => ({
+                    key: itemKey === 'index' ? index : item[itemKey] || index,
+                    item,
+                    order: index
+                }));
+            }
+            
+            // Criar mapa de ordem
+            const orderMap = new Map();
+            orderConfig.forEach((orderItem, index) => {
+                if (typeof orderItem === 'object' && orderItem.id !== undefined) {
+                    orderMap.set(String(orderItem.id), orderItem.order || index);
+                } else {
+                    orderMap.set(String(orderItem), index);
+                }
+            });
+            
+            // Mapear itens com suas ordens
+            return items.map((item, index) => {
+                const key = itemKey === 'index' ? index : (item[itemKey] || index);
+                return {
+                    key,
+                    item,
+                    order: orderMap.has(String(key)) ? orderMap.get(String(key)) : Infinity
+                };
+            }).sort((a, b) => a.order - b.order);
+        }
+
         // Função para buscar dados do JSONBin
         async function fetchJSONBinData() {
             const binId = '68d7d3e5ae596e708ffdae68';
@@ -1312,37 +1343,25 @@ function onPlayerReady() {
         function populateDropdown() {
             dropdownList.innerHTML = '';
             
-            // Obter todos os subjectIds
-            let subjectIds = Object.keys(trainingData);
+            // Obter todos os subjects e ordenar
+            const subjects = Object.keys(trainingData).map(id => ({
+                id,
+                ...trainingData[id]
+            }));
             
-            // Ordenar se houver ordem definida
-            if (orderData.subjects && Array.isArray(orderData.subjects)) {
-                // Criar um mapa de ordem para facilitar a ordenação
-                const orderMap = new Map();
-                orderData.subjects.forEach((id, index) => {
-                    orderMap.set(String(id), index);
-                });
-                
-                // Ordenar: primeiro os que estão na ordem, depois os que não estão
-                subjectIds.sort((a, b) => {
-                    const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
-                    const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
-                    return orderA - orderB;
-                });
-            }
+            const sortedSubjects = sortItems(subjects, orderData.subjects, 'id');
             
-            subjectIds.forEach(subjectId => {
-                const subject = trainingData[subjectId];
+            sortedSubjects.forEach(({item: subject}) => {
                 const subjectLi = document.createElement('li');
                 subjectLi.className = 'subject';
-                subjectLi.dataset.subjectId = subjectId;
+                subjectLi.dataset.subjectId = subject.id;
                 subjectLi.textContent = subject.name;
                 subjectLi.onclick = (e) => {
                     e.stopPropagation();
                     btn.textContent = subject.name;
                     dropdownContent.style.display = 'none';
-                    currentTrainingId = subjectId;
-                    populateThemeDropdown(subjectId);
+                    currentTrainingId = subject.id;
+                    populateThemeDropdown(subject.id);
                     themeBtn.textContent = 'Escolha um Assunto';
                     contentDiv.style.display = 'none';
                     resetContent();
@@ -1355,36 +1374,24 @@ function onPlayerReady() {
             themeDropdownList.innerHTML = '';
             const themes = trainingData[subjectId].themes;
             
-            // Obter todos os themeIds
-            let themeIds = Object.keys(themes);
+            // Obter todos os themes e ordenar
+            const themeArray = Object.keys(themes).map(id => ({
+                id,
+                ...themes[id]
+            }));
             
-            // Ordenar se houver ordem definida para este subject
-            if (orderData.themes && orderData.themes[subjectId] && Array.isArray(orderData.themes[subjectId])) {
-                // Criar um mapa de ordem para facilitar a ordenação
-                const orderMap = new Map();
-                orderData.themes[subjectId].forEach((id, index) => {
-                    orderMap.set(String(id), index);
-                });
-                
-                // Ordenar: primeiro os que estão na ordem, depois os que não estão
-                themeIds.sort((a, b) => {
-                    const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
-                    const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
-                    return orderA - orderB;
-                });
-            }
+            const sortedThemes = sortItems(themeArray, orderData.themes?.[subjectId], 'id');
             
-            themeIds.forEach(themeId => {
-                const theme = themes[themeId];
+            sortedThemes.forEach(({item: theme}) => {
                 const themeLi = document.createElement('li');
                 themeLi.className = 'theme';
-                themeLi.dataset.themeId = themeId;
+                themeLi.dataset.themeId = theme.id;
                 themeLi.textContent = theme.name;
                 themeLi.onclick = (e) => {
                     e.stopPropagation();
                     themeBtn.textContent = theme.name;
                     themeDropdownContent.style.display = 'none';
-                    loadTraining(subjectId, themeId);
+                    loadTraining(subjectId, theme.id);
                 };
                 themeDropdownList.appendChild(themeLi);
             });
@@ -1541,39 +1548,16 @@ function onPlayerReady() {
                 saveProgression();
             }
             
-            // Criar array de módulos ordenado
-            let modules = [...theme.modules];
-            moduleIndexMapping.clear(); // Limpar mapeamento anterior
+            // Criar array de módulos ordenado usando a função centralizada
+            const modulesWithIndex = theme.modules.map((mod, idx) => ({ mod, idx }));
+            const sortedModules = sortItems(modulesWithIndex, orderData.modules?.[subjectId]?.[themeId], 'idx');
             
-            // Ordenar módulos se houver ordem definida
-            if (orderData.modules && orderData.modules[subjectId] && orderData.modules[subjectId][themeId] && Array.isArray(orderData.modules[subjectId][themeId])) {
-                // Criar um mapa de ordem para facilitar a ordenação
-                const orderMap = new Map();
-                orderData.modules[subjectId][themeId].forEach((index, orderIndex) => {
-                    orderMap.set(index, orderIndex);
-                });
-                
-                // Criar array de índices com seus módulos correspondentes
-                const indexedModules = theme.modules.map((mod, idx) => ({ mod, idx }));
-                
-                // Ordenar: primeiro os que estão na ordem, depois os que não estão
-                indexedModules.sort((a, b) => {
-                    const orderA = orderMap.has(a.idx) ? orderMap.get(a.idx) : Infinity;
-                    const orderB = orderMap.has(b.idx) ? orderMap.get(b.idx) : Infinity;
-                    return orderA - orderB;
-                });
-                
-                // Reconstruir arrays ordenados
-                modules = indexedModules.map(item => item.mod);
-                indexedModules.forEach((item, newIndex) => {
-                    moduleIndexMapping.set(newIndex, item.idx);
-                });
-            } else {
-                // Se não houver ordem, mapeamento é direto
-                theme.modules.forEach((mod, idx) => {
-                    moduleIndexMapping.set(idx, idx);
-                });
-            }
+            // Extrair módulos ordenados e criar mapeamento
+            const modules = sortedModules.map(({item}) => item.mod);
+            moduleIndexMapping.clear();
+            sortedModules.forEach(({item}, newIndex) => {
+                moduleIndexMapping.set(newIndex, item.idx);
+            });
             
             loadModule(modules[0], modules, 0);
             modulesDiv.innerHTML = '';
