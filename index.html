@@ -803,9 +803,43 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        .incorrect-answers {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #1a2b49;
+        }
+        .incorrect-answers h3 {
+            color: #1a2b49;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .incorrect-answers ul {
+            list-style: none;
+            padding: 0;
+        }
+        .incorrect-answers li {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 3px solid #e74c3c;
+        }
+        .incorrect-answers li strong {
+            color: #1a2b49;
+        }
+
         @media (max-width: 600px) {
             .star-rating label {
                 font-size: 1.5em;
+            }
+            .incorrect-answers {
+                padding: 15px;
+            }
+            .incorrect-answers li {
+                padding: 10px;
             }
         }
     </style>
@@ -1907,6 +1941,23 @@ function submitForm(score, erros = '') {
                 successDiv.className = 'success-message';
                 successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
                 resultContainer.appendChild(successDiv);
+
+                // Exibir gabarito das alternativas incorretas
+                const errors = getDetailedIncorrectAnswers(currentTrainingId, currentThemeId);
+                if (errors) {
+                    const incorrectDiv = document.createElement('div');
+                    incorrectDiv.className = 'incorrect-answers';
+                    incorrectDiv.innerHTML = '<h3>Gabarito das Alternativas Incorretas</h3><ul></ul>';
+                    const ul = incorrectDiv.querySelector('ul');
+                    const errorList = errors.split('---').filter(e => e.trim());
+                    errorList.forEach(error => {
+                        const lines = error.trim().split(';').map(l => l.trim());
+                        const li = document.createElement('li');
+                        li.innerHTML = `<strong>${lines[0]}</strong><br>${lines[1]}<br>${lines[2]}`;
+                        ul.appendChild(li);
+                    });
+                    resultContainer.appendChild(incorrectDiv);
+                }
 
                 if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
                 assessmentResults[currentTrainingId][currentThemeId] = score;
