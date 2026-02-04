@@ -1088,15 +1088,20 @@
         let currentModuleIndex = null;
         let moduleIndexMapping = new Map(); // Mapeia índice de exibição -> índice original
         const completionStatus = {};
+        const watchedTime = {};
         let currentVideoId = null;
         let assessmentResults = {};
         
         // Load progression from localStorage
         function loadProgression() {
             const savedCompletion = localStorage.getItem('completionStatus');
+            const savedWatchedTime = localStorage.getItem('watchedTime');
             const savedAssessments = localStorage.getItem('assessmentResults');
             if (savedCompletion) {
                 Object.assign(completionStatus, JSON.parse(savedCompletion));
+            }
+            if (savedWatchedTime) {
+                Object.assign(watchedTime, JSON.parse(savedWatchedTime));
             }
             if (savedAssessments) {
                 Object.assign(assessmentResults, JSON.parse(savedAssessments));
@@ -1106,6 +1111,7 @@
         // Save progression to localStorage
         function saveProgression() {
             localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
+            localStorage.setItem('watchedTime', JSON.stringify(watchedTime));
             localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
         }
         
@@ -1116,6 +1122,12 @@
                     delete completionStatus[currentTrainingId][currentThemeId];
                     if (Object.keys(completionStatus[currentTrainingId]).length === 0) {
                         delete completionStatus[currentTrainingId];
+                    }
+                }
+                if (watchedTime[currentTrainingId]) {
+                    delete watchedTime[currentTrainingId][currentThemeId];
+                    if (Object.keys(watchedTime[currentTrainingId]).length === 0) {
+                        delete watchedTime[currentTrainingId];
                     }
                 }
                 if (assessmentResults[currentTrainingId]) {
@@ -1270,18 +1282,20 @@ function onPlayerReady() {
             };
             progressRange.oninput = () => {
                 if (!ytPlayer) return;
+                const duration = ytPlayer.getDuration() || 0;
+                const seekTo = (parseFloat(progressRange.value) / 100) * duration;
                 if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
                     const originalIndex = moduleIndexMapping.has(currentModuleIndex) 
                         ? moduleIndexMapping.get(currentModuleIndex) 
                         : currentModuleIndex;
-                    if (!completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndex]) {
-                        showWarning('Você deve assistir o vídeo inteiro antes de avançar.');
+                    const maxWatched = watchedTime[currentTrainingId]?.[currentThemeId]?.[originalIndex] || 0;
+                    const isCompleted = completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndex];
+                    if (!isCompleted && seekTo > maxWatched) {
+                        showWarning('Você só pode voltar até o ponto já assistido. Assista o vídeo inteiro para avançar.');
                         progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
                         return;
                     }
                 }
-                const duration = ytPlayer.getDuration() || 0;
-                const seekTo = (parseFloat(progressRange.value) / 100) * duration;
                 ytPlayer.seekTo(seekTo, true);
                 updateTimeUI();
             };
@@ -1333,6 +1347,18 @@ function onPlayerReady() {
                 const duration = ytPlayer.getDuration() || 0;
                 if (duration > 0) {
                     progressRange.value = (current / duration) * 100;
+                    // Update max watched time
+                    if (currentTrainingId && currentThemeId != null && currentModuleIndex != null) {
+                        const originalIndex = moduleIndexMapping.has(currentModuleIndex) 
+                            ? moduleIndexMapping.get(currentModuleIndex) 
+                            : currentModuleIndex;
+                        if (!watchedTime[currentTrainingId]) watchedTime[currentTrainingId] = {};
+                        if (!watchedTime[currentTrainingId][currentThemeId]) watchedTime[currentTrainingId][currentThemeId] = [];
+                        if (!watchedTime[currentTrainingId][currentThemeId][originalIndex] || watchedTime[currentTrainingId][currentThemeId][originalIndex] < current) {
+                            watchedTime[currentTrainingId][currentThemeId][originalIndex] = current;
+                            saveProgression();
+                        }
+                    }
                 }
                 updateTimeUI();
             }, 250);
