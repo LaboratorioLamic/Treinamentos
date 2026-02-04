@@ -1291,9 +1291,8 @@ function onPlayerReady() {
                     const maxWatched = watchedTime[currentTrainingId]?.[currentThemeId]?.[originalIndex] || 0;
                     const isCompleted = completionStatus[currentTrainingId]?.[currentThemeId]?.[originalIndex];
                     if (!isCompleted && seekTo > maxWatched) {
-                        showWarning('Você só pode voltar até o ponto já assistido. Assista o vídeo inteiro para avançar.');
-                        progressRange.value = (ytPlayer.getCurrentTime() / ytPlayer.getDuration()) * 100;
-                        return;
+                        seekTo = maxWatched;
+                        progressRange.value = (maxWatched / duration) * 100;
                     }
                 }
                 ytPlayer.seekTo(seekTo, true);
