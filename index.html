@@ -798,6 +798,14 @@
             display: block;
         }
 
+        .comment-instruction {
+            display: block;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -933,8 +941,9 @@
 
                     <!-- Seção de comentário -->
                     <div class="comment-section" id="comment-section" style="display: none;">
-                        <label for="comment">Deixe sua crítica, elogio ou sugestões abaixo:</label>
-                        <textarea id="comment" placeholder="Escreva aqui... (opcional)"></textarea>
+                        <label for="comment">Há alguma crítica, elogio ou sugestões?</label>
+                        <textarea id="comment" placeholder="Escreva aqui..."></textarea>
+                        <small class="comment-instruction">Descreva nos comentários sua avaliação sobre o curso</small>
                     </div>
 
                     <button id="submit-form">Enviar</button>
@@ -1847,6 +1856,18 @@ function submitForm(score, erros = '') {
     if (!rating) {
         showWarning('Por favor, avalie o curso com estrelas.');
         ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    // Validação de comentário obrigatório apenas se nota <= 4
+    const commentField = document.getElementById('comment');
+    const commentValue = commentField?.value.trim() || '';
+    const ratingValue = parseInt(rating.value);
+    
+    if (ratingValue <= 4 && !commentValue) {
+        showWarning('Comente sua avaliação sobre o curso, e o que motivou essa nota.');
+        commentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        commentField.focus();
         return;
     }
 
