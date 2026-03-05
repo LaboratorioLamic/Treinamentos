@@ -964,6 +964,7 @@
         let trainingData = {};
         let quizData = {};
         let orderData = {}; // Armazena a ordem dos itens
+        let quizStatus = {}; // Armazena o status das avaliações
         
         let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
         
@@ -1044,6 +1045,7 @@
                 trainingData = data.record.trainingData || {};
                 quizData = data.record.quizData || {};
                 orderData = data.record.order || {};
+                quizStatus = data.record.quizStatus || {};
                 populateDropdown();
                 // Load saved progression from localStorage after fetching data
                 loadProgression();
@@ -1683,6 +1685,10 @@ function onPlayerReady() {
             });
             resetContent();
             const quizKey = `${subjectId}_${themeId}`;
+            if (quizStatus[quizKey] === false) {
+                showWarning('Avaliação indisponivel no momento');
+                return;
+            }
             const questions = quizData[quizKey];
             if (!questions) {
                 showWarning('Nenhuma avaliação disponível para este tema.');
