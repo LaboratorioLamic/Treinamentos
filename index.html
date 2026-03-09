@@ -1871,7 +1871,7 @@ function submitForm(score, erros = '') {
     const ratingValue = parseInt(rating.value);
     
     if (ratingValue <= 4 && !commentValue) {
-        showWarning('Comente sua avaliação sobre o curso, e o que motivou essa nota.');
+        showWarning('Escreva um comentário explicando o motivo da sua avaliação. Isso nos ajuda a melhorar!');
         commentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
         commentField.focus();
         return;
