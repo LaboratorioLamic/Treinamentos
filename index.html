@@ -730,6 +730,44 @@
             100% { transform: rotate(360deg); }
         }
 
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(245, 247, 250, 0.95);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .spinner-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .modern-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top: 3px solid #1a2b49;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 8px rgba(26, 43, 73, 0.3);
+        }
+
+        .spinner-container p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #1a2b49;
+            font-weight: 600;
+        }
+
         /* Estrelas de avaliação */
         .rating-container {
             margin: 15px 0;
@@ -859,6 +897,13 @@
             <h1>Universidade LAMIC - Treinamentos</h1>
         </div>
     </header>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner-container">
+            <div class="modern-spinner"></div>
+            <p>Carregando dados...</p>
+        </div>
+    </div>
 
     <div class="dropdown-container">
         <div class="dropdown">
@@ -1049,9 +1094,11 @@
                 populateDropdown();
                 // Load saved progression from localStorage after fetching data
                 loadProgression();
+                document.getElementById('loading-overlay').style.display = 'none';
             } catch (error) {
                 console.error('Erro ao carregar dados do JSONBin:', error);
                 showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
+                document.getElementById('loading-overlay').style.display = 'none';
             }
         }
         
@@ -1353,6 +1400,7 @@ function onPlayerReady() {
         window.onload = () => {
             warningMessage.style.display = 'none';
             resetContent();
+            document.getElementById('loading-overlay').style.display = 'flex';
             fetchJSONBinData();
             fetchNames();
             themeDropdownContent.style.display = 'none';
