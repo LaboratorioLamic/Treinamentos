@@ -1005,24 +1005,21 @@
     <div id="cinema-overlay"></div>
 
     <script>
-        // Variáveis globais para armazenar os dados do JSONBin
+        // Variáveis globais para armazenar os dados do Firebase
         let trainingData = {};
         let quizData = {};
-        let orderData = {}; // Armazena a ordem dos itens
-        let quizStatus = {}; // Armazena o status das avaliações
-        
-        let nameOptions = []; // Armazena os nomes carregados para uso futuro, se necessário
+        let orderData = {};
+        let quizStatus = {};
+        let nameOptions = [];
         
         // Função para buscar nomes da planilha (Google Apps Script)
         async function fetchNames() {
             const url = 'https://script.google.com/macros/s/AKfycbzUd6efhfzkCmYd88_eIIL6dGIQxIINsw-6Y_qM3PRemUbZ06obtF9xKY1S8WRfvXyq9Q/exec';
             try {
                 const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const names = await response.json();
-                nameOptions = names; // Armazena globalmente
+                nameOptions = names;
                 const select = document.getElementById('name');
                 if (select) {
                     names.forEach(name => {
@@ -1046,8 +1043,6 @@
                     order: index
                 }));
             }
-            
-            // Criar mapa de ordem
             const orderMap = new Map();
             orderConfig.forEach((orderItem, index) => {
                 if (typeof orderItem === 'object' && orderItem.id !== undefined) {
@@ -1056,8 +1051,6 @@
                     orderMap.set(String(orderItem), index);
                 }
             });
-            
-            // Mapear itens com suas ordens
             return items.map((item, index) => {
                 const key = itemKey === 'index' ? index : (item[itemKey] || index);
                 return {
@@ -1067,36 +1060,23 @@
                 };
             }).sort((a, b) => a.order - b.order);
         }
-
-        // Função para buscar dados do JSONBin
-        async function fetchJSONBinData() {
-            const binId = '68d7d3e5ae596e708ffdae68';
-            const masterKey = '$2a$10$2elKW8TT6o.K3V176efqwu7kOfD1PnS3D/F0s4Tczc3MYmaU.N1bi';
-            const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
         
+        // Função para buscar dados do Firebase Realtime Database
+        async function fetchFirebaseData() {
             try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'X-Master-Key': masterKey
-                    }
-                });
-        
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-        
+                // Usando a Firebase Realtime Database REST API
+                const response = await fetch('https://uniadmin-708f5-default-rtdb.firebaseio.com/uniadmin/treinamentos.json');
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const data = await response.json();
-                trainingData = data.record.trainingData || {};
-                quizData = data.record.quizData || {};
-                orderData = data.record.order || {};
-                quizStatus = data.record.quizStatus || {};
+                orderData = data.order || {};
+                quizData = data.quizData || {};
+                quizStatus = data.quizStatus || {};
+                trainingData = data.trainingData || {};
                 populateDropdown();
-                // Load saved progression from localStorage after fetching data
                 loadProgression();
                 document.getElementById('loading-overlay').style.display = 'none';
             } catch (error) {
-                console.error('Erro ao carregar dados do JSONBin:', error);
+                console.error('Erro ao carregar dados do Firebase:', error);
                 showWarning('Não foi possível carregar os dados do treinamento. Tente novamente mais tarde.');
                 document.getElementById('loading-overlay').style.display = 'none';
             }
@@ -1401,7 +1381,7 @@ function onPlayerReady() {
             warningMessage.style.display = 'none';
             resetContent();
             document.getElementById('loading-overlay').style.display = 'flex';
-            fetchJSONBinData();
+            fetchFirebaseData();
             fetchNames();
             themeDropdownContent.style.display = 'none';
             themeDropdownList.innerHTML = '';
