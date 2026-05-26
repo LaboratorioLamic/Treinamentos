@@ -1404,10 +1404,12 @@ function onPlayerReady() {
             dropdownList.innerHTML = '';
             
             // Obter todos os subjects e ordenar
-            const subjects = Object.keys(trainingData).map(id => ({
-                id,
-                ...trainingData[id]
-            }));
+            const subjects = Object.keys(trainingData)
+                .filter(id => trainingData[id] && trainingData[id].name && trainingData[id].name.trim() !== '')
+                .map(id => ({
+                    id,
+                    ...trainingData[id]
+                }));
             
             const sortedSubjects = sortItems(subjects, orderData.subjects, 'id');
             
@@ -1434,11 +1436,13 @@ function onPlayerReady() {
             themeDropdownList.innerHTML = '';
             const themes = trainingData[subjectId].themes;
             
-            // Obter todos os themes e ordenar
-            const themeArray = Object.keys(themes).map(id => ({
-                id,
-                ...themes[id]
-            }));
+            // Obter todos os themes e ordenar, filtrando vazios
+            const themeArray = Object.keys(themes)
+                .filter(id => themes[id] && themes[id].name && themes[id].name.trim() !== '')
+                .map(id => ({
+                    id,
+                    ...themes[id]
+                }));
             
             const sortedThemes = sortItems(themeArray, orderData.themes?.[subjectId], 'id');
             
@@ -1600,7 +1604,7 @@ function onPlayerReady() {
             currentTrainingId = subjectId;
             currentThemeId = themeId;
             const theme = trainingData[subjectId].themes[themeId];
-            if (!theme) return;
+            if (!theme || !theme.modules || theme.modules.length === 0) return;
             contentDiv.style.display = 'block';
             if (!completionStatus[subjectId]) completionStatus[subjectId] = {};
             if (!completionStatus[subjectId][themeId] || completionStatus[subjectId][themeId].length !== theme.modules.length) {
@@ -1703,7 +1707,7 @@ function onPlayerReady() {
             }
             titleEl.style.display = 'block';
             captionEl.style.display = 'block';
-            attachmentContainer.style.display = mod.attachments.length > 0 ? 'flex' : 'none';
+            attachmentContainer.style.display = (mod.attachments && mod.attachments.length > 0) ? 'flex' : 'none';
         }
         
         function loadQuiz(subjectId, themeId) {
