@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universidade LAMIC - Treinamentos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+
+    <!-- ─── HEADER ─── -->
+    <header>
+        <div class="header-inner">
+            <div class="header-logo">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <div class="header-text">
+                <h1>Universidade LAMIC</h1>
+                <p id="header-category-label">Plataforma de Treinamentos</p>
+            </div>
+            <div class="header-divider"></div>
+            <span class="header-badge" id="header-category-badge">LMS</span>
+            <a class="header-home" href="index.html" title="Trocar de plataforma" aria-label="Trocar de plataforma">
+                <i class="fas fa-grip"></i><span>Plataformas</span>
+            </a>
+            <button id="settings-btn" class="header-settings" title="Configurações" aria-label="Abrir configurações">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </header>
+    <!-- ─── LOADING ─── -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner-container">
+            <div class="modern-spinner"></div>
+            <p>Carregando conteúdo...</p>
+        </div>
+    </div>
+
+    <!-- ─── TOAST ─── -->
+    <div class="warning-message" id="warning-message" style="display:none;">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span id="warning-text">Por favor, responda todas as questões antes de enviar.</span>
+    </div>
+
+    <!-- ─── SELECTION BAR ─── -->
+    <div class="selection-bar">
+        <div class="selection-inner">
+            <div class="select-group">
+                <div class="selection-label">Tema</div>
+                <div class="dropdown">
+                    <button id="dropdownBtn">Escolha um Tema</button>
+                    <div id="dropdownContent" class="dropdown-content">
+                        <ul id="dropdownList"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="selection-divider">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+
+            <div class="select-group" id="themeDropdown">
+                <div class="selection-label">Assunto</div>
+                <div class="dropdown">
+                    <button id="themeBtn">Escolha um Assunto</button>
+                    <div id="themeDropdownContent" class="theme-dropdown-content">
+                        <ul id="themeDropdownList"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── PAGE BODY ─── -->
+    <div class="page-body">
+
+        <!-- Welcome state (before course selection) -->
+        <div class="welcome-screen" id="welcome-screen">
+            <div class="welcome-icon"><i class="fas fa-play-circle"></i></div>
+            <h2>Selecione um curso para começar</h2>
+            <p>Escolha o Tema e o Assunto nos menus acima para acessar o conteúdo do treinamento.</p>
+        </div>
+
+        <!-- Course content -->
+        <div class="content" id="content">
+            <div class="lms-layout">
+
+                <!-- Main content column -->
+                <div class="main-content">
+                    <div class="player-card">
+                        <div class="video-player" id="player-container">
+                            <iframe id="video" src="" allowfullscreen style="display:none; width:100%; aspect-ratio:16/9; border:none;"></iframe>
+
+                            <div id="custom-player" class="custom-player">
+                                <div id="yt-frame"></div>
+                                <div class="player-controls">
+                                    <button id="play-pause-btn" aria-label="Reproduzir ou Pausar"><i class="fas fa-play"></i></button>
+                                    <span class="time-labels" id="time-labels">00:00 / 00:00</span>
+                                    <input id="progress-range" type="range" min="0" max="100" value="0">
+                                    <button id="mute-btn" aria-label="Ativar/Desativar Áudio"><i class="fas fa-volume-high"></i></button>
+                                    <input id="volume-range" type="range" min="0" max="100" value="100">
+                                    <select id="speed-select" title="Velocidade">
+                                        <option value="0.5">0.5x</option>
+                                        <option value="0.75">0.75x</option>
+                                        <option value="1" selected>1x</option>
+                                        <option value="1.25">1.25x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="1.75">1.75x</option>
+                                        <option value="2">2x</option>
+                                    </select>
+                                    <button id="fullscreen-btn" aria-label="Tela cheia">
+                                        <i class="fas fa-expand"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="pdf-container" class="pdf-container">
+                                <canvas id="pdf-canvas"></canvas>
+                                <div class="pdf-navigation" id="pdf-navigation"></div>
+                            </div>
+                        </div>
+
+                        <div class="module-info">
+                            <h2 id="title"></h2>
+                            <p id="caption"></p>
+                            <div id="attachment-container" class="attachment-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Quiz, Result, Form rendered here -->
+                    <div id="quiz-container" class="quiz-container" style="margin-top:20px;"></div>
+                    <div id="result-container" class="result-container"></div>
+                    <div id="form-container" class="form-container">
+                        <div class="form-title"><i class="fas fa-certificate" style="color:var(--accent);margin-right:8px;"></i>Registrar Conclusão</div>
+                        <label for="name">Nome</label>
+                        <select id="name">
+                            <option value="">Selecione seu nome</option>
+                        </select>
+                        <label for="email">Email</label>
+                        <input type="email" id="email" placeholder="seu@email.com">
+
+                        <div class="rating-container" id="rating-container" style="display:none;">
+                            <label>Avalie o Curso</label>
+                            <div class="star-rating">
+                                <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 estrelas">★</label>
+                                <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 estrelas">★</label>
+                                <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 estrelas">★</label>
+                                <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 estrelas">★</label>
+                                <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 estrela">★</label>
+                            </div>
+                        </div>
+
+                        <button type="button" class="comment-toggle-btn" id="comment-toggle-btn" style="display:none;">
+                            <i class="fas fa-comment-alt" style="margin-right:6px;"></i>Deixe um Comentário
+                        </button>
+
+                        <div class="comment-section" id="comment-section" style="display:none;">
+                            <label for="comment">Comentário</label>
+                            <textarea id="comment" placeholder="Críticas, elogios ou sugestões..."></textarea>
+                            <small class="comment-instruction">Sua opinião nos ajuda a melhorar o conteúdo.</small>
+                        </div>
+
+                        <button id="submit-form">Enviar</button>
+                        <div id="loading-spinner" class="loading-spinner"></div>
+                    </div>
+                </div>
+
+                <!-- Sidebar column -->
+                <div class="sidebar-card">
+                    <div class="sidebar-header">
+                        <h3>Conteúdo do Curso</h3>
+                        <p id="sidebar-course-name">—</p>
+                    </div>
+                    <div class="sidebar-scroll">
+                        <div id="modules">
+                            <div class="sidebar-empty">
+                                <i class="fas fa-list-ul"></i>
+                                Selecione um curso para ver os módulos
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="cinema-overlay"></div>
+
+    <!-- ─── MODAL DE ACESSO ÀS CONFIGURAÇÕES ─── -->
+    <div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="auth-card" id="auth-card">
+            <div class="auth-header">
+                <h2 id="auth-title"><i class="fas fa-lock"></i> <span id="auth-title-text">Acessar Configurações</span></h2>
+                <button class="auth-close" id="auth-close" aria-label="Fechar">&times;</button>
+            </div>
+            <div class="auth-body">
+                <p class="auth-intro" id="auth-intro">Digite a senha para abrir o painel de configurações.</p>
+
+                <div class="auth-lockout" id="auth-lockout">
+                    <i class="fas fa-clock"></i> Muitas tentativas. Aguarde para tentar novamente.
+                </div>
+                <div class="auth-progress-container" id="auth-progress-container">
+                    <div class="auth-progress" id="auth-progress"></div>
+                </div>
+
+                <div class="auth-error" id="auth-error"></div>
+
+                <label for="auth-password" id="auth-password-label">Senha</label>
+                <input type="password" id="auth-password" placeholder="Digite a senha" autocomplete="current-password">
+
+                <div id="auth-confirm-wrapper" style="display:none;">
+                    <label for="auth-confirm">Confirme a senha</label>
+                    <input type="password" id="auth-confirm" placeholder="Repita a senha" autocomplete="new-password">
+                </div>
+
+                <button class="auth-submit" id="auth-submit">
+                    <i class="fas fa-sign-in-alt"></i> <span id="auth-submit-text">Entrar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── PAINEL DE CONFIGURAÇÕES (admin) ─── -->
+
+    <!-- Loading Overlay -->
+    <div id="cfg-loading-overlay" class="cfg-loading-overlay" aria-hidden="true">
+        <div class="cfg-loading-panel">
+            <div class="cfg-loading-message">Carregando dados...</div>
+            <div id="cfg-loading-bar-container" class="cfg-loading-bar-container">
+                <div id="cfg-loading-bar" class="cfg-loading-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal" id="cfg-category-modal">
+        <div class="modal-content" id="cfg-modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-tag" style="color:var(--primary);margin-right:7px;"></i>Selecionar Categoria</h2>
+            </div>
+            <div class="modal-body">
+                <div class="lockout-message" id="cfg-lockout-message">
+                    <i class="fas fa-clock"></i> Aguarde para tentar novamente
+                </div>
+                <div class="progress-bar-container" id="cfg-progress-bar-container" style="display:none">
+                    <div class="progress-bar" id="cfg-progress-bar"></div>
+                </div>
+                <label for="cfg-category-select">Categoria</label>
+                <select id="cfg-category-select">
+                    <option value="">Selecione uma categoria</option>
+                    <option value="Treinamentos">Treinamentos</option>
+                    <option value="Educação Continuada">Educação Continuada</option>
+                    <option value="Estágios">Estágios</option>
+                </select>
+                <button id="cfg-category-submit">
+                    <i class="fas fa-sign-in-alt"></i> Entrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Modal -->
+    <div class="modal" id="cfg-backup-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-database" style="color:var(--purple);margin-right:7px;"></i>Backup de Dados</h2>
+                <span class="close" id="cfg-backup-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="backup-section">
+                    <div class="backup-section-title">Exportar</div>
+                    <button id="cfg-download-btn"><i class="fas fa-download"></i> Baixar Backup</button>
+                </div>
+                <div class="backup-section">
+                    <div class="backup-section-title">Restaurar</div>
+                    <input type="file" id="cfg-upload-file" accept=".json">
+                    <button id="cfg-upload-btn"><i class="fas fa-upload"></i> Carregar Backup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="cfg-warning-message" id="cfg-warning-message"><span id="cfg-warning-text"></span></div>
+
+
+    <section id="cfg-root" hidden>
+    <!-- Admin Shell -->
+    <div class="admin-shell">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon"><i class="fas fa-graduation-cap"></i></div>
+                <div>
+                    <div class="brand-name">UniAdmin</div>
+                    <div class="brand-sub">Universidade LAMIC</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Navegação</div>
+                <nav class="sidebar-nav">
+                    <button class="tab-btn active" data-tab="subjects">
+                        <span class="nav-icon"><i class="fas fa-bookmark"></i></span>Temas
+                    </button>
+                    <button class="tab-btn" data-tab="themes">
+                        <span class="nav-icon"><i class="fas fa-layer-group"></i></span>Assuntos
+                    </button>
+                    <button class="tab-btn" data-tab="modules">
+                        <span class="nav-icon"><i class="fas fa-play-circle"></i></span>Módulos
+                    </button>
+                    <button class="tab-btn" data-tab="quizzes">
+                        <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span>Avaliações
+                    </button>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="sidebar-action-btn change-category-btn" id="cfg-change-category-btn">
+                    <i class="fas fa-exchange-alt"></i><span>Trocar Categoria</span>
+                </button>
+                <button class="sidebar-action-btn backup-act" id="cfg-backup-btn">
+                    <i class="fas fa-database"></i><span>Backup</span>
+                </button>
+                <button class="sidebar-action-btn" id="cfg-back-to-portal">
+                    <i class="fas fa-arrow-left"></i><span>Voltar ao Portal</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <div class="main-area">
+            <header class="topbar">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="topbar-title">Gerenciador de Aulas</span>
+                    <span class="topbar-sub">Universidade LAMIC</span>
+                </div>
+                <div class="category-badge inactive" id="cfg-category-badge-display">
+                    <i class="fas fa-tag"></i>
+                    <span id="cfg-current-category-label">Nenhuma categoria</span>
+                </div>
+            </header>
+
+            <main class="content-area">
+
+                <!-- Temas Tab -->
+                <div class="tab-content active" id="cfg-subjects-tab">
+                    <div class="content-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-bookmark"></i></div>
+                                <h2>Gerenciar Temas</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-subject-name">Nome do Tema</label>
+                                    <input class="form-control" type="text" id="cfg-subject-name" placeholder="Digite o nome do tema">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary btn-full" id="cfg-subject-save">
+                                        <i class="fas fa-save"></i> Salvar Tema
+                                    </button>
+                                    <button class="btn btn-danger btn-icon" id="cfg-subject-delete" style="display:none;" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <div id="cfg-subject-loading" class="cfg-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
+                                <h2>Temas Cadastrados</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div id="cfg-subjects-container" class="subjects-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assuntos Tab -->
+                <div class="tab-content" id="cfg-themes-tab">
+                    <div class="content-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-layer-group"></i></div>
+                                <h2>Gerenciar Assuntos</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-theme-subject">Tema</label>
+                                    <select class="form-control" id="cfg-theme-subject">
+                                        <option value="">Selecione um tema</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-theme-name">Nome do Assunto</label>
+                                    <input class="form-control" type="text" id="cfg-theme-name" placeholder="Digite o nome do assunto">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary btn-full" id="cfg-theme-save">
+                                        <i class="fas fa-save"></i> Salvar Assunto
+                                    </button>
+                                    <button class="btn btn-danger btn-icon" id="cfg-theme-delete" style="display:none;" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <div id="cfg-theme-migrate-container" class="migrate-container">
+                                    <div class="migrate-header">
+                                        <i class="fas fa-exchange-alt"></i>
+                                        <h3>Migrar Assunto</h3>
+                                    </div>
+                                    <div class="migrate-content">
+                                        <div class="migrate-select-wrapper">
+                                            <label for="cfg-theme-new-subject">Novo tema de destino</label>
+                                            <select id="cfg-theme-new-subject">
+                                                <option value="">Selecione o novo tema</option>
+                                            </select>
+                                        </div>
+                                        <button id="cfg-theme-migrate" class="migrate-btn">
+                                            <i class="fas fa-arrow-right"></i> Migrar (com Módulos e Avaliações)
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="cfg-theme-loading" class="cfg-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
+                                <h2>Assuntos Cadastrados</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div id="cfg-themes-container" class="themes-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Módulos Tab -->
+                <div class="tab-content" id="cfg-modules-tab">
+                    <div class="content-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-play-circle"></i></div>
+                                <h2>Gerenciar Módulos</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-subject">Tema</label>
+                                    <select class="form-control" id="cfg-module-subject">
+                                        <option value="">Selecione um tema</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-theme">Assunto</label>
+                                    <select class="form-control" id="cfg-module-theme">
+                                        <option value="">Selecione um assunto</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-title">Título do Módulo</label>
+                                    <input class="form-control" type="text" id="cfg-module-title" placeholder="Título do módulo">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-caption">Subtítulo</label>
+                                    <textarea class="form-control" id="cfg-module-caption" placeholder="Descrição do módulo"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-video">ID do Vídeo (YouTube)</label>
+                                    <input class="form-control" type="text" id="cfg-module-video" placeholder="Ex.: dQw4w9WgXcQ">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-pdf">Diretório do PDF</label>
+                                    <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Código após dropbox.com/scl/fi/…">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-module-attachments">
+                                        Anexos <span style="color:var(--text-3);font-weight:400;">(título;URL — um por linha)</span>
+                                    </label>
+                                    <textarea class="form-control" id="cfg-module-attachments" placeholder="Ex.: Guia;https://example.com/guia.pdf"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary btn-full" id="cfg-module-save">
+                                        <i class="fas fa-save"></i> Salvar Módulo
+                                    </button>
+                                    <button class="btn btn-danger btn-icon" id="cfg-module-delete" style="display:none;" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <div id="cfg-module-loading" class="cfg-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
+                                <h2>Módulos Cadastrados</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div id="cfg-modules-container" class="modules-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Avaliações Tab -->
+                <div class="tab-content" id="cfg-quizzes-tab">
+                    <div class="content-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-clipboard-list"></i></div>
+                                <h2>Gerenciar Avaliações</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-subject">Tema</label>
+                                    <select class="form-control" id="cfg-quiz-subject">
+                                        <option value="">Selecione um tema</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-theme">Assunto</label>
+                                    <select class="form-control" id="cfg-quiz-theme">
+                                        <option value="">Selecione um assunto</option>
+                                    </select>
+                                </div>
+                                <div id="cfg-quiz-toggle-wrapper" class="quiz-toggle-wrapper" style="display:none;">
+                                    <div class="quiz-toggle-container">
+                                        <label class="quiz-toggle-label">
+                                            <i class="fas fa-power-off"></i>
+                                            <span>Status da Avaliação</span>
+                                        </label>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="cfg-quiz-status-toggle" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <div class="toggle-status enabled" id="cfg-quiz-status-text">Habilitada</div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-question">Pergunta</label>
+                                    <input class="form-control" type="text" id="cfg-quiz-question" placeholder="Digite a pergunta">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-option1">Opção 1</label>
+                                    <input class="form-control" type="text" id="cfg-quiz-option1" placeholder="Opção 1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-option2">Opção 2</label>
+                                    <input class="form-control" type="text" id="cfg-quiz-option2" placeholder="Opção 2">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-option3">Opção 3</label>
+                                    <input class="form-control" type="text" id="cfg-quiz-option3" placeholder="Opção 3">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-option4">Opção 4</label>
+                                    <input class="form-control" type="text" id="cfg-quiz-option4" placeholder="Opção 4">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-quiz-correct">Resposta Correta</label>
+                                    <select class="form-control" id="cfg-quiz-correct">
+                                        <option value="0">Opção 1</option>
+                                        <option value="1">Opção 2</option>
+                                        <option value="2">Opção 3</option>
+                                        <option value="3">Opção 4</option>
+                                    </select>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary btn-full" id="cfg-quiz-save">
+                                        <i class="fas fa-save"></i> Salvar Questão
+                                    </button>
+                                    <button class="btn btn-danger btn-icon" id="cfg-quiz-delete" style="display:none;" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <div id="cfg-quiz-loading" class="cfg-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
+                                <h2>Questões Cadastradas</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div id="cfg-quizzes-container" class="quizzes-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    </section>
+
+    <!-- Firebase (SDK compat: scripts classicos, funcionam tambem via file://) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script src="js/main.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/portal-auth.js"></script>
+</body>
+</html>
