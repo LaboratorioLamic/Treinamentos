@@ -100,7 +100,6 @@ function buildCard(platform) {
         <div class="card-stats">${stats}</div>
         <div class="card-foot">
             <span class="card-enter">Acessar <i class="fas fa-arrow-right"></i></span>
-            <span class="card-kicker">Portal + Configurações</span>
         </div>`;
 
     card.addEventListener('click', () => openPlatform(platform));
