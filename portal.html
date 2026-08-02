@@ -7,9 +7,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/certificate.css">
 </head>
 <body>
 
@@ -28,6 +34,9 @@
             <a class="header-home" href="index.html" title="Trocar de plataforma" aria-label="Trocar de plataforma">
                 <i class="fas fa-grip"></i><span>Plataformas</span>
             </a>
+            <button id="student-account-btn" class="header-account" title="Minha conta" aria-label="Minha conta">
+                <i class="fas fa-user"></i><span id="student-account-label">Entrar</span>
+            </button>
             <button id="settings-btn" class="header-settings" title="Configurações" aria-label="Abrir configurações">
                 <i class="fas fa-cog"></i>
             </button>
@@ -53,24 +62,31 @@
             <div class="select-group">
                 <div class="selection-label">Tema</div>
                 <div class="dropdown">
-                    <button id="dropdownBtn">Escolha um Tema</button>
-                    <div id="dropdownContent" class="dropdown-content">
+                    <button id="dropdownBtn" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dropdown-btn-icon"><i class="fas fa-bookmark"></i></span>
+                        <span class="dropdown-btn-label">Escolha um Tema</span>
+                        <i class="fas fa-chevron-down dropdown-btn-caret"></i>
+                    </button>
+                    <div id="dropdownContent" class="dropdown-content" role="listbox">
+                        <div class="dropdown-head">
+                            <i class="fas fa-layer-group"></i> Temas disponíveis
+                        </div>
                         <ul id="dropdownList"></ul>
                     </div>
                 </div>
             </div>
 
-            <div class="selection-divider">
+            <div class="selection-divider" id="selection-divider" style="display:none;">
                 <i class="fas fa-chevron-right"></i>
             </div>
 
-            <div class="select-group" id="themeDropdown">
-                <div class="selection-label">Assunto</div>
-                <div class="dropdown">
-                    <button id="themeBtn">Escolha um Assunto</button>
-                    <div id="themeDropdownContent" class="theme-dropdown-content">
-                        <ul id="themeDropdownList"></ul>
-                    </div>
+            <div class="select-group course-crumb" id="themeDropdown">
+                <!-- Guarda o nome do curso em aberto; o envio da avaliação lê daqui. -->
+                <span id="themeBtn" hidden>Escolha um Assunto</span>
+                <div class="crumb-row">
+                    <button type="button" id="back-to-courses" class="back-to-courses" style="display:none;">
+                        <i class="fas fa-th-large"></i> Ver todos os cursos
+                    </button>
                 </div>
             </div>
         </div>
@@ -79,11 +95,30 @@
     <!-- ─── PAGE BODY ─── -->
     <div class="page-body">
 
+        <!-- Course gallery (após escolher o Tema) -->
+        <div class="course-gallery" id="course-gallery" style="display:none;">
+            <div class="gallery-header">
+                <div>
+                    <h2 id="gallery-title">Cursos disponíveis</h2>
+                    <p id="gallery-sub">Escolha um curso para começar</p>
+                </div>
+                <div class="gallery-search">
+                    <i class="fas fa-search"></i>
+                    <input type="search" id="gallery-filter" placeholder="Buscar curso...">
+                </div>
+            </div>
+            <div class="course-grid" id="course-grid"></div>
+            <div class="gallery-empty" id="gallery-empty" style="display:none;">
+                <i class="fas fa-folder-open"></i>
+                <p>Nenhum curso encontrado neste tema.</p>
+            </div>
+        </div>
+
         <!-- Welcome state (before course selection) -->
         <div class="welcome-screen" id="welcome-screen">
             <div class="welcome-icon"><i class="fas fa-play-circle"></i></div>
-            <h2>Selecione um curso para começar</h2>
-            <p>Escolha o Tema e o Assunto nos menus acima para acessar o conteúdo do treinamento.</p>
+            <h2>Selecione um tema para começar</h2>
+            <p>Escolha o Tema no menu acima e os cursos disponíveis aparecerão aqui em cards.</p>
         </div>
 
         <!-- Course content -->
@@ -137,12 +172,25 @@
                     <div id="result-container" class="result-container"></div>
                     <div id="form-container" class="form-container">
                         <div class="form-title"><i class="fas fa-certificate" style="color:var(--accent);margin-right:8px;"></i>Registrar Conclusão</div>
-                        <label for="name">Nome</label>
-                        <select id="name">
-                            <option value="">Selecione seu nome</option>
-                        </select>
-                        <label for="email">Email</label>
-                        <input type="email" id="email" placeholder="seu@email.com">
+
+                        <!-- Estágios: nome digitado livremente, sem exigir conta -->
+                        <div id="form-name-free-group">
+                            <label for="name">Nome</label>
+                            <select id="name">
+                                <option value="">Selecione seu nome</option>
+                            </select>
+                            <label for="email">Email</label>
+                            <input type="email" id="email" placeholder="seu@email.com">
+                        </div>
+
+                        <!-- Treinamentos/Educação Continuada: identidade vem da sessão logada -->
+                        <div id="form-name-logged-group" style="display:none;">
+                            <label>Concluindo como</label>
+                            <div class="form-logged-user">
+                                <i class="fas fa-user-circle"></i>
+                                <span id="form-logged-user-name">—</span>
+                            </div>
+                        </div>
 
                         <div class="rating-container" id="rating-container" style="display:none;">
                             <label>Avalie o Curso</label>
@@ -226,6 +274,133 @@
         </div>
     </div>
 
+    <!-- ─── MODAL DE CADASTRO/LOGIN DO ALUNO ─── -->
+    <div class="auth-modal" id="student-auth-modal" role="dialog" aria-modal="true" aria-labelledby="student-auth-title">
+        <div class="auth-card student-auth-card" id="student-auth-card">
+            <div class="auth-header">
+                <h2 id="student-auth-title"><i class="fas fa-user"></i> Minha Conta</h2>
+                <button class="auth-close" id="student-auth-close" aria-label="Fechar">&times;</button>
+            </div>
+            <div class="auth-body">
+                <div class="student-auth-tabs">
+                    <button type="button" class="student-auth-tab active" id="student-auth-tab-login">Entrar</button>
+                    <button type="button" class="student-auth-tab" id="student-auth-tab-register">Criar Conta</button>
+                </div>
+
+                <div class="auth-error" id="student-auth-error"></div>
+
+                <!-- Painel de login -->
+                <div id="student-auth-login-panel">
+                    <label for="student-login-username">Login</label>
+                    <input type="text" id="student-login-username" placeholder="Digite seu login" autocomplete="username">
+                    <label for="student-login-password">Senha</label>
+                    <input type="password" id="student-login-password" placeholder="Digite sua senha" autocomplete="current-password">
+                    <button class="auth-submit" id="student-login-submit">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </button>
+                </div>
+
+                <!-- Painel de cadastro -->
+                <div id="student-auth-register-panel" style="display:none;">
+                    <label for="student-register-name">Nome completo</label>
+                    <div class="student-name-combobox">
+                        <input type="text" id="student-register-name" placeholder="Digite para buscar seu nome" autocomplete="off">
+                        <div class="student-name-popover" id="student-register-name-popover"></div>
+                    </div>
+                    <small class="form-hint">Seu nome precisa estar na lista de colaboradores cadastrada pelo administrador.</small>
+                    <label for="student-register-username">Login</label>
+                    <input type="text" id="student-register-username" placeholder="ex: pedrolima" autocomplete="username">
+                    <small class="form-hint">Apenas letras minúsculas, sem espaços ou caracteres especiais.</small>
+                    <label for="student-register-password">Senha</label>
+                    <input type="password" id="student-register-password" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
+                    <label for="student-register-confirm">Confirmar senha</label>
+                    <input type="password" id="student-register-confirm" placeholder="Repita a senha" autocomplete="new-password">
+                    <button class="auth-submit" id="student-register-submit">
+                        <i class="fas fa-user-plus"></i> Criar Conta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── MODAL DE PERFIL DO ALUNO ─── -->
+    <div class="auth-modal" id="student-profile-modal" role="dialog" aria-modal="true" aria-labelledby="student-profile-title">
+        <div class="auth-card student-profile-card" id="student-profile-card">
+            <div class="auth-header">
+                <h2 id="student-profile-title"><i class="fas fa-user-circle"></i> <span id="student-profile-name">Meu Perfil</span></h2>
+                <button class="auth-close" id="student-profile-close" aria-label="Fechar">&times;</button>
+            </div>
+            <div class="auth-body">
+                <div class="student-profile-tabs">
+                    <button type="button" class="student-auth-tab active" id="student-profile-tab-overview">Visão geral</button>
+                    <button type="button" class="student-auth-tab" id="student-profile-tab-history">Histórico</button>
+                </div>
+
+                <!-- Aba: Visão geral -->
+                <div id="student-profile-overview-panel">
+                    <!-- Dados principais do usuário: nome/criação vêm da conta,
+                         setor/função da planilha (Colaboradores). -->
+                    <div class="student-profile-info" id="student-profile-info">
+                        <div class="student-profile-info-item">
+                            <span class="label"><i class="fas fa-user"></i> Nome completo</span>
+                            <span class="value" id="student-profile-info-name">—</span>
+                        </div>
+                        <div class="student-profile-info-item">
+                            <span class="label"><i class="fas fa-calendar-plus"></i> Criado em</span>
+                            <span class="value" id="student-profile-info-created">—</span>
+                        </div>
+                        <div class="student-profile-info-item">
+                            <span class="label"><i class="fas fa-building"></i> Setor</span>
+                            <span class="value" id="student-profile-info-unit">—</span>
+                        </div>
+                        <div class="student-profile-info-item">
+                            <span class="label"><i class="fas fa-id-badge"></i> Função</span>
+                            <span class="value" id="student-profile-info-role">—</span>
+                        </div>
+                    </div>
+
+                    <div class="student-profile-summary">
+                        <div class="student-profile-stat">
+                            <strong id="student-profile-approved-count">0</strong>
+                            <span>Cursos concluídos</span>
+                        </div>
+                        <div class="student-profile-stat">
+                            <strong id="student-profile-avg-score">—</strong>
+                            <span>Média geral</span>
+                        </div>
+                    </div>
+
+                    <button type="button" class="student-profile-toggle" id="student-profile-password-toggle">
+                        <i class="fas fa-key"></i> Alterar senha
+                    </button>
+                    <div id="student-profile-password-panel" style="display:none;">
+                        <div class="auth-error" id="student-profile-password-error"></div>
+                        <label for="student-profile-current-password">Senha atual</label>
+                        <input type="password" id="student-profile-current-password" placeholder="Digite sua senha atual" autocomplete="current-password">
+                        <label for="student-profile-new-password">Nova senha</label>
+                        <input type="password" id="student-profile-new-password" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
+                        <label for="student-profile-confirm-password">Confirmar nova senha</label>
+                        <input type="password" id="student-profile-confirm-password" placeholder="Repita a nova senha" autocomplete="new-password">
+                        <button class="auth-submit" id="student-profile-password-submit">
+                            <i class="fas fa-check"></i> Salvar nova senha
+                        </button>
+                    </div>
+
+                    <button class="auth-submit student-profile-logout" id="student-profile-logout">
+                        <i class="fas fa-right-from-bracket"></i> Sair da Conta
+                    </button>
+                </div>
+
+                <!-- Aba: Histórico -->
+                <div id="student-profile-history-panel" style="display:none;">
+                    <div id="student-profile-list" class="student-profile-list">
+                        <p class="form-hint">Carregando histórico...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ─── PAINEL DE CONFIGURAÇÕES (admin) ─── -->
 
     <!-- Loading Overlay -->
@@ -272,16 +447,455 @@
                 <h2><i class="fas fa-database" style="color:var(--purple);margin-right:7px;"></i>Backup de Dados</h2>
                 <span class="close" id="cfg-backup-close">&times;</span>
             </div>
-            <div class="modal-body">
-                <div class="backup-section">
-                    <div class="backup-section-title">Exportar</div>
-                    <button id="cfg-download-btn"><i class="fas fa-download"></i> Baixar Backup</button>
+            <div class="modal-body backup-body">
+                <div class="backup-row">
+                    <div class="backup-row-text">
+                        <div class="backup-row-title">Exportar</div>
+                        <div class="backup-row-hint">Baixa um arquivo .json da categoria</div>
+                    </div>
+                    <button id="cfg-download-btn"><i class="fas fa-download"></i> Baixar</button>
                 </div>
-                <div class="backup-section">
-                    <div class="backup-section-title">Restaurar</div>
+
+                <div class="backup-row">
+                    <div class="backup-row-text">
+                        <div class="backup-row-title">Restaurar</div>
+                        <div class="backup-row-hint" id="cfg-upload-filename">Nenhum arquivo escolhido</div>
+                    </div>
+                    <label class="file-pick" for="cfg-upload-file"><i class="fas fa-folder-open"></i> Arquivo</label>
                     <input type="file" id="cfg-upload-file" accept=".json">
-                    <button id="cfg-upload-btn"><i class="fas fa-upload"></i> Carregar Backup</button>
+                    <button id="cfg-upload-btn"><i class="fas fa-upload"></i> Carregar</button>
                 </div>
+
+                <div class="backup-row">
+                    <div class="backup-row-text">
+                        <div class="backup-row-title">Exportar Excel</div>
+                        <div class="backup-row-hint">Colaboradores, usuários e resultados em .xlsx</div>
+                    </div>
+                    <button id="cfg-excel-download-btn"><i class="fas fa-file-excel"></i> Baixar</button>
+                </div>
+
+                <details class="danger-details">
+                    <summary><i class="fas fa-triangle-exclamation"></i> Zona de perigo</summary>
+                    <p class="danger-note">
+                        Apaga todo o conteúdo de <strong id="cfg-wipe-category">—</strong>.
+                        Irreversível — baixe um backup antes.
+                    </p>
+                    <p class="danger-shared" id="cfg-wipe-shared" style="display:none;">
+                        <span id="cfg-wipe-shared-text"></span>
+                    </p>
+                    <button id="cfg-wipe-btn"><i class="fas fa-trash-can"></i> Apagar dados da categoria</button>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmação (substitui o prompt do navegador) -->
+    <div class="modal" id="cfg-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-confirm-title">
+        <div class="modal-content confirm-content" id="cfg-confirm-content">
+            <div class="confirm-head">
+                <div class="confirm-icon" id="cfg-confirm-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <h2 id="cfg-confirm-title">Confirmar ação</h2>
+                <p id="cfg-confirm-message">Esta ação não pode ser desfeita.</p>
+            </div>
+            <ul class="confirm-details" id="cfg-confirm-details"></ul>
+            <div class="confirm-field">
+                <label for="cfg-confirm-input">Digite <strong>SIM</strong> para confirmar</label>
+                <input type="text" id="cfg-confirm-input" placeholder="SIM" autocomplete="off" spellcheck="false">
+                <span class="confirm-error" id="cfg-confirm-error">Digite SIM para continuar.</span>
+            </div>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-confirm-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-confirm-ok">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de redefinir senha (painel de Usuários) -->
+    <div class="modal" id="cfg-reset-password-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-reset-password-title">
+        <div class="modal-content confirm-content" id="cfg-reset-password-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-key"></i></div>
+                <h2 id="cfg-reset-password-title">Redefinir senha</h2>
+                <p id="cfg-reset-password-message">Defina uma nova senha para este usuário.</p>
+            </div>
+            <div class="confirm-field">
+                <label for="cfg-reset-password-input">Nova senha</label>
+                <input type="password" id="cfg-reset-password-input" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
+                <span class="confirm-error" id="cfg-reset-password-error"></span>
+            </div>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-reset-password-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-reset-password-ok">Redefinir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de criar/editar conta de aluno (aba Usuários) -->
+    <div class="modal" id="cfg-user-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-user-form-title">
+        <div class="modal-content confirm-content user-form-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-user-plus" id="cfg-user-form-icon"></i></div>
+                <h2 id="cfg-user-form-title">Novo usuário</h2>
+                <p id="cfg-user-form-message">Crie uma conta de aluno a partir de um colaborador da planilha.</p>
+            </div>
+
+            <div class="confirm-field" id="cfg-user-form-colab-field">
+                <label for="cfg-user-form-colab">Colaborador</label>
+                <div class="user-combobox">
+                    <input type="text" id="cfg-user-form-colab" placeholder="Digite para buscar o colaborador" autocomplete="off" role="combobox" aria-expanded="false">
+                    <i class="fas fa-chevron-down user-combobox-caret"></i>
+                    <div class="user-combobox-popover" id="cfg-user-form-colab-popover"></div>
+                </div>
+                <small class="form-hint">Só aparecem colaboradores ainda sem conta.</small>
+            </div>
+
+            <div class="confirm-field" id="cfg-user-form-name-field">
+                <label for="cfg-user-form-name">Nome completo</label>
+                <div class="user-combobox">
+                    <input type="text" id="cfg-user-form-name" placeholder="Digite para buscar o nome" autocomplete="off" role="combobox" aria-expanded="false">
+                    <i class="fas fa-chevron-down user-combobox-caret"></i>
+                    <div class="user-combobox-popover" id="cfg-user-form-name-popover"></div>
+                </div>
+            </div>
+
+            <div class="confirm-field">
+                <label for="cfg-user-form-username">Login</label>
+                <input type="text" id="cfg-user-form-username" placeholder="apenas letras minúsculas e números" autocomplete="off">
+            </div>
+
+            <div id="cfg-user-form-password-field">
+                <div class="user-form-row">
+                    <div class="confirm-field">
+                        <label for="cfg-user-form-password">Senha</label>
+                        <input type="password" id="cfg-user-form-password" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
+                    </div>
+                    <div class="confirm-field">
+                        <label for="cfg-user-form-password2">Confirmar senha</label>
+                        <input type="password" id="cfg-user-form-password2" placeholder="Repita a senha" autocomplete="new-password">
+                    </div>
+                </div>
+                <div class="user-password-hint" id="cfg-user-form-password-hint"></div>
+            </div>
+
+            <div class="user-form-row">
+                <div class="confirm-field">
+                    <label for="cfg-user-form-unit">Setor</label>
+                    <div class="user-combobox">
+                        <input type="text" id="cfg-user-form-unit" placeholder="Buscar setor" autocomplete="off" role="combobox" aria-expanded="false">
+                        <i class="fas fa-chevron-down user-combobox-caret"></i>
+                        <div class="user-combobox-popover" id="cfg-user-form-unit-popover"></div>
+                    </div>
+                </div>
+                <div class="confirm-field">
+                    <label for="cfg-user-form-role">Função</label>
+                    <div class="user-combobox">
+                        <input type="text" id="cfg-user-form-role" placeholder="Buscar função" autocomplete="off" role="combobox" aria-expanded="false">
+                        <i class="fas fa-chevron-down user-combobox-caret"></i>
+                        <div class="user-combobox-popover" id="cfg-user-form-role-popover"></div>
+                    </div>
+                </div>
+            </div>
+
+            <span class="confirm-error" id="cfg-user-form-error"></span>
+
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-user-form-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-user-form-ok">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de edição manual de colaborador (corrige linha inválida da planilha) -->
+    <div class="modal" id="cfg-colab-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-colab-form-title">
+        <div class="modal-content confirm-content user-form-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-user-pen"></i></div>
+                <h2 id="cfg-colab-form-title">Editar colaborador</h2>
+                <p id="cfg-colab-form-message">Corrija os dados que vieram errados da planilha.</p>
+            </div>
+
+            <div class="confirm-field">
+                <label for="cfg-colab-form-name">Nome completo</label>
+                <input type="text" id="cfg-colab-form-name" placeholder="Nome completo" autocomplete="off">
+            </div>
+
+            <div class="user-form-row">
+                <div class="confirm-field">
+                    <label for="cfg-colab-form-unit">Setor</label>
+                    <input type="text" id="cfg-colab-form-unit" placeholder="Setor / unidade" autocomplete="off">
+                </div>
+                <div class="confirm-field">
+                    <label for="cfg-colab-form-role">Função</label>
+                    <input type="text" id="cfg-colab-form-role" placeholder="Cargo / função" autocomplete="off">
+                </div>
+            </div>
+
+            <small class="form-hint">Os campos alterados aqui deixam de ser sobrescritos pela sincronização.</small>
+            <span class="confirm-error" id="cfg-colab-form-error"></span>
+
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-colab-form-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-colab-form-ok">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de configuração do certificado do assunto -->
+    <div class="modal cert-modal" id="cfg-cert-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-cert-modal-title">
+        <div class="cert-modal-card">
+            <div class="cert-modal-head">
+                <div class="cert-modal-icon"><i class="fas fa-award"></i></div>
+                <div class="cert-modal-titles">
+                    <h2 id="cfg-cert-modal-title">Certificado do assunto</h2>
+                    <p>Defina como o certificado deste curso será emitido.</p>
+                </div>
+                <button type="button" class="cert-modal-close" id="cfg-cert-close" aria-label="Fechar">&times;</button>
+            </div>
+
+            <div class="cert-modal-body">
+                <label class="cert-switch-row">
+                    <span class="cert-switch-text">
+                        <strong>Emitir certificado</strong>
+                        <small>O aluno aprovado poderá baixar o certificado em PDF.</small>
+                    </span>
+                    <input type="checkbox" id="cfg-theme-cert-enabled">
+                    <span class="cert-switch"></span>
+                </label>
+
+                <div id="cfg-theme-cert-fields" class="cert-fields">
+                    <div class="cert-field-row">
+                        <div class="cert-field">
+                            <label for="cfg-theme-cert-title">Título do certificado</label>
+                            <input type="text" id="cfg-theme-cert-title" placeholder="Nome do assunto">
+                            <small>Deixe em branco para usar o nome do assunto.</small>
+                        </div>
+                        <div class="cert-field cert-field-hours">
+                            <label for="cfg-theme-cert-hours">Carga horária</label>
+                            <div class="cert-input-suffix">
+                                <input type="number" min="1" id="cfg-theme-cert-hours" placeholder="10">
+                                <span>horas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cert-field">
+                        <label for="cfg-theme-cert-topic-input">
+                            Temas abordados
+                            <span class="cert-topic-counter" id="cfg-theme-cert-topics-count">0</span>
+                        </label>
+                        <div class="cert-topic-add">
+                            <input type="text" id="cfg-theme-cert-topic-input" placeholder="Ex.: Procedimento de coleta" autocomplete="off">
+                            <button type="button" id="cfg-theme-cert-topic-add" title="Adicionar tema">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="cert-topic-list" id="cfg-theme-cert-topic-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cert-modal-foot">
+                <button type="button" class="cert-btn-ghost" id="cfg-cert-cancel">Cancelar</button>
+                <button type="button" class="cert-btn-primary" id="cfg-cert-apply">
+                    <i class="fas fa-check"></i> Aplicar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de histórico de cursos de um usuário (clique no card em Usuários) -->
+    <div class="modal" id="cfg-user-history-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-user-history-title">
+        <div class="modal-content history-detail-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-clock" style="color:var(--cfg-primary);margin-right:7px;"></i><span id="cfg-user-history-title">Histórico do usuário</span></h2>
+                <span class="close" id="cfg-user-history-close">&times;</span>
+            </div>
+            <div class="modal-body history-detail-body">
+                <div id="cfg-user-history-summary" class="history-detail-summary"></div>
+                <div id="cfg-user-history-table-wrap" class="dashboard-table-wrap history-table-wrap"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de detalhe do Histórico (feedback do quiz + avaliação) -->
+    <div class="modal" id="cfg-history-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-detail-title">
+        <div class="modal-content history-detail-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-clipboard-list" style="color:var(--cfg-primary);margin-right:7px;"></i><span id="cfg-history-detail-title">Detalhe da avaliação</span></h2>
+                <span class="close" id="cfg-history-detail-close">&times;</span>
+            </div>
+            <div class="modal-body history-detail-body">
+                <div id="cfg-history-detail-attempts" class="history-detail-attempts" style="display:none;"></div>
+                <div id="cfg-history-detail-summary" class="history-detail-summary"></div>
+                <div id="cfg-history-detail-cert"></div>
+
+                <div id="cfg-history-detail-satisfaction" class="history-detail-satisfaction" style="display:none;">
+                    <h3><i class="fas fa-star"></i> Avaliação do Curso</h3>
+                    <div id="cfg-history-detail-satisfaction-body"></div>
+                </div>
+
+                <div class="history-detail-questions-header">
+                    <h3><i class="fas fa-list-check"></i> Questões</h3>
+                    <label class="history-only-wrong-toggle">
+                        <input type="checkbox" id="cfg-history-detail-only-wrong">
+                        Mostrar apenas erradas
+                    </label>
+                </div>
+                <div id="cfg-history-detail-questions" class="history-detail-questions"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de importação do Histórico (escolha de categoria) -->
+    <div class="modal" id="cfg-history-import-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-import-title">
+        <div class="modal-content confirm-content" id="cfg-history-import-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-file-import"></i></div>
+                <h2 id="cfg-history-import-title">Importar histórico</h2>
+                <p id="cfg-history-import-message">Selecione a categoria dos registros deste arquivo.</p>
+            </div>
+            <div class="confirm-field">
+                <label for="cfg-history-import-category">Categoria</label>
+                <select id="cfg-history-import-category" class="form-control">
+                    <option value="treinamentos">Treinamentos</option>
+                    <option value="educacao_continuada">Educação Continuada</option>
+                    <option value="estagios">Estágios</option>
+                </select>
+            </div>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-history-import-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-history-import-ok">Continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de mapeamento de Assunto/Tema não cadastrados no import -->
+    <div class="modal" id="cfg-history-mapping-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-mapping-title">
+        <div class="modal-content confirm-content" id="cfg-history-mapping-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-random"></i></div>
+                <h2 id="cfg-history-mapping-title">Assunto/Tema não reconhecidos</h2>
+                <p>Estes pares da planilha não batem com nenhum curso cadastrado. Selecione a qual curso cada um corresponde (ou deixe em branco para ignorar essas linhas).</p>
+            </div>
+            <div class="confirm-field" id="cfg-history-mapping-list"></div>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-history-mapping-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-history-mapping-ok">Aplicar e continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comentário de uma linha do Histórico -->
+    <div class="modal" id="cfg-history-comment-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-comment-title">
+        <div class="modal-content history-comment-content">
+            <div class="modal-header">
+                <h2 id="cfg-history-comment-title"><i class="fas fa-comment-dots" style="color:var(--cfg-primary);margin-right:7px;"></i>Comentário</h2>
+                <span class="close" id="cfg-history-comment-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="history-comment-meta" id="cfg-history-comment-meta"></div>
+                <div class="history-comment-text" id="cfg-history-comment-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adicionar/editar registro do Histórico -->
+    <div class="modal" id="cfg-history-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-form-title">
+        <div class="modal-content history-form-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-pen-to-square" style="color:var(--cfg-primary);margin-right:7px;"></i><span id="cfg-history-form-title">Adicionar registro</span></h2>
+                <span class="close" id="cfg-history-form-close">&times;</span>
+            </div>
+            <div class="modal-body history-form-body">
+                <p class="history-form-hint" id="cfg-history-form-hint"></p>
+                <div class="history-form-grid">
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-category">Categoria</label>
+                        <select id="cfg-history-form-category">
+                            <option value="treinamentos">Treinamentos</option>
+                            <option value="educacao_continuada">Educação Continuada</option>
+                            <option value="estagios">Estágios</option>
+                        </select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field is-wide">
+                        <label for="cfg-history-form-course">Assunto (Tema)</label>
+                        <select id="cfg-history-form-course"></select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field is-wide">
+                        <label for="cfg-history-form-name">Nome</label>
+                        <input type="text" id="cfg-history-form-name" placeholder="Nome completo do aluno">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-unit">Unidade</label>
+                        <input type="text" id="cfg-history-form-unit" placeholder="Ex.: 06 - Unidade Milagres">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-role">Cargo</label>
+                        <input type="text" id="cfg-history-form-role" placeholder="Ex.: Atendente/Coletador">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-date">Data/Hora</label>
+                        <input type="datetime-local" id="cfg-history-form-date">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-score">Nota (0 a 10)</label>
+                        <input type="number" id="cfg-history-form-score" min="0" max="10" step="0.5">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-approved">Situação</label>
+                        <select id="cfg-history-form-approved">
+                            <option value="auto">Automática (nota ≥ 8)</option>
+                            <option value="1">Aprovado</option>
+                            <option value="0">Reprovado</option>
+                        </select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-rating">Avaliação do curso</label>
+                        <select id="cfg-history-form-rating">
+                            <option value="">Sem avaliação</option>
+                            <option value="1">★ 1</option>
+                            <option value="2">★ 2</option>
+                            <option value="3">★ 3</option>
+                            <option value="4">★ 4</option>
+                            <option value="5">★ 5</option>
+                        </select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-deadline">Prazo</label>
+                        <select id="cfg-history-form-deadline">
+                            <option value="livre">Sem prazo</option>
+                            <option value="not_started">Ainda não iniciado</option>
+                            <option value="on_time">No prazo</option>
+                            <option value="late">Em atraso</option>
+                            <option value="closed">Encerrado</option>
+                            <option value="forgiven">Atraso desconsiderado</option>
+                        </select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field is-wide">
+                        <label for="cfg-history-form-comment">Comentário</label>
+                        <textarea id="cfg-history-form-comment" rows="2" placeholder="Opcional"></textarea>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field is-wide" id="cfg-history-form-errors-wrap">
+                        <label for="cfg-history-form-errors">Erros (opcional)</label>
+                        <textarea id="cfg-history-form-errors" rows="4" placeholder="1) Pergunta&#10;Resposta: o que o aluno marcou&#10;Gabarito: resposta correta"></textarea>
+                        <small class="history-form-help">Mesmo formato da planilha: um bloco por questão errada. As questões não citadas contam como acertadas.</small>
+                    </div>
+                </div>
+            </div>
+            <div class="history-form-actions">
+                <button type="button" class="confirm-cancel" id="cfg-history-form-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-history-form-save">Salvar</button>
             </div>
         </div>
     </div>
@@ -318,6 +932,18 @@
                     </button>
                     <button class="tab-btn" data-tab="quizzes">
                         <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span>Avaliações
+                    </button>
+                    <button class="tab-btn" data-tab="colaboradores">
+                        <span class="nav-icon"><i class="fas fa-address-book"></i></span>Colaboradores
+                    </button>
+                    <button class="tab-btn" data-tab="users">
+                        <span class="nav-icon"><i class="fas fa-users"></i></span>Usuários
+                    </button>
+                    <button class="tab-btn" data-tab="dashboard">
+                        <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>Dashboard
+                    </button>
+                    <button class="tab-btn" data-tab="history">
+                        <span class="nav-icon"><i class="fas fa-table-list"></i></span>Histórico
                     </button>
                 </nav>
             </div>
@@ -404,6 +1030,92 @@
                                 <div class="form-group">
                                     <label class="form-label" for="cfg-theme-name">Nome do Assunto</label>
                                     <input class="form-control" type="text" id="cfg-theme-name" placeholder="Digite o nome do assunto">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="cfg-theme-description">
+                                        Descrição <span style="color:var(--text-3);font-weight:400;">(breve, aparece no card)</span>
+                                    </label>
+                                    <textarea class="form-control" id="cfg-theme-description" maxlength="220" placeholder="Resumo do curso em uma ou duas frases"></textarea>
+                                    <small class="form-hint"><span id="cfg-theme-desc-count">0</span>/220 caracteres</small>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Imagem do curso <span style="color:var(--text-3);font-weight:400;">(128×128, comprimida)</span></label>
+                                    <div class="image-picker">
+                                        <div class="image-preview" id="cfg-theme-image-preview">
+                                            <span class="image-initials" id="cfg-theme-image-initials">?</span>
+                                        </div>
+                                        <div class="image-picker-actions">
+                                            <label class="btn btn-ghost btn-sm" for="cfg-theme-image-file">
+                                                <i class="fas fa-image"></i> Escolher imagem
+                                            </label>
+                                            <input type="file" id="cfg-theme-image-file" accept="image/*" hidden>
+                                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-theme-image-clear">
+                                                <i class="fas fa-times"></i> Remover
+                                            </button>
+                                            <small class="form-hint" id="cfg-theme-image-info">Sem imagem — o card mostra as iniciais.</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Prazo</label>
+                                    <div class="deadline-mode-toggle">
+                                        <button type="button" class="deadline-mode-btn active" id="cfg-theme-deadline-livre" data-mode="livre">
+                                            <i class="fas fa-infinity"></i> Livre
+                                        </button>
+                                        <button type="button" class="deadline-mode-btn" id="cfg-theme-deadline-prazo" data-mode="prazo">
+                                            <i class="fas fa-calendar-days"></i> Prazo
+                                        </button>
+                                    </div>
+                                    <div id="cfg-theme-deadline-fields" class="deadline-fields" style="display:none;">
+                                        <div class="form-group">
+                                            <label class="form-label" for="cfg-theme-deadline-start">Início <span style="color:var(--text-3);font-weight:400;">(curso fica disponível a partir daqui)</span></label>
+                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-start">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label" for="cfg-theme-deadline-end">Prazo final <span style="color:var(--text-3);font-weight:400;">(data esperada de término)</span></label>
+                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-end">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label" for="cfg-theme-deadline-close">Encerramento <span style="color:var(--text-3);font-weight:400;">(bloqueia a avaliação após esta data)</span></label>
+                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-close">
+                                        </div>
+                                        <small class="form-hint" id="cfg-theme-deadline-error" style="display:none;color:var(--danger);"></small>
+                                    </div>
+                                </div>
+                                <!-- Funções (cargos) que enxergam o curso. Vazio = todas.
+                                     A lista vem dos cargos das contas cadastradas. -->
+                                <div class="form-group">
+                                    <label class="form-label">Funções que veem este curso</label>
+                                    <div class="roles-picker" id="cfg-theme-roles-picker">
+                                        <button type="button" class="roles-picker-btn" id="cfg-theme-roles-btn"
+                                                aria-haspopup="true" aria-expanded="false">
+                                            <span class="roles-picker-icon"><i class="fas fa-user-tag"></i></span>
+                                            <span class="roles-picker-text">
+                                                <strong id="cfg-theme-roles-summary">Todas as funções</strong>
+                                                <small>Clique para selecionar</small>
+                                            </span>
+                                            <i class="fas fa-chevron-down roles-picker-arrow"></i>
+                                        </button>
+                                        <div class="roles-popover" id="cfg-theme-roles-popover" hidden>
+                                            <div class="roles-popover-head">
+                                                <input type="text" class="roles-popover-search" id="cfg-theme-roles-search" placeholder="Buscar função..." autocomplete="off">
+                                                <button type="button" class="roles-popover-clear" id="cfg-theme-roles-clear">Limpar</button>
+                                            </div>
+                                            <div class="roles-popover-list" id="cfg-theme-roles-list"></div>
+                                            <p class="roles-popover-hint">Sem seleção, o curso aparece para todos.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Certificado</label>
+                                    <button type="button" class="cert-config-btn" id="cfg-theme-cert-open">
+                                        <span class="cert-config-btn-icon"><i class="fas fa-award"></i></span>
+                                        <span class="cert-config-btn-text">
+                                            <strong>Configurar certificado</strong>
+                                            <small id="cfg-theme-cert-summary">Emissão desativada</small>
+                                        </span>
+                                        <i class="fas fa-chevron-right cert-config-btn-arrow"></i>
+                                    </button>
                                 </div>
                                 <div class="form-actions">
                                     <button class="btn btn-primary btn-full" id="cfg-theme-save">
@@ -550,6 +1262,24 @@
                                     <input class="form-control" type="text" id="cfg-quiz-question" placeholder="Digite a pergunta">
                                 </div>
                                 <div class="form-group">
+                                    <label class="form-label">Imagem da questão <span style="color:var(--text-3);font-weight:400;">(opcional, altura 256px, comprimida)</span></label>
+                                    <div class="image-picker">
+                                        <div class="image-preview quiz-image-preview" id="cfg-quiz-image-preview">
+                                            <span class="image-initials"><i class="fas fa-image"></i></span>
+                                        </div>
+                                        <div class="image-picker-actions">
+                                            <label class="btn btn-ghost btn-sm" for="cfg-quiz-image-file">
+                                                <i class="fas fa-image"></i> Escolher imagem
+                                            </label>
+                                            <input type="file" id="cfg-quiz-image-file" accept="image/*" hidden>
+                                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-quiz-image-clear">
+                                                <i class="fas fa-times"></i> Remover
+                                            </button>
+                                            <small class="form-hint" id="cfg-quiz-image-info">Sem imagem — a questão mostra apenas o texto.</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
                                     <label class="form-label" for="cfg-quiz-option1">Opção 1</label>
                                     <input class="form-control" type="text" id="cfg-quiz-option1" placeholder="Opção 1">
                                 </div>
@@ -597,6 +1327,291 @@
                     </div>
                 </div>
 
+                <!-- Colaboradores Tab -->
+                <div class="tab-content" id="cfg-colaboradores-tab">
+                    <div class="content-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-address-book"></i></div>
+                                <h2>Sincronização</h2>
+                            </div>
+                            <div class="panel-body">
+                                <p class="form-hint" style="margin-bottom:14px;">
+                                    Lista global de nomes elegíveis para cadastro de conta — compartilhada entre
+                                    Treinamentos, Educação Continuada e Estágios. Mantida automaticamente a partir
+                                    da planilha de colaboradores (Google Sheets). Nomes que saem da planilha
+                                    permanecem na lista até serem excluídos aqui, e cada item pode ser
+                                    corrigido à mão quando vier errado da origem.
+                                </p>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary btn-full" id="cfg-colab-sync-btn">
+                                        <i class="fas fa-rotate"></i> Sincronizar agora
+                                    </button>
+                                </div>
+                                <small class="form-hint" id="cfg-colab-sync-status" style="display:block;margin-top:10px;"></small>
+                                <div id="cfg-colab-loading" class="cfg-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
+                                <h2>Colaboradores Cadastrados</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="gallery-search" style="margin-bottom:14px;">
+                                    <i class="fas fa-search"></i>
+                                    <input type="search" id="cfg-colab-filter" placeholder="Buscar colaborador...">
+                                </div>
+                                <div id="cfg-colab-container" class="themes-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usuários Tab -->
+                <div class="tab-content" id="cfg-users-tab">
+                    <div class="content-panels users-panels">
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div class="panel-icon"><i class="fas fa-users"></i></div>
+                                <h2>Contas de Alunos</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="users-toolbar">
+                                    <div class="gallery-search">
+                                        <i class="fas fa-search"></i>
+                                        <input type="search" id="cfg-users-filter" placeholder="Buscar por nome ou login...">
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-sm" id="cfg-users-new">
+                                        <i class="fas fa-user-plus"></i> Novo usuário
+                                    </button>
+                                </div>
+                                <div id="cfg-users-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Tab -->
+                <div class="tab-content" id="cfg-dashboard-tab">
+                    <div class="dashboard-mode-toggle">
+                        <button type="button" class="deadline-mode-btn active" id="cfg-dash-mode-user" data-mode="user">
+                            <i class="fas fa-user"></i> Por colaborador
+                        </button>
+                        <button type="button" class="deadline-mode-btn" id="cfg-dash-mode-course" data-mode="course">
+                            <i class="fas fa-book"></i> Por curso
+                        </button>
+                    </div>
+
+                    <!-- Seletor: colaborador -->
+                    <div id="cfg-dash-user-picker" class="dashboard-picker">
+                        <div class="student-name-combobox">
+                            <input type="text" id="cfg-dash-user-search" placeholder="Buscar colaborador por nome...">
+                            <div class="student-name-popover" id="cfg-dash-user-popover"></div>
+                        </div>
+                    </div>
+
+                    <!-- Seletor: curso (categoria fixa = a selecionada nas Configurações) -->
+                    <div id="cfg-dash-course-picker" class="dashboard-picker" style="display:none;">
+                        <div class="dash-theme-combobox">
+                            <button type="button" class="dash-theme-trigger" id="cfg-dash-subject-trigger">
+                                <span class="dash-theme-trigger-text">
+                                    <i class="fas fa-layer-group"></i>
+                                    <span id="cfg-dash-subject-label">Selecione um tema</span>
+                                </span>
+                                <i class="fas fa-chevron-down dash-theme-caret"></i>
+                            </button>
+                            <div class="dash-theme-popover" id="cfg-dash-subject-popover"></div>
+                        </div>
+                        <span class="dash-category-chip" id="cfg-dash-category-chip">
+                            <i class="fas fa-folder-open"></i> <span id="cfg-dash-category-label">—</span>
+                        </span>
+                    </div>
+
+                    <!-- Assuntos do tema escolhido, em cards selecionáveis -->
+                    <div id="cfg-dash-course-cards" class="dash-course-grid" style="display:none;"></div>
+
+                    <div id="cfg-dash-empty" class="dashboard-empty">
+                        <i class="fas fa-chart-pie"></i>
+                        <p>Selecione um colaborador ou um curso para ver os indicadores.</p>
+                    </div>
+
+                    <!-- Painel: por colaborador -->
+                    <div id="cfg-dash-user-panel" class="dashboard-panel" style="display:none;">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Histórico de Notas</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-scores-chart"></canvas></div>
+                        </div>
+                        <div class="dashboard-chart-row">
+                            <div class="panel-card dashboard-chart-card">
+                                <div class="panel-header"><h2>Realização dos Cursos</h2></div>
+                                <div class="panel-body"><canvas id="cfg-dash-user-deadline-chart"></canvas></div>
+                            </div>
+                            <div class="panel-card dashboard-chart-card">
+                                <div class="panel-header"><h2>Tentativas das Avaliações</h2></div>
+                                <div class="panel-body"><canvas id="cfg-dash-user-approval-chart"></canvas></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Painel: por curso -->
+                    <div id="cfg-dash-course-panel" class="dashboard-panel" style="display:none;">
+                        <div class="dashboard-chart-row">
+                            <div class="panel-card dashboard-chart-card">
+                                <div class="panel-header"><h2>Satisfação com o Curso</h2></div>
+                                <div class="panel-body"><canvas id="cfg-dash-course-satisfaction-chart"></canvas></div>
+                            </div>
+                            <div class="panel-card dashboard-chart-card">
+                                <div class="panel-header"><h2>Realização do Curso</h2></div>
+                                <div class="panel-body"><canvas id="cfg-dash-course-completion-chart"></canvas></div>
+                            </div>
+                        </div>
+                        <div class="dashboard-chart-row">
+                            <div class="panel-card dashboard-chart-card">
+                                <div class="panel-header"><h2>Prazo de Realização</h2></div>
+                                <div class="panel-body"><canvas id="cfg-dash-course-deadline-chart"></canvas></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header"><h2>Comentários da Pesquisa de Satisfação</h2></div>
+                            <div class="panel-body">
+                                <div id="cfg-dash-course-comments" class="dashboard-table-wrap"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div class="panel-header"><h2>Reprovações</h2></div>
+                            <div class="panel-body">
+                                <div id="cfg-dash-course-reprovals" class="dashboard-table-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Histórico Tab -->
+                <div class="tab-content" id="cfg-history-tab">
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <div class="panel-icon"><i class="fas fa-table-list"></i></div>
+                            <h2>Histórico de Avaliações</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div class="history-toolbar">
+                                <div class="hfilter-row" id="cfg-history-filter-row">
+                                    <!-- "Assunto" é o curso (campo interno `theme`) e "Tema" é o
+                                         tema-pai (campo interno `subject`) — mesma nomenclatura do
+                                         cadastro em Temas/Assuntos. -->
+                                    <div class="hfilter-chip" data-field="subject">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Tema">Tema</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar tema...">
+                                            <div class="hfilter-chip-list" id="cfg-history-filter-subject-list"></div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="theme">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Assunto">Assunto</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar assunto...">
+                                            <div class="hfilter-chip-list" id="cfg-history-filter-theme-list"></div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="name">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Nome">Nome</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar nome...">
+                                            <div class="hfilter-chip-list" id="cfg-history-filter-name-list"></div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="role">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Cargo">Cargo</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar cargo...">
+                                            <div class="hfilter-chip-list" id="cfg-history-filter-role-list"></div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="unit">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Unidade">Unidade</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar unidade...">
+                                            <div class="hfilter-chip-list" id="cfg-history-filter-unit-list"></div>
+                                        </div>
+                                    </div>
+                                    <!-- Nota (0 a 10) do resultado — não confundir com "Avaliação",
+                                         que são as estrelas dadas pelo aluno ao curso. -->
+                                    <div class="hfilter-chip" data-field="score">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Nota">Nota</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover hfilter-chip-popover-score">
+                                            <div class="hfilter-score-range">
+                                                <label>Mín. <input type="number" id="cfg-history-filter-score-min" min="0" max="10" step="0.5" placeholder="0"></label>
+                                                <label>Máx. <input type="number" id="cfg-history-filter-score-max" min="0" max="10" step="0.5" placeholder="10"></label>
+                                            </div>
+                                            <div class="hfilter-score-actions">
+                                                <button type="button" class="hfilter-chip-item" id="cfg-history-filter-score-clear">Qualquer nota</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="rating">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Avaliação">Avaliação</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover hfilter-chip-popover-stars">
+                                            <div class="history-filter-stars" id="cfg-history-filter-rating" data-value="0">
+                                                <i class="fas fa-star" data-star="1"></i>
+                                                <i class="fas fa-star" data-star="2"></i>
+                                                <i class="fas fa-star" data-star="3"></i>
+                                                <i class="fas fa-star" data-star="4"></i>
+                                                <i class="fas fa-star" data-star="5"></i>
+                                                <span class="history-filter-stars-label">Qualquer</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="hfilter-toggle-chip" id="cfg-history-filter-comments">
+                                        <i class="fas fa-comment"></i> Com comentários
+                                    </button>
+                                    <button type="button" class="hfilter-clear-chip" id="cfg-history-filter-clear" style="display:none;">
+                                        <i class="fas fa-xmark"></i> Limpar filtros
+                                    </button>
+                                </div>
+                                <div class="history-toolbar-actions">
+                                    <button class="btn btn-primary" id="cfg-history-add-btn" title="Adicionar um registro manualmente">
+                                        <i class="fas fa-plus"></i> Adicionar
+                                    </button>
+                                    <button class="btn btn-ghost" id="cfg-history-export-btn" title="Baixar histórico filtrado em Excel">
+                                        <i class="fas fa-file-excel"></i> Exportar
+                                    </button>
+                                    <label class="btn btn-ghost" for="cfg-history-import-file" title="Importar registros de uma planilha Excel">
+                                        <i class="fas fa-file-import"></i> Importar
+                                    </label>
+                                    <input type="file" id="cfg-history-import-file" accept=".xlsx,.xls" hidden>
+                                    <button class="btn btn-danger" id="cfg-history-clear-btn" title="Apagar todo o histórico">
+                                        <i class="fas fa-trash-can"></i> Limpar Lista
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="cfg-history-loading" class="cfg-loading-spinner"></div>
+                            <div id="cfg-history-table-wrap" class="dashboard-table-wrap history-table-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -607,11 +1622,24 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
+    <script src="js/course-image.js"></script>
     <script src="js/main.js"></script>
     <script src="js/firebase-config.js"></script>
+    <script src="js/crypto-utils.js"></script>
+    <script src="js/deadlines.js"></script>
+    <script src="js/certificate.js"></script>
+    <script src="js/colaboradores-sync.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/student-auth.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/admin-colaboradores.js"></script>
+    <script src="js/admin-users.js"></script>
+    <script src="js/admin-excel.js"></script>
+    <script src="js/admin-dashboard.js"></script>
+    <script src="js/admin-history.js"></script>
     <script src="js/portal-auth.js"></script>
+    <script src="js/student-profile.js"></script>
+    <script src="js/student-header.js"></script>
 </body>
 </html>

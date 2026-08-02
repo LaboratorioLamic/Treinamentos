@@ -61,6 +61,97 @@ function cancelLoadingBar() {
     if (bar) bar.style.width = '0%';
 }
 
+// ─── Modal de confirmação (substitui confirm() e prompt() do navegador) ───
+// Uso: await showConfirm({ title, message, details, requireWord, tone, confirmText })
+// Resolve true quando o usuário confirma e false quando cancela.
+function showConfirm(options) {
+    const config = options || {};
+    const modal = document.getElementById('cfg-confirm-modal');
+    const content = document.getElementById('cfg-confirm-content');
+    const icon = document.getElementById('cfg-confirm-icon');
+    const titleEl = document.getElementById('cfg-confirm-title');
+    const messageEl = document.getElementById('cfg-confirm-message');
+    const detailsEl = document.getElementById('cfg-confirm-details');
+    const field = modal?.querySelector('.confirm-field');
+    const input = document.getElementById('cfg-confirm-input');
+    const errorEl = document.getElementById('cfg-confirm-error');
+    const okBtn = document.getElementById('cfg-confirm-ok');
+    const cancelBtn = document.getElementById('cfg-confirm-cancel');
+
+    // Sem o modal na página (ex.: uso fora do portal), volta para o confirm nativo.
+    if (!modal || !content || !input || !okBtn || !cancelBtn) {
+        return Promise.resolve(window.confirm(config.message || 'Confirmar?'));
+    }
+
+    const requireWord = config.requireWord || null;
+    const isNeutral = config.tone === 'neutral';
+
+    content.classList.toggle('is-neutral', isNeutral);
+    icon.innerHTML = `<i class="fas ${config.icon || (isNeutral ? 'fa-circle-question' : 'fa-triangle-exclamation')}"></i>`;
+    titleEl.textContent = config.title || 'Confirmar ação';
+    messageEl.textContent = config.message || '';
+    messageEl.style.display = config.message ? 'block' : 'none';
+    okBtn.textContent = config.confirmText || 'Confirmar';
+
+    detailsEl.innerHTML = '';
+    for (const detail of config.details || []) {
+        const item = document.createElement('li');
+        if (typeof detail === 'string') {
+            item.textContent = detail;
+        } else {
+            item.textContent = detail.text;
+            if (detail.alert) item.classList.add('is-alert');
+        }
+        detailsEl.appendChild(item);
+    }
+
+    // A palavra de confirmação só aparece nas ações mais destrutivas.
+    field.style.display = requireWord ? 'block' : 'none';
+    field.querySelector('label').innerHTML = `Digite <strong>${requireWord || ''}</strong> para confirmar`;
+    input.value = '';
+    input.placeholder = requireWord || '';
+    errorEl.classList.remove('active');
+    okBtn.disabled = false;
+
+    modal.style.display = 'flex';
+    setTimeout(() => (requireWord ? input : okBtn).focus(), 60);
+
+    return new Promise(resolve => {
+        function cleanup(result) {
+            modal.style.display = 'none';
+            okBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            input.removeEventListener('keydown', onKey);
+            document.removeEventListener('keydown', onEscape);
+            resolve(result);
+        }
+
+        function onConfirm() {
+            if (requireWord && input.value.trim().toUpperCase() !== requireWord.toUpperCase()) {
+                errorEl.textContent = `Digite ${requireWord} para continuar.`;
+                errorEl.classList.add('active');
+                content.classList.add('error');
+                setTimeout(() => content.classList.remove('error'), 400);
+                input.focus();
+                return;
+            }
+            cleanup(true);
+        }
+
+        function onCancel() { cleanup(false); }
+        function onBackdrop(event) { if (event.target === modal) cleanup(false); }
+        function onKey(event) { if (event.key === 'Enter') { event.preventDefault(); onConfirm(); } }
+        function onEscape(event) { if (event.key === 'Escape') cleanup(false); }
+
+        okBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+        input.addEventListener('keydown', onKey);
+        document.addEventListener('keydown', onEscape);
+    });
+}
+
 // ─── Bloqueio de devtools (página inteira, portal do aluno incluso) ───
 function ctrlShiftKey(event, key) {
     return event.ctrlKey && event.shiftKey && event.keyCode === key.charCodeAt(0);
@@ -83,5 +174,5 @@ document.onkeydown = function (event) {
 document.addEventListener('contextmenu', function (evento) { evento.preventDefault(); });
 
 window.UniAdmin = window.UniAdmin || {};
-Object.assign(window.UniAdmin, { showWarning, showLoadingBar, hideLoadingBar, cancelLoadingBar });
+Object.assign(window.UniAdmin, { showWarning, showLoadingBar, hideLoadingBar, cancelLoadingBar, showConfirm });
 })();

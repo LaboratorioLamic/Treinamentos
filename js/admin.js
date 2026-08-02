@@ -8,6 +8,8 @@ const ref = U.ref, get = U.get, set = U.set;
 const db = U.db, dbRoot = U.dbRoot, getCategoryDbPath = U.getCategoryDbPath;
 const showWarning = U.showWarning, showLoadingBar = U.showLoadingBar;
 const hideLoadingBar = U.hideLoadingBar, cancelLoadingBar = U.cancelLoadingBar;
+const showConfirm = U.showConfirm;
+const normalizeName = U.normalizeName; // js/crypto-utils.js
 
 let currentDbPath = null;
 let currentCategory = null;
@@ -26,6 +28,12 @@ function initializeTabs() {
     const subjectsTab = document.getElementById('cfg-subjects-tab');
     if (subjectsBtn) subjectsBtn.classList.add('active');
     if (subjectsTab) subjectsTab.classList.add('active');
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
 }
 
 function getNextId(obj) {
@@ -59,6 +67,11 @@ document.getElementById('cfg-category-submit').addEventListener('click', async (
         const catLabel = document.getElementById('cfg-current-category-label');
         if (catBadge && catLabel) { catLabel.textContent = currentCategory; catBadge.classList.remove('inactive'); }
         hideModal();
+        // Outras abas (Histórico, Usuários) seguem a categoria/plataforma
+        // escolhida aqui em vez de terem um seletor próprio.
+        U.currentCategorySlug = U.categoryPaths[currentCategory] || null;
+        U.currentCategoryName = currentCategory;
+        document.dispatchEvent(new CustomEvent('uniadmin:category-changed', { detail: { slug: U.currentCategorySlug } }));
         await fetchData();
     } catch (error) {
         cancelLoadingBar();
@@ -74,6 +87,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
 
         document.getElementById('cfg-backup-btn').addEventListener('click', () => {
             if (!currentDbPath) { showWarning('Selecione uma categoria primeiro.'); return; }
+            refreshWipeSection();
             document.getElementById('cfg-backup-modal').style.display = 'flex';
         });
 
@@ -95,11 +109,29 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             } catch (error) { showWarning('Erro ao baixar backup: ' + error.message); }
         });
 
+        // O input de arquivo fica escondido; o nome escolhido aparece na linha.
+        document.getElementById('cfg-upload-file').addEventListener('change', (event) => {
+            const label = document.getElementById('cfg-upload-filename');
+            const file = event.target.files[0];
+            label.textContent = file ? file.name : 'Nenhum arquivo escolhido';
+        });
+
         document.getElementById('cfg-upload-btn').addEventListener('click', async () => {
             const fileInput = document.getElementById('cfg-upload-file');
             if (!fileInput.files[0]) { showWarning('Selecione um arquivo JSON primeiro.'); return; }
-            const confirmation = prompt('Digite "SIM" para confirmar o upload e substituição de todos os dados:');
-            if (confirmation !== 'SIM') { showWarning('Upload cancelado.'); return; }
+            const confirmed = await showConfirm({
+                title: 'Restaurar backup',
+                message: `O conteúdo atual de ${currentCategory} será substituído pelo arquivo selecionado.`,
+                icon: 'fa-upload',
+                details: [
+                    `Arquivo: ${fileInput.files[0].name}`,
+                    'Temas, assuntos, módulos e avaliações serão sobrescritos.',
+                    { text: 'A versão atual será perdida se não houver backup.', alert: true }
+                ],
+                requireWord: 'SIM',
+                confirmText: 'Restaurar'
+            });
+            if (!confirmed) { showWarning('Upload cancelado.'); return; }
             try {
                 const file = fileInput.files[0];
                 const text = await file.text();
@@ -113,6 +145,74 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             } catch (error) { showWarning('Erro ao carregar backup: ' + error.message); }
         });
 
+        // Outras categorias que gravam no MESMO caminho do banco que a atual.
+        // Apagar os dados atinge todas elas, então o aviso precisa ser explícito.
+        function sharedCategories() {
+            const paths = U.categoryPaths || {};
+            const currentSlug = paths[currentCategory];
+            return Object.keys(paths).filter(c => c !== currentCategory && paths[c] === currentSlug);
+        }
+
+        function refreshWipeSection() {
+            // A zona de perigo volta recolhida a cada abertura do modal.
+            document.querySelector('#cfg-backup-modal .danger-details')?.removeAttribute('open');
+
+            const label = document.getElementById('cfg-wipe-category');
+            if (label) label.textContent = currentCategory || '—';
+
+            const box = document.getElementById('cfg-wipe-shared');
+            const text = document.getElementById('cfg-wipe-shared-text');
+            if (!box || !text) return;
+
+            const shared = currentCategory ? sharedCategories() : [];
+            if (shared.length === 0) { box.style.display = 'none'; return; }
+            text.textContent = `Atenção: mesmo banco de ${shared.join(', ')} — esses dados também serão apagados.`;
+            box.style.display = 'flex';
+        }
+
+        document.getElementById('cfg-wipe-btn').addEventListener('click', async () => {
+            if (!currentDbPath) { showWarning('Selecione uma categoria primeiro.'); return; }
+
+            const shared = sharedCategories();
+            const details = ['Temas, assuntos, módulos e avaliações serão removidos.'];
+            if (shared.length) {
+                details.push({ text: `Isso também apaga: ${shared.join(', ')} (mesmo banco de dados).`, alert: true });
+            }
+            details.push({ text: 'Não há como desfazer — baixe um backup antes.', alert: true });
+
+            const confirmed = await showConfirm({
+                title: `Apagar dados de ${currentCategory}`,
+                message: 'Todo o conteúdo desta categoria será removido do banco.',
+                icon: 'fa-trash-can',
+                details,
+                requireWord: 'SIM',
+                confirmText: 'Apagar tudo'
+            });
+            if (!confirmed) { showWarning('Exclusão cancelada.'); return; }
+
+            const wipeBtn = document.getElementById('cfg-wipe-btn');
+            wipeBtn.disabled = true;
+            showLoadingBar();
+            try {
+                // Grava a estrutura vazia no caminho da categoria; as outras ficam intactas.
+                const emptyData = { trainingData: {}, quizData: {}, quizStatus: {}, order: { subjects: [], themes: {}, modules: {} } };
+                await set(ref(db, currentDbPath), emptyData);
+                data = emptyData;
+                currentSubjectId = null;
+                currentThemeId = null;
+                initializeOrderFields();
+                populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
+                document.getElementById('cfg-backup-modal').style.display = 'none';
+                showWarning(`Dados da categoria ${currentCategory} apagados.`);
+            } catch (error) {
+                cancelLoadingBar();
+                showWarning('Erro ao apagar os dados: ' + error.message);
+            } finally {
+                hideLoadingBar();
+                wipeBtn.disabled = false;
+            }
+        });
+
         document.getElementById('cfg-backup-close').addEventListener('click', () => {
             document.getElementById('cfg-backup-modal').style.display = 'none';
         });
@@ -123,15 +223,32 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             document.querySelectorAll('#cfg-root .tab-btn').forEach(btn => btn.classList.remove('active'));
         });
 
+        // O Firebase devolve arrays com buracos (índice 0 nulo, ids removidos).
+        // Só interessam as chaves que apontam para um objeto real.
+        function validKeys(collection) {
+            if (!collection || typeof collection !== 'object') return [];
+            return Object.keys(collection).filter(key => collection[key] && typeof collection[key] === 'object');
+        }
+
         function initializeOrderFields() {
-            if (!data.order) { data.order = { subjects: [], themes: {}, modules: {} }; }
-            if (data.order.subjects.length === 0) { data.order.subjects = Object.keys(data.trainingData); }
-            Object.keys(data.trainingData).forEach(subjectId => {
-                if (!data.order.themes[subjectId]) { data.order.themes[subjectId] = Object.keys(data.trainingData[subjectId].themes || {}); }
-                Object.keys(data.trainingData[subjectId].themes || {}).forEach(themeId => {
+            if (!data.trainingData || typeof data.trainingData !== 'object') { data.trainingData = {}; }
+            if (!data.quizData || typeof data.quizData !== 'object') { data.quizData = {}; }
+            if (!data.order || typeof data.order !== 'object') { data.order = { subjects: [], themes: {}, modules: {} }; }
+            if (!Array.isArray(data.order.subjects)) { data.order.subjects = []; }
+            if (!data.order.themes || typeof data.order.themes !== 'object') { data.order.themes = {}; }
+            if (!data.order.modules || typeof data.order.modules !== 'object') { data.order.modules = {}; }
+
+            const subjectIds = validKeys(data.trainingData);
+            if (data.order.subjects.length === 0) { data.order.subjects = subjectIds; }
+
+            subjectIds.forEach(subjectId => {
+                const themes = data.trainingData[subjectId].themes;
+                const themeIds = validKeys(themes);
+                if (!data.order.themes[subjectId]) { data.order.themes[subjectId] = themeIds; }
+                themeIds.forEach(themeId => {
                     if (!data.order.modules[subjectId]) { data.order.modules[subjectId] = {}; }
                     if (!data.order.modules[subjectId][themeId]) {
-                        const moduleCount = data.trainingData[subjectId].themes[themeId].modules?.length || 0;
+                        const moduleCount = themes[themeId].modules?.length || 0;
                         data.order.modules[subjectId][themeId] = Array.from({length: moduleCount}, (_, i) => i);
                     }
                 });
@@ -218,9 +335,15 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
 
         const tabButtons = document.querySelectorAll('#cfg-root .tab-btn');
         const tabContents = document.querySelectorAll('#cfg-root .tab-content');
+        // Colaboradores e Usuários são globais (não dependem de categoria) —
+        // as demais abas gerenciam conteúdo de curso e continuam exigindo
+        // uma categoria escolhida.
+        const CATEGORY_INDEPENDENT_TABS = ['colaboradores', 'users', 'dashboard', 'history'];
+
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
-                if (!currentDbPath) { showWarning('Selecione uma categoria antes de continuar.'); return; }
+                const isCategoryIndependent = CATEGORY_INDEPENDENT_TABS.includes(btn.dataset.tab);
+                if (!currentDbPath && !isCategoryIndependent) { showWarning('Selecione uma categoria antes de continuar.'); return; }
                 tabButtons.forEach(b => b.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
                 btn.classList.add('active');
@@ -230,6 +353,10 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 if (btn.dataset.tab === 'themes') populateThemes();
                 if (btn.dataset.tab === 'modules') populateModules();
                 if (btn.dataset.tab === 'quizzes') populateQuizzes();
+                if (btn.dataset.tab === 'colaboradores') window.UniAdmin.populateColaboradores?.();
+                if (btn.dataset.tab === 'users') window.UniAdmin.populateUsers?.();
+                if (btn.dataset.tab === 'dashboard') window.UniAdmin.initDashboard?.();
+                if (btn.dataset.tab === 'history') window.UniAdmin.populateHistory?.();
             });
         });
 
@@ -242,7 +369,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const selects = [document.getElementById('cfg-theme-subject'), document.getElementById('cfg-module-subject'), document.getElementById('cfg-quiz-subject')];
             selects.forEach(select => {
                 select.innerHTML = '<option value="">Selecione um tema</option>';
-                Object.keys(data.trainingData).forEach(id => {
+                validKeys(data.trainingData).forEach(id => {
                     const option = document.createElement('option');
                     option.value = id; option.textContent = data.trainingData[id].name;
                     select.appendChild(option);
@@ -258,7 +385,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (data.order?.subjects && data.order.subjects.length > 0) {
                 orderedIds = data.order.subjects.filter(id => data.trainingData[id]);
             } else {
-                orderedIds = Object.keys(data.trainingData).sort();
+                orderedIds = validKeys(data.trainingData).sort();
             }
             orderedIds.forEach((id, index) => {
                 const subject = data.trainingData[id];
@@ -298,8 +425,13 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
 
         async function deleteSubject(id) {
             if (!data.trainingData[id]) { showWarning('Tema não encontrado.'); return; }
-            if (Object.keys(data.trainingData[id].themes).length > 0) { showWarning('Não é possível excluir o tema porque ele contém assuntos.'); return; }
-            if (confirm(`Tem certeza que deseja excluir o tema "${data.trainingData[id].name}"?`)) {
+            if (validKeys(data.trainingData[id].themes).length > 0) { showWarning('Não é possível excluir o tema porque ele contém assuntos.'); return; }
+            if (await showConfirm({
+                title: 'Excluir tema',
+                message: `O tema "${data.trainingData[id].name}" será removido.`,
+                icon: 'fa-bookmark',
+                confirmText: 'Excluir'
+            })) {
                 showSpinner('cfg-subject-loading', true);
                 try {
                     delete data.trainingData[id];
@@ -344,13 +476,391 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
 
         const themeSubjectSelect = document.getElementById('cfg-theme-subject');
         const themeNameInput = document.getElementById('cfg-theme-name');
+        const themeDescriptionInput = document.getElementById('cfg-theme-description');
+        const themeDescCount = document.getElementById('cfg-theme-desc-count');
+        const themeImageFile = document.getElementById('cfg-theme-image-file');
+        const themeImageClear = document.getElementById('cfg-theme-image-clear');
+        const themeImagePreview = document.getElementById('cfg-theme-image-preview');
+        const themeImageInfo = document.getElementById('cfg-theme-image-info');
         const themeSaveBtn = document.getElementById('cfg-theme-save');
         const themeDeleteBtn = document.getElementById('cfg-theme-delete');
         const themesContainer = document.getElementById('cfg-themes-container');
 
-        themeSubjectSelect.addEventListener('change', () => {
-            currentThemeId = null; themeNameInput.value = ''; themeDeleteBtn.style.display = 'none';
+        // Imagem em edição no formulário de assunto.
+        // null = sem alteração pendente; { dataUrl, version } = nova; { removed: true } = apagar.
+        let pendingThemeImage = null;
+
+        // ─── Prazo (deadline) do assunto ───
+        const deadlineLivreBtn = document.getElementById('cfg-theme-deadline-livre');
+        const deadlinePrazoBtn = document.getElementById('cfg-theme-deadline-prazo');
+        const deadlineFields = document.getElementById('cfg-theme-deadline-fields');
+        const deadlineStartInput = document.getElementById('cfg-theme-deadline-start');
+        const deadlineEndInput = document.getElementById('cfg-theme-deadline-end');
+        const deadlineCloseInput = document.getElementById('cfg-theme-deadline-close');
+        const deadlineErrorEl = document.getElementById('cfg-theme-deadline-error');
+        let deadlineMode = 'livre';
+
+        // datetime-local não trabalha com timestamp direto; local (não UTC).
+        function timestampToLocalInput(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        function localInputToTimestamp(value) {
+            if (!value) return null;
+            const ts = new Date(value).getTime();
+            return Number.isNaN(ts) ? null : ts;
+        }
+
+        function setDeadlineMode(mode) {
+            deadlineMode = mode;
+            deadlineLivreBtn.classList.toggle('active', mode === 'livre');
+            deadlinePrazoBtn.classList.toggle('active', mode === 'prazo');
+            deadlineFields.style.display = mode === 'prazo' ? 'block' : 'none';
+            deadlineErrorEl.style.display = 'none';
+        }
+        deadlineLivreBtn.addEventListener('click', () => setDeadlineMode('livre'));
+        deadlinePrazoBtn.addEventListener('click', () => setDeadlineMode('prazo'));
+
+        function resetDeadlineFields() {
+            setDeadlineMode('livre');
+            deadlineStartInput.value = '';
+            deadlineEndInput.value = '';
+            deadlineCloseInput.value = '';
+        }
+
+        function loadDeadlineFields(deadline) {
+            if (!deadline || deadline.mode !== 'prazo') { resetDeadlineFields(); return; }
+            setDeadlineMode('prazo');
+            deadlineStartInput.value = timestampToLocalInput(deadline.startAt);
+            deadlineEndInput.value = timestampToLocalInput(deadline.endAt);
+            deadlineCloseInput.value = timestampToLocalInput(deadline.closeAt);
+        }
+
+        // Valida e monta o objeto deadline a salvar. Retorna null (modo livre)
+        // ou lança erro de validação exibido no próprio card do formulário.
+        function buildDeadlineFromForm() {
+            if (deadlineMode !== 'prazo') return null;
+            const startAt = localInputToTimestamp(deadlineStartInput.value);
+            const endAt = localInputToTimestamp(deadlineEndInput.value);
+            const closeAt = localInputToTimestamp(deadlineCloseInput.value);
+            if (!startAt || !endAt || !closeAt) {
+                throw new Error('Preencha início, prazo final e encerramento.');
+            }
+            if (!(startAt < endAt && endAt <= closeAt)) {
+                throw new Error('As datas devem seguir: início < prazo final ≤ encerramento.');
+            }
+            return { mode: 'prazo', startAt, endAt, closeAt };
+        }
+
+        // ─── Funções (cargos) que enxergam o assunto ───
+        // Lista vinda dos cargos das contas cadastradas (/users), que por sua
+        // vez são sincronizados da planilha via Colaboradores. Seleção vazia =
+        // curso visível para todos (inclusive quem não tem cargo definido).
+        const rolesBtn = document.getElementById('cfg-theme-roles-btn');
+        const rolesPopover = document.getElementById('cfg-theme-roles-popover');
+        const rolesListEl = document.getElementById('cfg-theme-roles-list');
+        const rolesSearchInput = document.getElementById('cfg-theme-roles-search');
+        const rolesClearBtn = document.getElementById('cfg-theme-roles-clear');
+        const rolesSummaryEl = document.getElementById('cfg-theme-roles-summary');
+
+        let selectedRoles = new Set();
+        let availableRoles = [];
+
+        // Cargos distintos das contas + os já gravados no assunto em edição
+        // (um cargo pode ter sumido da planilha, mas a regra do curso
+        // continua valendo até o admin mudar).
+        async function loadAvailableRoles() {
+            try {
+                const snapshot = await U.get(U.ref(U.db, `/${U.dbRoot}/users`));
+                const users = snapshot.exists() ? snapshot.val() : {};
+                const roles = new Set();
+                Object.keys(users).forEach(id => {
+                    const role = (users[id]?.role || '').trim();
+                    if (role) roles.add(role);
+                });
+                selectedRoles.forEach(role => roles.add(role));
+                availableRoles = [...roles].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+            } catch (error) {
+                availableRoles = [...selectedRoles];
+            }
+            renderRolesList();
+        }
+
+        function refreshRolesSummary() {
+            const count = selectedRoles.size;
+            rolesSummaryEl.textContent = count === 0
+                ? 'Todas as funções'
+                : count === 1 ? [...selectedRoles][0] : `${count} funções selecionadas`;
+            rolesBtn.classList.toggle('is-on', count > 0);
+        }
+
+        function renderRolesList() {
+            const term = normalizeName(rolesSearchInput?.value || '');
+            const visible = availableRoles.filter(role => !term || normalizeName(role).includes(term));
+            if (visible.length === 0) {
+                rolesListEl.innerHTML = availableRoles.length === 0
+                    ? '<p class="roles-popover-empty">Nenhuma função encontrada nas contas cadastradas.</p>'
+                    : '<p class="roles-popover-empty">Nada encontrado.</p>';
+                refreshRolesSummary();
+                return;
+            }
+            rolesListEl.innerHTML = visible.map(role => `
+                <label class="roles-popover-option">
+                    <input type="checkbox" value="${escapeHtml(role)}" ${selectedRoles.has(role) ? 'checked' : ''}>
+                    <span>${escapeHtml(role)}</span>
+                </label>`).join('');
+            rolesListEl.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                input.addEventListener('change', () => {
+                    if (input.checked) selectedRoles.add(input.value);
+                    else selectedRoles.delete(input.value);
+                    refreshRolesSummary();
+                });
+            });
+            refreshRolesSummary();
+        }
+
+        function closeRolesPopover() {
+            if (!rolesPopover || rolesPopover.hidden) return;
+            rolesPopover.hidden = true;
+            rolesBtn.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('click', onRolesOutsideClick, true);
+        }
+        function onRolesOutsideClick(event) {
+            if (!rolesPopover.contains(event.target) && !rolesBtn.contains(event.target)) closeRolesPopover();
+        }
+
+        rolesBtn?.addEventListener('click', () => {
+            const willOpen = rolesPopover.hidden;
+            if (!willOpen) { closeRolesPopover(); return; }
+            rolesPopover.hidden = false;
+            rolesBtn.setAttribute('aria-expanded', 'true');
+            // O card do formulário corta o que passa da borda: se não couber
+            // abaixo do botão, o popover abre para cima.
+            const card = rolesBtn.closest('.panel-card') || rolesBtn.closest('.tab-content');
+            rolesSearchInput.value = '';
+            renderRolesList();
+            const spaceBelow = card
+                ? card.getBoundingClientRect().bottom - rolesBtn.getBoundingClientRect().bottom
+                : Number.POSITIVE_INFINITY;
+            rolesPopover.classList.toggle('is-up', spaceBelow < rolesPopover.offsetHeight + 12);
+            loadAvailableRoles();
+            document.addEventListener('click', onRolesOutsideClick, true);
+            setTimeout(() => rolesSearchInput.focus(), 40);
+        });
+        rolesSearchInput?.addEventListener('input', renderRolesList);
+        rolesClearBtn?.addEventListener('click', () => {
+            selectedRoles.clear();
+            renderRolesList();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeRolesPopover();
+        });
+
+        function resetRolesConfig() {
+            selectedRoles = new Set();
+            closeRolesPopover();
+            renderRolesList();
+        }
+
+        function loadRolesConfig(theme) {
+            selectedRoles = new Set(Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : []);
+            closeRolesPopover();
+            renderRolesList();
+        }
+
+        // ─── Certificado do assunto (modal de configuração) ───
+        // `certConfig` é o estado confirmado (gravado junto com o assunto ao
+        // salvar); `certDraftTopics` é a lista em edição dentro do modal, que
+        // só substitui a original quando o usuário clica em "Aplicar".
+        let certConfig = { enabled: false, title: '', hours: null, topics: [] };
+        let certDraftTopics = [];
+
+        const certOpenBtn = document.getElementById('cfg-theme-cert-open');
+        const certSummaryEl = document.getElementById('cfg-theme-cert-summary');
+        const certModal = document.getElementById('cfg-cert-modal');
+        const certEnabledInput = document.getElementById('cfg-theme-cert-enabled');
+        const certFieldsEl = document.getElementById('cfg-theme-cert-fields');
+        const certTitleInput = document.getElementById('cfg-theme-cert-title');
+        const certHoursInput = document.getElementById('cfg-theme-cert-hours');
+        const certTopicInput = document.getElementById('cfg-theme-cert-topic-input');
+        const certTopicAddBtn = document.getElementById('cfg-theme-cert-topic-add');
+        const certTopicListEl = document.getElementById('cfg-theme-cert-topic-list');
+        const certTopicsCount = document.getElementById('cfg-theme-cert-topics-count');
+
+        function refreshCertSummary() {
+            certSummaryEl.textContent = certConfig.enabled
+                ? `Ativo — ${certConfig.hours || 10}h, ${certConfig.topics.length} tema(s)`
+                : 'Emissão desativada';
+            certOpenBtn.classList.toggle('is-on', certConfig.enabled);
+        }
+
+        function resetCertConfig() {
+            certConfig = { enabled: false, title: '', hours: null, topics: [] };
+            refreshCertSummary();
+        }
+
+        function loadCertConfig(theme) {
+            certConfig = {
+                enabled: !!theme?.certificateEnabled,
+                title: theme?.certificateTitle || '',
+                hours: theme?.certificateHours || null,
+                topics: U.Certificate?.parseTopics(theme?.certificateTopics) || []
+            };
+            refreshCertSummary();
+        }
+
+        function syncCertFieldsVisibility() {
+            certFieldsEl.classList.toggle('is-visible', certEnabledInput.checked);
+        }
+
+        function renderCertTopics() {
+            certTopicsCount.textContent = String(certDraftTopics.length);
+            if (certDraftTopics.length === 0) {
+                certTopicListEl.innerHTML = '<div class="cert-topic-empty">Nenhum tema adicionado ainda.</div>';
+                return;
+            }
+            certTopicListEl.innerHTML = certDraftTopics.map((topic, i) => `
+                <div class="cert-topic-item">
+                    <span class="cert-topic-item-num">${String(i + 1).padStart(2, '0')}</span>
+                    <span class="cert-topic-item-text" title="${escapeHtml(topic)}">${escapeHtml(topic)}</span>
+                    <button type="button" class="cert-topic-item-remove" data-index="${i}" title="Remover">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>`).join('');
+
+            certTopicListEl.querySelectorAll('.cert-topic-item-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    certDraftTopics.splice(Number(btn.dataset.index), 1);
+                    renderCertTopics();
+                });
+            });
+        }
+
+        function addCertTopic() {
+            const value = certTopicInput.value.trim();
+            if (!value) return;
+            certDraftTopics.push(value);
+            certTopicInput.value = '';
+            certTopicInput.focus();
+            renderCertTopics();
+        }
+
+        certOpenBtn?.addEventListener('click', () => {
+            certEnabledInput.checked = certConfig.enabled;
+            certTitleInput.value = certConfig.title;
+            certHoursInput.value = certConfig.hours || '';
+            certTopicInput.value = '';
+            certDraftTopics = [...certConfig.topics];
+            syncCertFieldsVisibility();
+            renderCertTopics();
+            certModal.style.display = 'flex';
+        });
+        certEnabledInput?.addEventListener('change', syncCertFieldsVisibility);
+        certTopicAddBtn?.addEventListener('click', addCertTopic);
+        certTopicInput?.addEventListener('keydown', (event) => {
+            // Enter adiciona o tema em vez de submeter/fechar o modal.
+            if (event.key === 'Enter') { event.preventDefault(); addCertTopic(); }
+        });
+
+        function closeCertModal() { certModal.style.display = 'none'; }
+        document.getElementById('cfg-cert-close')?.addEventListener('click', closeCertModal);
+        document.getElementById('cfg-cert-cancel')?.addEventListener('click', closeCertModal);
+        certModal?.addEventListener('click', (event) => { if (event.target === certModal) closeCertModal(); });
+
+        document.getElementById('cfg-cert-apply')?.addEventListener('click', () => {
+            // Um tema digitado e não adicionado ainda não se perde ao aplicar.
+            const pending = certTopicInput.value.trim();
+            if (pending) certDraftTopics.push(pending);
+
+            certConfig = {
+                enabled: certEnabledInput.checked,
+                title: certTitleInput.value.trim(),
+                hours: Number(certHoursInput.value) || null,
+                topics: [...certDraftTopics]
+            };
+            refreshCertSummary();
+            closeCertModal();
+        });
+
+        function themeInitials(name) {
+            const clean = (name || '').trim();
+            if (!clean) return '?';
+            const words = clean.split(/\s+/).filter(w => /[a-zA-ZÀ-ÿ0-9]/.test(w));
+            if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+            return clean.slice(0, 2).toUpperCase();
+        }
+
+        function renderThemeImagePreview(dataUrl, infoText) {
+            themeImagePreview.innerHTML = '';
+            if (dataUrl) {
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.alt = 'Prévia da imagem do curso';
+                themeImagePreview.appendChild(img);
+            } else {
+                const span = document.createElement('span');
+                span.className = 'image-initials';
+                span.textContent = themeInitials(themeNameInput.value);
+                themeImagePreview.appendChild(span);
+            }
+            themeImageInfo.textContent = infoText;
+        }
+
+        function updateDescCount() {
+            themeDescCount.textContent = String(themeDescriptionInput.value.length);
+        }
+
+        // Volta o formulário de assunto ao estado "novo cadastro".
+        function resetThemeForm() {
+            currentThemeId = null;
+            themeNameInput.value = '';
+            themeDescriptionInput.value = '';
+            themeImageFile.value = '';
+            pendingThemeImage = null;
+            updateDescCount();
+            renderThemeImagePreview(null, 'Sem imagem — o card mostra as iniciais.');
+            resetDeadlineFields();
+            resetRolesConfig();
+            resetCertConfig();
+            themeDeleteBtn.style.display = 'none';
             document.getElementById('cfg-theme-migrate-container').classList.remove('active');
+        }
+
+        themeDescriptionInput.addEventListener('input', updateDescCount);
+        themeNameInput.addEventListener('input', () => {
+            if (!themeImagePreview.querySelector('img')) {
+                const span = themeImagePreview.querySelector('.image-initials');
+                if (span) span.textContent = themeInitials(themeNameInput.value);
+            }
+        });
+
+        themeImageFile.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                themeImageInfo.textContent = 'Processando imagem...';
+                const result = await window.UniAdminImages.processFile(file);
+                pendingThemeImage = { dataUrl: result.dataUrl, version: result.version };
+                renderThemeImagePreview(result.dataUrl, `${window.UniAdminImages.MAX_SIZE}×${window.UniAdminImages.MAX_SIZE} • ${(result.bytes / 1024).toFixed(1)} KB • ${result.mime}`);
+            } catch (error) {
+                themeImageFile.value = '';
+                renderThemeImagePreview(pendingThemeImage?.dataUrl || null, 'Sem imagem — o card mostra as iniciais.');
+                showWarning(error.message || 'Não foi possível processar a imagem.');
+            }
+        });
+
+        themeImageClear.addEventListener('click', () => {
+            themeImageFile.value = '';
+            pendingThemeImage = { removed: true };
+            renderThemeImagePreview(null, 'A imagem será removida ao salvar.');
+        });
+
+        resetThemeForm();
+
+        themeSubjectSelect.addEventListener('change', () => {
+            resetThemeForm();
             populateModuleThemes(); populateQuizThemes(); populateThemes();
         });
 
@@ -360,18 +870,36 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!subjectId || !data.trainingData[subjectId]) return;
             let orderedIds;
             if (data.order?.themes?.[subjectId] && data.order.themes[subjectId].length > 0) {
-                orderedIds = data.order.themes[subjectId].filter(id => data.trainingData[subjectId].themes[id]);
+                orderedIds = data.order.themes[subjectId].filter(id => data.trainingData[subjectId].themes?.[id]);
             } else {
-                orderedIds = Object.keys(data.trainingData[subjectId].themes || {}).sort();
+                orderedIds = validKeys(data.trainingData[subjectId].themes).sort();
             }
             orderedIds.forEach((id, index) => {
                 const theme = data.trainingData[subjectId].themes[id];
+                if (!theme) return;
                 const card = document.createElement('div');
                 card.className = 'theme-card';
                 const isFirst = index === 0;
                 const isLast = index === orderedIds.length - 1;
+                const thumb = theme.image
+                    ? `<img class="theme-card-thumb" src="${escapeHtml(theme.image)}" alt="">`
+                    : `<span class="theme-card-thumb is-initials">${escapeHtml(themeInitials(theme.name))}</span>`;
+                const deadlineStatus = U.Deadlines.computeDeadlineStatus(theme.deadline);
+                const deadlineBadge = theme.deadline
+                    ? `<span class="deadline-badge deadline-${deadlineStatus}">${U.Deadlines.STATUS_LABELS[deadlineStatus]}</span>`
+                    : '';
+                const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
+                const rolesBadge = roles.length
+                    ? `<span class="roles-badge" title="Visível apenas para: ${escapeHtml(roles.join(', '))}"><i class="fas fa-user-tag"></i> ${roles.length} função(ões)</span>`
+                    : '';
                 card.innerHTML = `
-                    <h3>${theme.name}</h3>
+                    <div class="theme-card-head">
+                        ${thumb}
+                        <div class="theme-card-title">
+                            <h3>${escapeHtml(theme.name)} ${deadlineBadge} ${rolesBadge}</h3>
+                            ${theme.description ? `<p class="card-desc">${escapeHtml(theme.description)}</p>` : ''}
+                        </div>
+                    </div>
                     <div class="card-footer">
                         <div class="order-buttons">
                             <button class="order-btn" data-id="${id}" data-direction="up" ${isFirst ? 'disabled' : ''} title="Mover para cima"><i class="fas fa-chevron-up"></i></button>
@@ -387,13 +915,25 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             themesContainer.querySelectorAll('.edit-theme').forEach(btn => {
                 btn.addEventListener('click', () => {
                     currentThemeId = btn.dataset.id;
-                    themeNameInput.value = data.trainingData[themeSubjectSelect.value].themes[currentThemeId].name;
+                    const editing = data.trainingData[themeSubjectSelect.value].themes[currentThemeId];
+                    themeNameInput.value = editing.name;
+                    themeDescriptionInput.value = editing.description || '';
+                    updateDescCount();
+                    themeImageFile.value = '';
+                    pendingThemeImage = null;
+                    renderThemeImagePreview(
+                        editing.image || null,
+                        editing.image ? 'Imagem atual do curso.' : 'Sem imagem — o card mostra as iniciais.'
+                    );
+                    loadDeadlineFields(editing.deadline);
+                    loadRolesConfig(editing);
+                    loadCertConfig(editing);
                     themeDeleteBtn.style.display = 'flex';
                     const migrateContainer = document.getElementById('cfg-theme-migrate-container');
                     const newSubjectSelect = document.getElementById('cfg-theme-new-subject');
                     migrateContainer.classList.add('active');
                     newSubjectSelect.innerHTML = '<option value="">Selecione o novo tema</option>';
-                    Object.keys(data.trainingData).forEach(id => {
+                    validKeys(data.trainingData).forEach(id => {
                         if (id !== themeSubjectSelect.value) {
                             const option = document.createElement('option');
                             option.value = id; option.textContent = data.trainingData[id].name;
@@ -413,7 +953,13 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         async function deleteTheme(subjectId, id) {
             if (!data.trainingData[subjectId]?.themes[id]) { showWarning('Assunto não encontrado.'); return; }
             if (data.trainingData[subjectId].themes[id].modules?.length > 0) { showWarning('Não é possível excluir o assunto porque ele contém módulos.'); return; }
-            if (confirm(`Tem certeza que deseja excluir o assunto "${data.trainingData[subjectId].themes[id].name}"?`)) {
+            if (await showConfirm({
+                title: 'Excluir assunto',
+                message: `O assunto "${data.trainingData[subjectId].themes[id].name}" será removido.`,
+                icon: 'fa-layer-group',
+                details: ['As questões vinculadas a este assunto também serão apagadas.'],
+                confirmText: 'Excluir'
+            })) {
                 showSpinner('cfg-theme-loading', true);
                 try {
                     delete data.trainingData[subjectId].themes[id];
@@ -422,9 +968,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                         if (idx > -1) data.order.themes[subjectId].splice(idx, 1);
                     }
                     delete data.quizData[`${subjectId}_${id}`];
+                    window.UniAdminImages?.clearCache(U.categoryPaths?.[currentCategory], subjectId, id);
                     if (await saveData()) {
-                        currentThemeId = null; themeNameInput.value = ''; themeDeleteBtn.style.display = 'none';
-                        document.getElementById('cfg-theme-migrate-container').classList.remove('active');
+                        resetThemeForm();
                         populateModuleThemes(); populateQuizThemes(); populateThemes(); showWarning('Assunto excluído com sucesso!');
                     }
                 } catch (error) { showWarning('Erro ao excluir assunto. Tente novamente.'); }
@@ -436,7 +982,14 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!data.trainingData[oldSubjectId]?.themes[themeId]) { showWarning('Assunto não encontrado.'); return false; }
             if (!data.trainingData[newSubjectId]) { showWarning('Novo tema não encontrado.'); return false; }
             if (oldSubjectId === newSubjectId) { showWarning('O assunto já está neste tema.'); return false; }
-            if (confirm(`Tem certeza que deseja migrar o assunto "${data.trainingData[oldSubjectId].themes[themeId].name}" e todos os seus módulos e avaliações para o tema "${data.trainingData[newSubjectId].name}"?`)) {
+            if (await showConfirm({
+                title: 'Migrar assunto',
+                message: `"${data.trainingData[oldSubjectId].themes[themeId].name}" será movido para o tema "${data.trainingData[newSubjectId].name}".`,
+                icon: 'fa-arrow-right-arrow-left',
+                tone: 'neutral',
+                details: ['Os módulos e as avaliações acompanham o assunto.'],
+                confirmText: 'Migrar'
+            })) {
                 showSpinner('cfg-theme-loading', true);
                 try {
                     const themeData = { ...data.trainingData[oldSubjectId].themes[themeId] };
@@ -460,8 +1013,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     }
                     if (await saveData()) {
                         showWarning(`Assunto migrado com sucesso para "${data.trainingData[newSubjectId].name}"!`);
-                        currentThemeId = null; themeNameInput.value = ''; themeDeleteBtn.style.display = 'none';
-                        document.getElementById('cfg-theme-migrate-container').classList.remove('active');
+                        window.UniAdminImages?.clearCache(U.categoryPaths?.[currentCategory], oldSubjectId, themeId);
+                        resetThemeForm();
                         populateSubjectSelects(); populateModuleThemes(); populateQuizThemes(); populateThemes();
                         return true;
                     }
@@ -477,10 +1030,48 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!subjectId) { showWarning('Por favor, selecione um tema.'); return; }
             const name = themeNameInput.value.trim();
             if (!name) { showWarning('Por favor, insira o nome do assunto.'); return; }
+
+            let deadline;
+            try {
+                deadline = buildDeadlineFromForm();
+            } catch (error) {
+                deadlineErrorEl.textContent = error.message;
+                deadlineErrorEl.style.display = 'block';
+                deadlineFields.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
             showSpinner('cfg-theme-loading', true);
             const id = currentThemeId || getNextId(data.trainingData[subjectId].themes);
             const isNew = !currentThemeId;
-            data.trainingData[subjectId].themes[id] = { id, name, modules: data.trainingData[subjectId].themes[id]?.modules || [] };
+            const previous = data.trainingData[subjectId].themes[id] || {};
+            const description = themeDescriptionInput.value.trim();
+
+            // Sem alteração pendente a imagem anterior permanece; "removed" apaga.
+            let image = previous.image || null;
+            let imageVersion = previous.imageVersion || null;
+            if (pendingThemeImage?.removed) { image = null; imageVersion = null; }
+            else if (pendingThemeImage?.dataUrl) { image = pendingThemeImage.dataUrl; imageVersion = pendingThemeImage.version; }
+
+            data.trainingData[subjectId].themes[id] = {
+                id,
+                name,
+                modules: previous.modules || [],
+                ...(description && { description }),
+                ...(image && { image, imageVersion }),
+                ...(deadline && { deadline }),
+                // Sem funções escolhidas o campo nem é gravado — assunto sem
+                // `roles` é visível para todos (comportamento dos já existentes).
+                ...(selectedRoles.size > 0 && { roles: [...selectedRoles] }),
+                ...(certConfig.enabled && {
+                    certificateEnabled: true,
+                    ...(certConfig.title && { certificateTitle: certConfig.title }),
+                    ...(certConfig.hours && { certificateHours: certConfig.hours }),
+                    ...(certConfig.topics.length > 0 && { certificateTopics: certConfig.topics })
+                })
+            };
+            // O portal guarda a imagem por versão; sem imagem, o cache local sai de cena.
+            if (!image) window.UniAdminImages?.clearCache(U.categoryPaths?.[currentCategory], subjectId, id);
             if (isNew) {
                 if (!data.order) data.order = { subjects: [], themes: {}, modules: {} };
                 if (!data.order.themes[subjectId]) data.order.themes[subjectId] = [];
@@ -488,8 +1079,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             }
             try {
                 if (await saveData()) {
-                    currentThemeId = null; themeNameInput.value = ''; themeDeleteBtn.style.display = 'none';
-                    document.getElementById('cfg-theme-migrate-container').classList.remove('active');
+                    resetThemeForm();
                     populateModuleThemes(); populateQuizThemes(); populateThemes(); showWarning('Assunto salvo com sucesso!');
                 }
             } catch (error) { showWarning('Erro ao salvar assunto. Tente novamente.'); }
@@ -524,7 +1114,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const subjectId = moduleSubjectSelect.value;
             moduleThemeSelect.innerHTML = '<option value="">Selecione um assunto</option>';
             if (subjectId && data.trainingData[subjectId]) {
-                Object.keys(data.trainingData[subjectId].themes).forEach(id => {
+                validKeys(data.trainingData[subjectId].themes).forEach(id => {
                     const option = document.createElement('option');
                     option.value = id; option.textContent = data.trainingData[subjectId].themes[id].name;
                     moduleThemeSelect.appendChild(option);
@@ -540,14 +1130,14 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             modulesContainer.innerHTML = '';
             const subjectId = moduleSubjectSelect.value;
             const themeId = moduleThemeSelect.value;
-            if (!subjectId || !themeId || !data.trainingData[subjectId]?.themes[themeId]) return;
+            if (!subjectId || !themeId || !data.trainingData[subjectId]?.themes?.[themeId]) return;
             const modules = data.trainingData[subjectId].themes[themeId].modules || [];
             let orderedModules;
             if (data.order?.modules?.[subjectId]?.[themeId] && data.order.modules[subjectId][themeId].length > 0) {
                 const orderArray = data.order.modules[subjectId][themeId];
                 orderedModules = orderArray.map(index => modules[index]).filter(m => m);
             } else {
-                orderedModules = modules;
+                orderedModules = modules.filter(m => m);
             }
             orderedModules.forEach((mod, index) => {
                 const card = document.createElement('div');
@@ -585,7 +1175,12 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             modulesContainer.querySelectorAll('.delete-module').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const index = parseInt(btn.dataset.index);
-                    if (confirm(`Tem certeza que deseja excluir o módulo "${orderedModules[index].title}"?`)) {
+                    if (await showConfirm({
+                        title: 'Excluir módulo',
+                        message: `O módulo "${orderedModules[index].title}" será removido.`,
+                        icon: 'fa-play-circle',
+                        confirmText: 'Excluir'
+                    })) {
                         showSpinner('cfg-module-loading', true);
                         try {
                             const actualIndex = modules.indexOf(orderedModules[index]);
@@ -660,7 +1255,12 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const subjectId = moduleSubjectSelect.value;
             const themeId = moduleThemeSelect.value;
             if (!subjectId || !themeId || currentModuleIndex === null) { showWarning('Selecione um tema, assunto e módulo para excluir.'); return; }
-            if (confirm(`Tem certeza que deseja excluir o módulo "${data.trainingData[subjectId].themes[themeId].modules[currentModuleIndex].title}"?`)) {
+            if (await showConfirm({
+                title: 'Excluir módulo',
+                message: `O módulo "${data.trainingData[subjectId].themes[themeId].modules[currentModuleIndex].title}" será removido.`,
+                icon: 'fa-play-circle',
+                confirmText: 'Excluir'
+            })) {
                 showSpinner('cfg-module-loading', true);
                 try {
                     data.trainingData[subjectId].themes[themeId].modules.splice(currentModuleIndex, 1);
@@ -690,6 +1290,63 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         const quizToggleWrapper = document.getElementById('cfg-quiz-toggle-wrapper');
         const quizStatusToggle = document.getElementById('cfg-quiz-status-toggle');
         const quizStatusText = document.getElementById('cfg-quiz-status-text');
+        const quizImageFile = document.getElementById('cfg-quiz-image-file');
+        const quizImageClear = document.getElementById('cfg-quiz-image-clear');
+        const quizImagePreview = document.getElementById('cfg-quiz-image-preview');
+        const quizImageInfo = document.getElementById('cfg-quiz-image-info');
+        const QUIZ_IMAGE_EMPTY_HINT = 'Sem imagem — a questão mostra apenas o texto.';
+
+        // Imagem em edição no formulário; null = a questão fica sem imagem.
+        let pendingQuizImage = null;
+
+        function renderQuizImagePreview(dataUrl, infoText) {
+            quizImagePreview.innerHTML = '';
+            if (dataUrl) {
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.alt = 'Prévia da imagem da questão';
+                quizImagePreview.appendChild(img);
+            } else {
+                const span = document.createElement('span');
+                span.className = 'image-initials';
+                span.innerHTML = '<i class="fas fa-image"></i>';
+                quizImagePreview.appendChild(span);
+            }
+            quizImageInfo.textContent = infoText;
+        }
+
+        function resetQuizForm() {
+            currentQuizIndex = null;
+            quizQuestionInput.value = ''; quizOption1Input.value = ''; quizOption2Input.value = '';
+            quizOption3Input.value = ''; quizOption4Input.value = ''; quizCorrectSelect.value = '0';
+            quizImageFile.value = '';
+            pendingQuizImage = null;
+            renderQuizImagePreview(null, QUIZ_IMAGE_EMPTY_HINT);
+            quizDeleteBtn.style.display = 'none';
+        }
+
+        quizImageFile.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                quizImageInfo.textContent = 'Processando imagem...';
+                const result = await window.UniAdminImages.processQuestionFile(file);
+                pendingQuizImage = result.dataUrl;
+                renderQuizImagePreview(result.dataUrl, `${result.width}×${result.height} • ${(result.bytes / 1024).toFixed(1)} KB • ${result.mime}`);
+            } catch (error) {
+                quizImageFile.value = '';
+                renderQuizImagePreview(pendingQuizImage, pendingQuizImage ? 'Imagem atual mantida.' : QUIZ_IMAGE_EMPTY_HINT);
+                showWarning(error.message || 'Não foi possível processar a imagem.');
+            }
+        });
+
+        quizImageClear.addEventListener('click', () => {
+            quizImageFile.value = '';
+            pendingQuizImage = null;
+            renderQuizImagePreview(null, QUIZ_IMAGE_EMPTY_HINT);
+        });
+
+        renderQuizImagePreview(null, QUIZ_IMAGE_EMPTY_HINT);
 
         function initializeQuizStatus() { if (!data.quizStatus) data.quizStatus = {}; }
 
@@ -718,7 +1375,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const subjectId = quizSubjectSelect.value;
             quizThemeSelect.innerHTML = '<option value="">Selecione um assunto</option>';
             if (subjectId && data.trainingData[subjectId]) {
-                Object.keys(data.trainingData[subjectId].themes).forEach(id => {
+                validKeys(data.trainingData[subjectId].themes).forEach(id => {
                     const option = document.createElement('option');
                     option.value = id; option.textContent = data.trainingData[subjectId].themes[id].name;
                     quizThemeSelect.appendChild(option);
@@ -743,12 +1400,14 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!data.quizData[quizKey]) return;
             const quizzes = data.quizData[quizKey];
             quizzes.forEach((quiz, index) => {
+                if (!quiz) return;
                 const card = document.createElement('div');
                 card.className = 'quiz-card';
                 const isFirst = index === 0;
                 const isLast = index === quizzes.length - 1;
                 card.innerHTML = `
                     <h3>${quiz.question}</h3>
+                    ${quiz.image ? `<img class="quiz-card-image" src="${quiz.image}" alt="Imagem da questão">` : ''}
                     <div class="card-footer">
                         <div class="order-buttons">
                             <button class="order-btn" data-index="${index}" data-direction="up" ${isFirst ? 'disabled' : ''} title="Mover para cima"><i class="fas fa-chevron-up"></i></button>
@@ -770,6 +1429,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     quizOption1Input.value = quiz.options[0]; quizOption2Input.value = quiz.options[1];
                     quizOption3Input.value = quiz.options[2]; quizOption4Input.value = quiz.options[3];
                     quizCorrectSelect.value = quiz.correct;
+                    quizImageFile.value = '';
+                    pendingQuizImage = quiz.image || null;
+                    renderQuizImagePreview(pendingQuizImage, pendingQuizImage ? 'Imagem atual da questão.' : QUIZ_IMAGE_EMPTY_HINT);
                     quizDeleteBtn.style.display = 'flex';
                 });
             });
@@ -777,15 +1439,17 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 btn.addEventListener('click', async () => {
                     const index = parseInt(btn.dataset.index);
                     if (!data.quizData[quizKey][index]) { showWarning('Questão não encontrada.'); return; }
-                    if (confirm(`Tem certeza que deseja excluir a questão "${data.quizData[quizKey][index].question}"?`)) {
+                    if (await showConfirm({
+                        title: 'Excluir questão',
+                        message: data.quizData[quizKey][index].question,
+                        icon: 'fa-clipboard-list',
+                        confirmText: 'Excluir'
+                    })) {
                         showSpinner('cfg-quiz-loading', true);
                         try {
                             data.quizData[quizKey].splice(index, 1);
                             if (await saveData()) {
-                                currentQuizIndex = null;
-                                quizQuestionInput.value = ''; quizOption1Input.value = ''; quizOption2Input.value = '';
-                                quizOption3Input.value = ''; quizOption4Input.value = ''; quizCorrectSelect.value = '0';
-                                quizDeleteBtn.style.display = 'none';
+                                resetQuizForm();
                                 populateQuizzes(); showWarning('Questão excluída com sucesso!');
                             } else { populateQuizzes(); }
                         } catch (error) { showWarning(`Erro ao excluir questão: ${error.message}`); populateQuizzes(); }
@@ -813,14 +1477,12 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const quizKey = `${subjectId}_${themeId}`;
             if (!data.quizData[quizKey]) data.quizData[quizKey] = [];
             const quiz = { question, options: [option1, option2, option3, option4], correct };
+            if (pendingQuizImage) quiz.image = pendingQuizImage;
             try {
                 if (currentQuizIndex !== null) { data.quizData[quizKey][currentQuizIndex] = quiz; }
                 else { data.quizData[quizKey].push(quiz); }
                 if (await saveData()) {
-                    currentQuizIndex = null;
-                    quizQuestionInput.value = ''; quizOption1Input.value = ''; quizOption2Input.value = '';
-                    quizOption3Input.value = ''; quizOption4Input.value = ''; quizCorrectSelect.value = '0';
-                    quizDeleteBtn.style.display = 'none';
+                    resetQuizForm();
                     populateQuizzes(); showWarning('Questão salva com sucesso!');
                 } else { populateQuizzes(); }
             } catch (error) { showWarning(`Erro ao salvar questão: ${error.message}`); populateQuizzes(); }
@@ -833,16 +1495,18 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const quizKey = `${subjectId}_${themeId}`;
             if (!subjectId || !themeId || currentQuizIndex === null) { showWarning('Selecione um tema, assunto e questão para excluir.'); return; }
             if (!data.quizData[quizKey] || !data.quizData[quizKey][currentQuizIndex]) { showWarning('Questão não encontrada.'); return; }
-            if (confirm(`Tem certeza que deseja excluir a questão "${data.quizData[quizKey][currentQuizIndex].question}"?`)) {
+            if (await showConfirm({
+                title: 'Excluir questão',
+                message: data.quizData[quizKey][currentQuizIndex].question,
+                icon: 'fa-clipboard-list',
+                confirmText: 'Excluir'
+            })) {
                 showSpinner('cfg-quiz-loading', true);
                 try {
                     data.quizData[quizKey].splice(currentQuizIndex, 1);
                     if (data.quizData[quizKey].length === 0) delete data.quizData[quizKey];
                     if (await saveData()) {
-                        currentQuizIndex = null;
-                        quizQuestionInput.value = ''; quizOption1Input.value = ''; quizOption2Input.value = '';
-                        quizOption3Input.value = ''; quizOption4Input.value = ''; quizCorrectSelect.value = '0';
-                        quizDeleteBtn.style.display = 'none';
+                        resetQuizForm();
                         populateQuizzes(); showWarning('Questão excluída com sucesso!');
                     } else { populateQuizzes(); }
                 } catch (error) { showWarning(`Erro ao excluir questão: ${error.message}`); populateQuizzes(); }

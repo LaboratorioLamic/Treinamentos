@@ -190,6 +190,11 @@
             align-items: start;
         }
 
+        /* Painel de Usuários é lista única, sem coluna de formulário */
+        #cfg-root .content-panels.users-panels {
+            grid-template-columns: 1fr;
+        }
+
         /* === PANEL CARD === */
         #cfg-root .panel-card {
             background: var(--cfg-surface);
@@ -243,6 +248,966 @@
         #cfg-root textarea.form-control { resize: vertical; min-height: 72px; }
 
         #cfg-root .form-actions { display: flex; gap: 7px; margin-top: 4px; }
+
+        /* === PRAZO (deadline) === */
+        #cfg-root .deadline-mode-toggle {
+            display: flex; gap: 6px; background: var(--bg);
+            border: 1.5px solid var(--cfg-border); border-radius: 8px; padding: 3px;
+        }
+        #cfg-root .deadline-mode-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 0; border: none; border-radius: 6px; background: transparent;
+            font-size: 12.5px; font-weight: 600; color: var(--text-2);
+            font-family: inherit; cursor: pointer; transition: all 0.14s ease;
+        }
+        #cfg-root .deadline-mode-btn.active {
+            background: var(--cfg-surface); color: var(--cfg-primary);
+            box-shadow: 0 2px 6px -2px rgba(37,99,235,0.25);
+        }
+        #cfg-root .deadline-mode-btn:hover:not(.active) { color: var(--text); }
+
+        #cfg-root .deadline-fields {
+            margin-top: 12px; padding: 14px; border-radius: 8px;
+            background: var(--bg); border: 1px solid var(--cfg-border);
+        }
+        #cfg-root .deadline-fields .form-group:last-of-type { margin-bottom: 0; }
+
+        #cfg-root .deadline-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 999px;
+            font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+            vertical-align: middle; margin-left: 4px;
+        }
+        #cfg-root .deadline-livre,
+        #cfg-root .deadline-on_time { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-root .deadline-not_started { background: var(--bg); color: var(--text-2); border: 1px solid var(--cfg-border); }
+        #cfg-root .deadline-late { background: #fef3c7; color: #92400e; }
+        #cfg-root .deadline-closed,
+        #cfg-root .deadline-forgiven { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        /* === PAINEL DE USUÁRIOS === */
+        #cfg-root .user-status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 999px;
+            font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+            vertical-align: middle; margin-left: 4px;
+            background: var(--cfg-danger-light); color: var(--cfg-danger);
+        }
+        #cfg-users-container {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+        }
+        @media (max-width: 1200px) { #cfg-users-container { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 980px) { #cfg-users-container { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 720px) { #cfg-users-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { #cfg-users-container { grid-template-columns: 1fr; } }
+
+        #cfg-root .user-card {
+            display: flex; flex-direction: column; padding: 18px 12px 10px;
+            position: relative; overflow: hidden; border-radius: 16px;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            animation: cfg-card-in 0.32s ease both;
+            animation-delay: calc(var(--card-i, 0) * 35ms);
+        }
+        @keyframes cfg-card-in {
+            from { opacity: 0; transform: translateY(10px) scale(0.98); }
+            to { opacity: 1; transform: none; }
+        }
+        /* Faixa colorida que "acende" no topo do card ao passar o mouse */
+        #cfg-root .user-card::before {
+            content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            background: linear-gradient(90deg, var(--cfg-primary), #8b5cf6);
+            transform: scaleX(0); transform-origin: left; transition: transform 0.26s ease;
+        }
+        #cfg-root .user-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--cfg-border-focus);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+        }
+        #cfg-root .user-card:hover::before { transform: scaleX(1); }
+
+        #cfg-root .user-card .card-desc i { color: var(--text-3); }
+        #cfg-root .user-card .user-card-open {
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            gap: 9px; cursor: pointer; border-radius: 12px; padding: 4px 4px 8px;
+            transition: background 0.14s;
+        }
+        #cfg-root .user-card .user-card-open:hover { background: var(--bg); }
+        #cfg-root .user-card .theme-card-thumb.is-initials {
+            width: 56px; height: 56px; font-size: 17px; border-radius: 50%;
+            box-shadow: 0 0 0 3px var(--cfg-surface), 0 0 0 5px var(--cfg-border);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        #cfg-root .user-card:hover .theme-card-thumb.is-initials {
+            transform: scale(1.06);
+            box-shadow: 0 0 0 3px var(--cfg-surface), 0 0 0 5px var(--cfg-primary);
+        }
+        #cfg-root .user-card .theme-card-title { min-width: 0; width: 100%; }
+        #cfg-root .user-card .theme-card-title h3 {
+            font-size: 12.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        #cfg-root .user-card .card-desc {
+            display: flex; flex-direction: column; gap: 3px; align-items: center;
+            font-size: 11px; white-space: normal;
+        }
+        /* Contador de cursos concluídos vira pílula — destaque do card */
+        #cfg-root .user-card .user-card-metric {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px; border-radius: 999px;
+            background: var(--cfg-success-light); color: var(--cfg-success);
+            font-weight: 700; font-size: 10.5px;
+        }
+        #cfg-root .user-card .card-desc .sep { display: none; }
+        #cfg-root .user-card .user-card-since { font-size: 10.5px; color: var(--text-3); }
+        /* Setor/função vindos da planilha — linha secundária do card */
+        #cfg-root .user-card .user-card-org {
+            flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 8px;
+            margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--cfg-border);
+        }
+        #cfg-root .user-card .user-card-org span {
+            display: inline-flex; align-items: center; gap: 4px;
+            max-width: 100%; font-size: 10.5px; color: var(--text-3);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .user-card .user-card-org i { color: var(--cfg-primary); }
+        #cfg-root .user-card.is-disabled { opacity: 0.72; }
+        /* Dica que aparece no hover, indicando que o card abre o histórico */
+        #cfg-root .user-card .user-card-hint {
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            margin-top: 6px; font-size: 10.5px; font-weight: 700;
+            color: var(--cfg-primary); opacity: 0; transform: translateY(-3px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        #cfg-root .user-card:hover .user-card-hint { opacity: 1; transform: none; }
+        #cfg-root .user-card .card-footer { margin-top: 8px; padding-top: 8px; justify-content: center; }
+        #cfg-root .user-card .card-actions { gap: 4px; }
+        #cfg-root .user-card .card-actions .btn-sm {
+            padding: 7px 9px; font-size: 11.5px; border-radius: 9px;
+            transition: transform 0.14s ease, background 0.14s, color 0.14s;
+        }
+        #cfg-root .user-card .card-actions .btn-sm:hover { transform: translateY(-2px); }
+        #cfg-root .user-card .card-actions .btn-label { display: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            #cfg-root .user-card,
+            #cfg-root .user-card:hover { animation: none; transform: none; }
+        }
+
+        .history-cert-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            margin-bottom: 16px; padding: 10px 18px;
+            border: 1.5px solid #d3b673; border-radius: 10px;
+            background: #fffdf7; color: #9c7d2e;
+            font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+            transition: background 0.16s, color 0.16s;
+        }
+        .history-cert-btn:hover { background: #c8a24c; color: #fff; border-color: #c8a24c; }
+
+        /* === CERTIFICADO (botão + modal de configuração) === */
+        #cfg-root .cert-config-btn {
+            display: flex; align-items: center; gap: 13px; width: 100%;
+            padding: 13px 15px; border-radius: 12px; cursor: pointer;
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+            font-family: inherit; text-align: left;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        #cfg-root .cert-config-btn:hover {
+            border-color: #d3b673; background: #fffdf7; box-shadow: 0 4px 14px -8px rgba(200,162,76,0.6);
+        }
+        #cfg-root .cert-config-btn.is-on { border-color: #d3b673; background: #fffdf7; }
+        .cert-config-btn-icon {
+            width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #c8a24c, #e0c98a);
+            color: #fff; font-size: 15px;
+        }
+        .cert-config-btn-text { flex: 1; min-width: 0; }
+        .cert-config-btn-text strong { display: block; font-size: 13px; color: var(--text); }
+        .cert-config-btn-text small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+        .cert-config-btn-arrow { color: var(--text-3); font-size: 12px; }
+
+        /* ─── Seletor de funções do assunto (popover) ─── */
+        #cfg-root .roles-picker { position: relative; }
+        #cfg-root .roles-picker-btn {
+            display: flex; align-items: center; gap: 13px; width: 100%;
+            padding: 13px 15px; border-radius: 12px; cursor: pointer;
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+            font-family: inherit; text-align: left;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        #cfg-root .roles-picker-btn:hover {
+            border-color: var(--cfg-primary);
+            box-shadow: 0 4px 14px -8px rgba(37,99,235,0.55);
+        }
+        #cfg-root .roles-picker-btn.is-on { border-color: var(--cfg-primary); background: var(--cfg-primary-light, #eff6ff); }
+        #cfg-root .roles-picker-icon {
+            width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #2563eb, #60a5fa);
+            color: #fff; font-size: 15px;
+        }
+        #cfg-root .roles-picker-text { flex: 1; min-width: 0; }
+        #cfg-root .roles-picker-text strong {
+            display: block; font-size: 13px; color: var(--text);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .roles-picker-text small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+        #cfg-root .roles-picker-arrow { color: var(--text-3); font-size: 12px; }
+
+        #cfg-root .roles-popover {
+            position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 6px);
+            background: #fff; border: 1.5px solid var(--cfg-border); border-radius: 12px;
+            box-shadow: 0 18px 44px -16px rgba(15,34,68,0.4);
+            padding: 10px; display: flex; flex-direction: column; gap: 8px;
+        }
+        #cfg-root .roles-popover[hidden] { display: none; }
+        /* O painel do formulário tem overflow:hidden; quando não sobra espaço
+           abaixo do botão, o popover abre para cima em vez de ser cortado. */
+        #cfg-root .roles-popover.is-up { top: auto; bottom: calc(100% + 6px); }
+        #cfg-root .roles-popover-head { display: flex; gap: 7px; align-items: center; }
+        #cfg-root .roles-popover-search {
+            flex: 1; min-width: 0; padding: 7px 10px; font-size: 12.5px; font-family: inherit;
+            border: 1.5px solid var(--cfg-border); border-radius: 9px; background: var(--cfg-surface);
+        }
+        #cfg-root .roles-popover-search:focus { outline: none; border-color: var(--cfg-primary); }
+        #cfg-root .roles-popover-clear {
+            border: none; background: none; cursor: pointer; font-family: inherit;
+            font-size: 12px; font-weight: 700; color: var(--cfg-primary); padding: 4px 6px;
+        }
+        #cfg-root .roles-popover-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        #cfg-root .roles-popover-option {
+            display: flex; align-items: center; gap: 9px; cursor: pointer;
+            padding: 7px 9px; border-radius: 9px; font-size: 12.5px; color: var(--text);
+        }
+        #cfg-root .roles-popover-option:hover { background: var(--cfg-surface); }
+        #cfg-root .roles-popover-option input { accent-color: var(--cfg-primary); flex-shrink: 0; }
+        #cfg-root .roles-popover-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #cfg-root .roles-popover-empty,
+        #cfg-root .roles-popover-hint { font-size: 11.5px; color: var(--text-3); margin: 0; padding: 4px 2px; }
+
+        /* Badge no card do assunto quando há restrição por função */
+        #cfg-root .roles-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 999px; vertical-align: middle;
+            background: var(--cfg-primary-light, #eff6ff); color: var(--cfg-primary);
+            font-size: 10.5px; font-weight: 700;
+        }
+
+        /* O modal vive fora de #cfg-root, então não herda .form-control /
+           .modal-body do painel — estilos próprios e completos aqui. */
+        .cert-modal { z-index: 2600; }
+        .cert-modal-card {
+            width: 100%; max-width: 560px; max-height: 90vh;
+            display: flex; flex-direction: column; overflow: hidden;
+            background: #fff; border-radius: 18px;
+            box-shadow: 0 24px 70px -18px rgba(15,34,68,0.45);
+            font-family: 'Inter', sans-serif;
+            animation: certModalIn 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+        }
+        @keyframes certModalIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .cert-modal-head {
+            display: flex; align-items: flex-start; gap: 13px;
+            padding: 22px 24px 18px; border-bottom: 1px solid #eef1f6;
+        }
+        .cert-modal-icon {
+            width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #c8a24c, #e5cf95);
+            color: #fff; font-size: 17px;
+            box-shadow: 0 8px 18px -8px rgba(200,162,76,0.9);
+        }
+        .cert-modal-titles { flex: 1; min-width: 0; }
+        .cert-modal-titles h2 {
+            font-size: 16px; font-weight: 700; color: #12294c; letter-spacing: -0.2px;
+        }
+        .cert-modal-titles p { font-size: 12.5px; color: #7b879b; margin-top: 3px; }
+        .cert-modal-close {
+            border: none; background: none; color: #9aa6b8; cursor: pointer;
+            font-size: 24px; line-height: 1; padding: 0 2px; transition: color 0.15s;
+        }
+        .cert-modal-close:hover { color: #12294c; }
+
+        .cert-modal-body { padding: 20px 24px; overflow-y: auto; }
+
+        .cert-switch-row {
+            display: flex; align-items: center; gap: 14px; cursor: pointer;
+            padding: 14px 16px; border: 1.5px solid #e4e8ef; border-radius: 13px;
+            background: #f8fafc; transition: border-color 0.16s, background 0.16s;
+        }
+        .cert-switch-row:has(input:checked) { border-color: #dfc796; background: #fffdf7; }
+        .cert-switch-text { flex: 1; }
+        .cert-switch-row strong { display: block; font-size: 13.5px; font-weight: 600; color: #12294c; }
+        .cert-switch-row small { display: block; font-size: 11.5px; color: #7b879b; margin-top: 3px; line-height: 1.45; }
+        .cert-switch-row input { display: none; }
+        .cert-switch {
+            width: 44px; height: 25px; border-radius: 999px; background: #cbd5e1;
+            position: relative; flex-shrink: 0; transition: background 0.18s;
+        }
+        .cert-switch::after {
+            content: ''; position: absolute; top: 3px; left: 3px;
+            width: 19px; height: 19px; border-radius: 50%; background: #fff;
+            transition: transform 0.18s; box-shadow: 0 1px 3px rgba(0,0,0,0.28);
+        }
+        .cert-switch-row input:checked + .cert-switch { background: #c8a24c; }
+        .cert-switch-row input:checked + .cert-switch::after { transform: translateX(19px); }
+
+        .cert-fields { display: none; margin-top: 20px; }
+        .cert-fields.is-visible { display: block; }
+
+        .cert-field-row { display: flex; gap: 14px; }
+        .cert-field { flex: 1; min-width: 0; margin-bottom: 18px; }
+        .cert-field-hours { flex: 0 0 150px; }
+        .cert-field label {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 600; color: #47536b; margin-bottom: 7px;
+        }
+        .cert-field > input {
+            width: 100%; padding: 11px 13px;
+            border: 1.5px solid #e4e8ef; border-radius: 10px;
+            font-size: 13.5px; font-family: inherit; color: #12294c; background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .cert-field > input:focus {
+            outline: none; border-color: #c8a24c; box-shadow: 0 0 0 3.5px rgba(200,162,76,0.16);
+        }
+        .cert-field small { display: block; font-size: 11px; color: #97a1b2; margin-top: 6px; }
+
+        .cert-input-suffix { position: relative; }
+        .cert-input-suffix input {
+            width: 100%; padding: 11px 62px 11px 13px;
+            border: 1.5px solid #e4e8ef; border-radius: 10px;
+            font-size: 13.5px; font-family: inherit; color: #12294c; background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .cert-input-suffix input:focus {
+            outline: none; border-color: #c8a24c; box-shadow: 0 0 0 3.5px rgba(200,162,76,0.16);
+        }
+        .cert-input-suffix span {
+            position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+            font-size: 12px; color: #97a1b2; pointer-events: none;
+        }
+
+        .cert-topic-counter {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+            background: #f2e7cd; color: #9c7d2e; font-size: 11px; font-weight: 700;
+        }
+
+        .cert-topic-add { display: flex; gap: 8px; }
+        .cert-topic-add input {
+            flex: 1; min-width: 0; padding: 11px 13px;
+            border: 1.5px solid #e4e8ef; border-radius: 10px;
+            font-size: 13.5px; font-family: inherit; color: #12294c; background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .cert-topic-add input:focus {
+            outline: none; border-color: #c8a24c; box-shadow: 0 0 0 3.5px rgba(200,162,76,0.16);
+        }
+        .cert-topic-add button {
+            width: 42px; flex-shrink: 0; border: none; border-radius: 10px; cursor: pointer;
+            background: linear-gradient(135deg, #c8a24c, #ddb96b); color: #fff; font-size: 13px;
+            transition: filter 0.15s;
+        }
+        .cert-topic-add button:hover { filter: brightness(1.08); }
+
+        .cert-topic-list { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+        .cert-topic-item {
+            display: flex; align-items: center; gap: 11px;
+            padding: 10px 12px; border: 1px solid #eef1f6; border-radius: 10px; background: #f8fafc;
+        }
+        .cert-topic-item-num {
+            width: 22px; height: 22px; flex-shrink: 0; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            background: #f2e7cd; color: #9c7d2e; font-size: 11px; font-weight: 700;
+        }
+        .cert-topic-item-text {
+            flex: 1; min-width: 0; font-size: 13px; color: #24344d;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .cert-topic-item-remove {
+            border: none; background: none; color: #b3bcca; cursor: pointer;
+            font-size: 13px; padding: 2px 4px; transition: color 0.15s;
+        }
+        .cert-topic-item-remove:hover { color: var(--cfg-danger); }
+        .cert-topic-empty {
+            padding: 16px 12px; text-align: center; font-size: 12px; color: #97a1b2;
+            border: 1px dashed #e0e5ee; border-radius: 10px;
+        }
+
+        .cert-modal-foot {
+            display: flex; gap: 10px; padding: 16px 24px 20px; border-top: 1px solid #eef1f6;
+        }
+        .cert-modal-foot button {
+            flex: 1; padding: 12px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.15s, background 0.15s, border-color 0.15s;
+        }
+        .cert-btn-ghost { border: 1.5px solid #e4e8ef; background: #fff; color: #67728a; }
+        .cert-btn-ghost:hover { background: #f8fafc; border-color: #cfd7e3; }
+        .cert-btn-primary {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, #c8a24c, #ddb96b);
+            box-shadow: 0 8px 18px -8px rgba(200,162,76,0.9);
+        }
+        .cert-btn-primary:hover { filter: brightness(1.07); }
+
+        /* === DASHBOARD === */
+        #cfg-root .dashboard-mode-toggle {
+            display: flex; gap: 6px; max-width: 360px;
+            background: var(--bg); border: 1.5px solid var(--cfg-border);
+            border-radius: 8px; padding: 3px; margin-bottom: 18px;
+        }
+        #cfg-root .dashboard-picker {
+            display: flex; gap: 10px; margin-bottom: 20px; max-width: 560px;
+        }
+        #cfg-root .dashboard-picker .student-name-combobox { flex: 1; }
+        #cfg-root .dashboard-picker input,
+        #cfg-root .dashboard-picker select {
+            padding: 10px 14px; border: 1.5px solid var(--cfg-border); border-radius: 8px;
+            font-size: 13px; font-family: inherit; color: var(--text); background: var(--cfg-surface);
+        }
+        #cfg-root .dashboard-picker .student-name-popover {
+            background: var(--cfg-surface); border-color: var(--cfg-border); color: var(--text);
+        }
+        #cfg-root .dashboard-picker .student-name-popover-item { color: var(--text); }
+        #cfg-root .dashboard-picker .student-name-popover-item:hover { background: var(--bg); }
+
+        /* ─── Dashboard · seleção de curso (tema em popover + cards) ─── */
+        #cfg-root .dashboard-picker { align-items: center; }
+
+        #cfg-root .dash-theme-combobox { position: relative; flex: 1; }
+
+        #cfg-root .dash-theme-trigger {
+            width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 11px 14px; border: 1.5px solid var(--cfg-border); border-radius: 10px;
+            background: var(--cfg-surface); color: var(--text);
+            font-size: 13px; font-family: inherit; font-weight: 500; cursor: pointer;
+            transition: border-color 0.16s, box-shadow 0.16s;
+        }
+        #cfg-root .dash-theme-trigger:hover { border-color: #c5d3e8; }
+        #cfg-root .dash-theme-trigger:focus-visible,
+        #cfg-root .dash-theme-trigger.is-open {
+            outline: none; border-color: var(--accent, #4f8ef7);
+            box-shadow: 0 0 0 3px rgba(79,142,247,0.15);
+        }
+        #cfg-root .dash-theme-trigger-text { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        #cfg-root .dash-theme-trigger-text i { color: var(--accent, #4f8ef7); }
+        #cfg-root .dash-theme-trigger-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #cfg-root .dash-theme-caret { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
+
+        #cfg-root .dash-theme-popover {
+            display: none; position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0;
+            max-height: 300px; overflow-y: auto; padding: 6px;
+            background: var(--cfg-surface); border: 1px solid var(--cfg-border);
+            border-radius: 12px; box-shadow: 0 14px 34px rgba(15,23,42,0.14);
+        }
+        #cfg-root .dash-theme-popover.active { display: block; }
+        #cfg-root .dash-theme-popover-item {
+            width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 10px 12px; border: none; border-radius: 8px; background: transparent;
+            font-family: inherit; font-size: 13px; color: var(--text); text-align: left; cursor: pointer;
+        }
+        #cfg-root .dash-theme-popover-item:hover { background: var(--bg); }
+        #cfg-root .dash-theme-popover-item.is-selected {
+            background: rgba(79,142,247,0.10); color: var(--accent, #4f8ef7); font-weight: 600;
+        }
+        #cfg-root .dash-theme-popover-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #cfg-root .dash-theme-popover-count { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
+        #cfg-root .dash-theme-popover-empty {
+            padding: 14px 12px; font-size: 12px; color: var(--text-3); text-align: center;
+        }
+
+        /* Categoria fixa: a que está selecionada nas Configurações. */
+        #cfg-root .dash-category-chip {
+            display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+            padding: 9px 13px; border-radius: 999px;
+            background: rgba(79,142,247,0.10); color: var(--accent, #4f8ef7);
+            font-size: 12px; font-weight: 600;
+        }
+
+        /* Cards de assunto — mesmo formato da plataforma do aluno. */
+        #cfg-root .dash-course-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px; margin-bottom: 22px;
+        }
+        #cfg-root .dash-course-card {
+            display: flex; gap: 14px; align-items: flex-start; text-align: left;
+            padding: 14px; background: var(--cfg-surface);
+            border: 1.5px solid var(--cfg-border); border-radius: 14px;
+            font-family: inherit; cursor: pointer;
+            transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+        }
+        #cfg-root .dash-course-card:hover {
+            transform: translateY(-2px); border-color: #c5d3e8; box-shadow: var(--cfg-shadow-sm);
+        }
+        #cfg-root .dash-course-card.is-selected {
+            border-color: var(--accent, #4f8ef7); box-shadow: 0 0 0 3px rgba(79,142,247,0.15);
+        }
+        #cfg-root .dash-course-thumb {
+            width: 76px; height: 76px; flex-shrink: 0; border-radius: 10px; overflow: hidden;
+            background: #eef3fb; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; font-weight: 700; color: var(--accent, #4f8ef7);
+        }
+        #cfg-root .dash-course-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        #cfg-root .dash-course-body { min-width: 0; flex: 1; }
+        #cfg-root .dash-course-body h3 {
+            font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 4px; line-height: 1.35;
+        }
+        #cfg-root .dash-course-desc {
+            font-size: 12px; color: var(--text-2); margin: 0 0 8px; line-height: 1.45;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        #cfg-root .dash-course-desc.is-empty { font-style: italic; color: var(--text-3); }
+        #cfg-root .dash-course-meta,
+        #cfg-root .dash-course-stats {
+            display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--text-3);
+        }
+        #cfg-root .dash-course-stats { margin-top: 6px; }
+        #cfg-root .dash-course-meta span,
+        #cfg-root .dash-course-stats span { display: inline-flex; align-items: center; gap: 5px; }
+
+        @media (max-width: 640px) {
+            #cfg-root .dash-course-grid { grid-template-columns: 1fr; }
+            #cfg-root .dashboard-picker { flex-wrap: wrap; }
+        }
+
+        #cfg-root .dashboard-empty {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            padding: 60px 20px; color: var(--text-3); text-align: center;
+        }
+        #cfg-root .dashboard-empty i { font-size: 34px; opacity: 0.5; }
+
+        #cfg-root .dashboard-panel { display: flex; flex-direction: column; gap: 18px; }
+        #cfg-root .dashboard-chart-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+        }
+        #cfg-root .dashboard-chart-card .panel-body {
+            height: 280px; display: flex; align-items: center; justify-content: center;
+        }
+        #cfg-root .dashboard-chart-card canvas { max-height: 100%; }
+
+        #cfg-root .dashboard-table-wrap { overflow-x: auto; }
+        #cfg-root .dashboard-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        #cfg-root .dashboard-table-wrap th {
+            text-align: left; padding: 8px 10px; color: var(--text-2);
+            font-weight: 600; border-bottom: 1.5px solid var(--cfg-border); white-space: nowrap;
+        }
+        #cfg-root .dashboard-table-wrap td {
+            padding: 8px 10px; border-bottom: 1px solid var(--cfg-border); color: var(--text);
+            vertical-align: top;
+        }
+        #cfg-root .dashboard-table-wrap tr:last-child td { border-bottom: none; }
+        #cfg-root .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
+
+        #cfg-root .dash-forgive-btn {
+            padding: 5px 10px; border-radius: 6px; border: 1px solid var(--cfg-border);
+            background: var(--cfg-surface); color: var(--text-2); font-size: 11.5px;
+            font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+        #cfg-root .dash-forgive-btn:hover { background: var(--bg); }
+
+        @media (max-width: 900px) {
+            #cfg-root .dashboard-chart-row { grid-template-columns: 1fr; }
+        }
+
+        /* === HISTÓRICO === */
+        #cfg-root .history-toolbar {
+            display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+        }
+        #cfg-root .history-toolbar .gallery-search { flex: 1; min-width: 220px; }
+        #cfg-root .history-toolbar select {
+            padding: 10px 14px; border: 1.5px solid var(--cfg-border); border-radius: 8px;
+            font-size: 13px; font-family: inherit; color: var(--text); background: var(--cfg-surface);
+        }
+
+        /* ─── Estrelas de avaliação (amarelas), reutilizadas em tabela/modal/cards ─── */
+        /* `direction: ltr` é obrigatório: o .star-rating do formulário de
+           satisfação (css/main.css) usa rtl para o efeito de hover com
+           radios, e a regra vazava para estas estrelas só de leitura,
+           preenchendo-as da direita para a esquerda. */
+        .star-rating { display: inline-flex; gap: 1px; letter-spacing: 0; direction: ltr; unicode-bidi: normal; }
+        .star-rating i { font-size: 12.5px; }
+        .star-rating i.is-on { color: #f5b301; text-shadow: 0 1px 1px rgba(245,179,1,0.25); }
+        .star-rating i.is-off { color: #e2e5ea; }
+        .stars-empty { color: var(--text-3); }
+        .history-detail-satisfaction .star-rating i { font-size: 18px; }
+
+        /* ─── Linha de filtros: chips, cada um com popover próprio ─── */
+        .history-toolbar { align-items: flex-start; }
+        .hfilter-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+            flex: 1 1 100%;
+        }
+        .history-toolbar-actions {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto;
+        }
+        .hfilter-chip { position: relative; }
+        .hfilter-chip-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 8px 12px; border: 1.5px solid var(--cfg-border); border-radius: 999px;
+            background: var(--cfg-surface); color: var(--text-2);
+            font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: border-color 0.14s, color 0.14s, background 0.14s;
+            max-width: 190px;
+        }
+        .hfilter-chip-btn:hover { border-color: #c5d3e8; }
+        .hfilter-chip-btn i { font-size: 9px; color: var(--text-3); flex-shrink: 0; }
+        .hfilter-chip-label {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .hfilter-chip.is-active .hfilter-chip-btn {
+            background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
+        }
+        .hfilter-chip.is-active .hfilter-chip-btn i { color: var(--cfg-primary); }
+        .hfilter-chip.is-open .hfilter-chip-btn { border-color: var(--cfg-primary); }
+
+        .hfilter-chip-popover {
+            display: none;
+            position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+            width: 240px;
+            background: var(--cfg-surface); border: 1px solid var(--cfg-border); border-radius: 14px;
+            box-shadow: var(--cfg-shadow-lg); padding: 10px;
+            animation: historyFilterPopIn 0.14s ease;
+        }
+        .hfilter-chip.is-open .hfilter-chip-popover { display: block; }
+        @keyframes historyFilterPopIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hfilter-chip-search {
+            width: 100%; padding: 8px 10px; margin-bottom: 8px;
+            border: 1.5px solid var(--cfg-border); border-radius: 9px;
+            font-size: 12.5px; font-family: inherit; color: var(--text); background: var(--bg);
+        }
+        .hfilter-chip-search:focus { outline: none; border-color: var(--cfg-border-focus); }
+        .hfilter-chip-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+        .hfilter-chip-item {
+            padding: 8px 9px; border-radius: 8px; font-size: 12.5px; color: var(--text);
+            cursor: pointer; transition: background 0.1s;
+        }
+        .hfilter-chip-item:hover { background: var(--bg); }
+        .hfilter-chip-item.is-selected { background: var(--cfg-primary-light); color: var(--cfg-primary); font-weight: 600; }
+        .hfilter-chip-empty { padding: 10px 9px; font-size: 12px; color: var(--text-3); }
+
+        .hfilter-chip-popover-score { width: 210px; padding: 12px; }
+        .hfilter-score-range { display: flex; gap: 8px; }
+        .hfilter-score-range label {
+            flex: 1; display: flex; align-items: center; gap: 6px;
+            font-size: 11.5px; font-weight: 600; color: var(--text-3);
+        }
+        .hfilter-score-range input {
+            width: 100%; min-width: 0; padding: 7px 8px;
+            border: 1.5px solid var(--cfg-border); border-radius: 9px;
+            font-size: 12.5px; font-family: inherit; color: var(--text); background: var(--bg);
+        }
+        .hfilter-score-range input:focus { outline: none; border-color: var(--cfg-primary); }
+        .hfilter-score-actions { margin-top: 8px; }
+        .hfilter-score-actions .hfilter-chip-item {
+            width: 100%; border: none; background: none; font-family: inherit; text-align: left;
+        }
+
+        .hfilter-chip-popover-stars { width: auto; padding: 12px 14px; }
+        .history-filter-stars { display: flex; align-items: center; gap: 3px; }
+        .history-filter-stars i {
+            font-size: 16px; color: #e2e5ea; cursor: pointer; transition: color 0.1s, transform 0.1s;
+        }
+        .history-filter-stars i:hover { transform: scale(1.15); }
+        .history-filter-stars i.is-filled { color: #f5b301; }
+        .history-filter-stars-label { font-size: 11px; color: var(--text-3); margin-left: 6px; }
+
+        .hfilter-toggle-chip {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 8px 12px; border: 1.5px solid var(--cfg-border); border-radius: 999px;
+            background: var(--cfg-surface); color: var(--text-2);
+            font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: border-color 0.14s, color 0.14s, background 0.14s;
+        }
+        .hfilter-toggle-chip:hover { border-color: #c5d3e8; }
+        .hfilter-toggle-chip.is-active {
+            background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
+        }
+
+        .hfilter-clear-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 12px; border: none; background: none;
+            color: var(--cfg-danger); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+        }
+        .hfilter-clear-chip:hover { text-decoration: underline; }
+
+        @media (max-width: 560px) {
+            .hfilter-chip-popover { width: 90vw; left: -8px; }
+        }
+
+        #cfg-root .history-table-wrap { max-height: 640px; }
+        #cfg-root .history-table-wrap table { font-size: 12.5px; }
+        #cfg-root .history-table-wrap thead th {
+            position: sticky; top: 0; background: var(--cfg-surface); z-index: 1;
+            cursor: pointer; user-select: none; white-space: nowrap;
+        }
+        #cfg-root .history-table-wrap thead th i { margin-left: 5px; color: var(--text-3); font-size: 10px; }
+        #cfg-root .history-table-wrap thead th:hover { color: var(--cfg-primary); }
+        #cfg-root .history-table-wrap tbody tr { cursor: pointer; }
+        #cfg-root .history-table-wrap tbody tr:hover { background: var(--bg); }
+
+        #cfg-root .history-status-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+        }
+        #cfg-root .history-status-pill.is-approved { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-root .history-status-pill.is-reproved { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        /* ─── Células da tabela de histórico ─── */
+        #cfg-root .history-table td { vertical-align: middle; }
+        #cfg-root .history-table tbody tr:hover { background: #f7f9fc; }
+        #cfg-root .hist-name { font-weight: 600; color: var(--text); }
+
+        #cfg-root .hist-date { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+        #cfg-root .hist-date > i {
+            font-size: 12px; color: var(--cfg-primary);
+            background: var(--cfg-primary-light); border-radius: 8px; padding: 6px;
+        }
+        #cfg-root .hist-date-text { display: inline-flex; flex-direction: column; line-height: 1.25; }
+        #cfg-root .hist-date-text strong { font-size: 12px; font-weight: 700; color: var(--text); }
+        #cfg-root .hist-date-text small { font-size: 10.5px; color: var(--text-3); font-weight: 600; }
+
+        /* Pílulas coloridas por conteúdo (matiz derivada do texto no JS) */
+        #cfg-root .hist-tag {
+            display: inline-flex; align-items: center; gap: 5px; max-width: 190px;
+            padding: 5px 10px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 600; line-height: 1.35;
+            background: hsl(var(--tag-hue, 220) 70% 96%);
+            color: hsl(var(--tag-hue, 220) 45% 34%);
+            border: 1px solid hsl(var(--tag-hue, 220) 60% 88%);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .hist-tag-emoji { font-size: 11.5px; line-height: 1; flex-shrink: 0; }
+        #cfg-root .hist-tag-unit, #cfg-root .hist-tag-role { max-width: 170px; }
+
+        #cfg-root .hist-score {
+            display: inline-flex; align-items: baseline; gap: 1px;
+            padding: 5px 10px; border-radius: 10px; font-variant-numeric: tabular-nums;
+        }
+        #cfg-root .hist-score b { font-size: 13px; font-weight: 800; }
+        #cfg-root .hist-score small { font-size: 10px; font-weight: 700; opacity: 0.65; }
+        #cfg-root .hist-score.is-high { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-root .hist-score.is-mid { background: #fef3c7; color: #b45309; }
+        #cfg-root .hist-score.is-low { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        #cfg-root .hist-errors {
+            display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+        }
+        #cfg-root .hist-errors.is-none { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-root .hist-errors.is-some { background: #fef2f2; color: #b91c1c; }
+
+        #cfg-root .hist-comment-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 9px; border: 1px solid transparent;
+            font-size: 12.5px; background: transparent; cursor: default; padding: 0;
+        }
+        #cfg-root .hist-comment-btn.is-off { color: #cbd5e1; }
+        #cfg-root .hist-comment-btn.is-on {
+            color: var(--cfg-primary); background: var(--cfg-primary-light);
+            border-color: rgba(37, 99, 235, 0.2); cursor: pointer;
+            transition: transform 0.14s ease, box-shadow 0.14s ease;
+        }
+        #cfg-root .hist-comment-btn.is-on:hover {
+            transform: translateY(-1px); box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.6);
+        }
+
+        #cfg-root .hist-actions { display: inline-flex; gap: 5px; }
+        #cfg-root .hist-act-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; padding: 0; border-radius: 9px;
+            border: 1px solid var(--cfg-border); background: var(--cfg-surface);
+            color: var(--text-3); font-size: 11.5px; cursor: pointer;
+            transition: color 0.14s, border-color 0.14s, background 0.14s;
+        }
+        #cfg-root .hist-act-btn:hover { color: var(--cfg-primary); border-color: var(--cfg-primary); background: var(--cfg-primary-light); }
+        #cfg-root .hist-act-btn.is-danger:hover { color: var(--cfg-danger); border-color: var(--cfg-danger); background: var(--cfg-danger-light); }
+
+        /* Registro de atraso (congelado no envio, não recalculado depois) */
+        .history-deadline-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+        }
+        .history-deadline-pill.is-late { background: #fef3c7; color: #92400e; }
+        .history-deadline-pill.is-forgiven { background: var(--bg); color: var(--text-2); border: 1px solid var(--cfg-border); }
+
+        /* Modal de detalhe */
+        #cfg-history-detail-modal { z-index: 2650; }
+        #cfg-history-detail-modal .modal-content { max-width: 720px; max-height: 86vh; display: flex; flex-direction: column; }
+        #cfg-history-detail-modal .history-detail-body { overflow-y: auto; }
+
+        /* Pílulas de tentativa no modal de detalhe (quando o curso tem mais de uma) */
+        .history-detail-attempts {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+        }
+        .history-attempt-pill {
+            padding: 6px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface); color: var(--text-2);
+            cursor: pointer; font-family: inherit; transition: all 0.14s;
+        }
+        .history-attempt-pill:hover { border-color: #c5d3e8; }
+        .history-attempt-pill.is-active {
+            background: var(--cfg-primary); border-color: var(--cfg-primary); color: #fff;
+        }
+
+        /* Modal de histórico do usuário (card clicável em Usuários) */
+        #cfg-user-history-modal { z-index: 2600; }
+        #cfg-user-history-modal .modal-content { max-width: 980px; max-height: 88vh; display: flex; flex-direction: column; }
+        #cfg-user-history-modal .history-detail-body { overflow-y: auto; }
+
+        .user-course-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(216px, 1fr)); gap: 16px;
+        }
+        #cfg-root .user-course-card {
+            display: flex; flex-direction: column; text-align: left; align-items: stretch;
+            background: var(--cfg-surface); border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 20px;
+            overflow: hidden; cursor: pointer; padding: 0; font-family: inherit; position: relative;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -10px rgba(15, 23, 42, 0.18);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            animation: cfg-card-in 0.32s ease both;
+            animation-delay: calc(var(--card-i, 0) * 40ms);
+        }
+        /* Os cards são <button>: sem isto o texto herda o alinhamento central
+           do botão e o card fica com título/notas centralizados. */
+        #cfg-root .user-course-card * { text-align: left; }
+        #cfg-root .user-course-card:hover {
+            transform: translateY(-4px); border-color: rgba(99, 102, 241, 0.35);
+            box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 18px 34px -16px rgba(15, 23, 42, 0.28);
+        }
+        #cfg-root .user-course-card::after {
+            content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 2;
+            background: linear-gradient(90deg, var(--cfg-primary), #8b5cf6);
+            transform: scaleX(0); transform-origin: left; transition: transform 0.26s ease;
+        }
+        #cfg-root .user-course-card:hover::after { transform: scaleX(1); }
+        .user-course-thumb {
+            position: relative; width: 100%; height: 118px; overflow: hidden;
+            background: linear-gradient(160deg, #f8fafc, #eef2f7);
+            border-radius: 20px 20px 0 0;
+        }
+        .user-course-thumb img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+            transition: transform 0.35s ease;
+        }
+        #cfg-root .user-course-card:hover .user-course-thumb img,
+        #cfg-root .user-course-card:hover .user-course-initials { transform: scale(1.07); }
+        /* Selo "Ver avaliação" que cobre a capa no hover */
+        .user-course-hover {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            gap: 7px; background: linear-gradient(180deg, rgba(15, 23, 42, 0.32), rgba(15, 23, 42, 0.58));
+            color: #fff; backdrop-filter: blur(1.5px);
+            font-size: 11.5px; font-weight: 700; opacity: 0; transition: opacity 0.2s ease;
+        }
+        #cfg-root .user-course-card:hover .user-course-hover { opacity: 1; }
+        .user-course-initials {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.9em; font-weight: 700; letter-spacing: 0.02em;
+            color: hsl(var(--initials-hue, 220) 45% 42%);
+            background: linear-gradient(150deg, hsl(var(--initials-hue, 220) 62% 96%), hsl(var(--initials-hue, 220) 55% 89%));
+            transition: transform 0.35s ease;
+        }
+        .user-course-badge {
+            position: absolute; right: 9px; bottom: 9px; width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.92); color: var(--cfg-success); display: flex; align-items: center;
+            justify-content: center; font-size: 0.82em;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+        }
+        .user-course-body { padding: 13px 15px 15px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+        .user-course-body h4 {
+            font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .user-course-subject { font-size: 11px; color: var(--text-3); margin: 0; }
+        .user-course-desc {
+            font-size: 11.5px; color: var(--text-2); line-height: 1.45; margin: 2px 0 0;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .user-course-stats {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 6px; font-size: 12.5px;
+        }
+        .user-course-stats .star-rating i { font-size: 12px; }
+        .user-course-no-rating { font-size: 11px; color: var(--text-3); font-style: italic; }
+        .user-course-score { font-weight: 700; color: var(--text); }
+        .user-course-foot {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .user-course-attempts { font-size: 11px; color: var(--text-3); font-weight: 600; }
+        .user-course-attempts i { margin-right: 3px; }
+        .user-course-cert {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            margin-top: 10px; padding: 9px; border-radius: 12px;
+            border: 1px solid rgba(202, 165, 90, 0.35); background: #fdf8ec; color: #9c7d2e;
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            transition: background 0.16s, color 0.16s, border-color 0.16s, box-shadow 0.16s;
+        }
+        .user-course-cert:hover {
+            background: #f3e3bd; color: #7d6220; border-color: rgba(202, 165, 90, 0.55);
+            box-shadow: 0 4px 12px -6px rgba(156, 125, 46, 0.5);
+        }
+
+        #cfg-root .history-detail-summary,
+        .history-detail-summary {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px; margin-bottom: 18px;
+        }
+        .history-detail-summary-item {
+            background: linear-gradient(160deg, #f9fafb, #f1f5f9);
+            border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 14px;
+            padding: 11px 14px;
+        }
+        .history-detail-summary-item .label {
+            display: block; font-size: 10.5px; font-weight: 700; color: var(--text-3);
+            text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px;
+        }
+        .history-detail-summary-item .value { font-size: 13.5px; font-weight: 600; color: var(--text); }
+
+        .history-detail-satisfaction {
+            margin-bottom: 18px; padding: 14px; border-radius: 10px;
+            background: #fffbeb; border: 1px solid #fde68a;
+        }
+        .history-detail-satisfaction h3,
+        .history-detail-questions-header h3 {
+            font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 10px;
+            display: flex; align-items: center; gap: 7px;
+        }
+        .history-detail-satisfaction .stars { color: #f59e0b; letter-spacing: 2px; margin-bottom: 6px; }
+        .history-detail-satisfaction .comment { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+
+        .history-detail-questions-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .history-only-wrong-toggle {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer;
+        }
+
+        .history-detail-question {
+            padding: 12px 14px; border-radius: 10px; border: 1.5px solid var(--cfg-border);
+            margin-bottom: 8px;
+        }
+        .history-detail-question.is-correct { border-color: var(--cfg-success-light); background: #f0fdf4; }
+        .history-detail-question.is-wrong { border-color: var(--cfg-danger-light); background: #fef2f2; }
+        .history-detail-question .q-title {
+            font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px;
+            display: flex; align-items: flex-start; gap: 8px;
+        }
+        .history-detail-question .q-title i { margin-top: 2px; flex-shrink: 0; }
+        .history-detail-question .q-title.correct i { color: var(--cfg-success); }
+        .history-detail-question .q-title.wrong i { color: var(--cfg-danger); }
+        .history-detail-question .q-option {
+            font-size: 12.5px; padding: 6px 10px; border-radius: 7px; margin-bottom: 4px;
+            color: var(--text-2);
+        }
+        .history-detail-question .q-option.was-selected.is-right { background: var(--cfg-success-light); color: var(--cfg-success); font-weight: 600; }
+        .history-detail-question .q-option.was-selected.is-wrong { background: var(--cfg-danger-light); color: var(--cfg-danger); font-weight: 600; }
+        .history-detail-question .q-option.is-answer-key { background: var(--cfg-success-light); color: var(--cfg-success); font-weight: 600; }
 
         /* === BUTTONS === */
         #cfg-root .btn {
@@ -298,8 +1263,75 @@
         }
 
         #cfg-root .module-card .card-desc,
+#cfg-root .theme-card .card-desc,
 #cfg-root .quiz-card .card-desc {
             font-size: 12px; color: var(--text-2); margin-top: 3px; margin-bottom: 0;
+        }
+
+        /* Miniatura da imagem da questão na lista de questões cadastradas. */
+        #cfg-root .quiz-card-image {
+            display: block; height: 64px; width: auto; max-width: 100%;
+            object-fit: contain; margin-top: 8px;
+            border: 1px solid var(--cfg-border); border-radius: 8px; background: #fff;
+        }
+
+        /* Prévia da imagem da questão: mantém a proporção, sem recorte. */
+        #cfg-root .quiz-image-preview {
+            width: auto; min-width: 84px; max-width: 180px;
+        }
+
+        #cfg-root .quiz-image-preview img {
+            width: auto; max-width: 100%; height: 100%; object-fit: contain;
+        }
+
+        /* ─── Assunto: miniatura + descrição no card ─── */
+        #cfg-root .theme-card-head {
+            display: flex; align-items: flex-start; gap: 11px;
+        }
+
+        #cfg-root .theme-card-title { min-width: 0; }
+
+        #cfg-root .theme-card-thumb {
+            width: 44px; height: 44px; flex-shrink: 0;
+            border-radius: 9px; object-fit: cover;
+            border: 1px solid var(--cfg-border); background: #fff;
+        }
+
+        #cfg-root .theme-card-thumb.is-initials {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 700; color: var(--text-2);
+            background: #eef2f8;
+        }
+
+        /* ─── Seletor de imagem do curso ─── */
+        #cfg-root .image-picker {
+            display: flex; align-items: center; gap: 14px;
+        }
+
+        #cfg-root .image-preview {
+            width: 84px; height: 84px; flex-shrink: 0;
+            border: 1px dashed var(--cfg-border); border-radius: 12px;
+            background: #f7f9fc; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #cfg-root .image-preview img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+
+        #cfg-root .image-preview .image-initials {
+            font-size: 24px; font-weight: 700; color: var(--text-3);
+        }
+
+        #cfg-root .image-picker-actions {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        }
+
+        #cfg-root .image-picker-actions label.btn { cursor: pointer; margin: 0; }
+
+        #cfg-root .form-hint {
+            display: block; width: 100%;
+            font-size: 11.5px; color: var(--text-3); margin-top: 2px;
         }
 
         #cfg-root .card-footer {
@@ -535,52 +1567,548 @@
         .progress-bar { height: 100%; background: var(--cfg-danger); width: 0%; transition: width 10s linear; border-radius: 4px; }
 
         /* === BACKUP MODAL === */
-        #cfg-backup-modal .modal-content { max-width: 460px; }
+        #cfg-backup-modal .modal-content { max-width: 400px; }
+        #cfg-backup-modal .modal-header { padding: 18px 20px 10px; }
         /* faixa roxa, combinando com o icone de backup */
         #cfg-backup-modal .modal-content::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
         #cfg-backup-modal .modal-header h2 i {
             background: linear-gradient(135deg, #7c3aed, #a78bfa);
             box-shadow: 0 6px 14px -4px rgba(124,58,237,0.55);
         }
-        #cfg-root .backup-section {
-            padding: 16px 17px; background: var(--bg);
-            border-radius: 13px; border: 1px solid var(--cfg-border); margin-bottom: 13px;
-            transition: border-color 0.16s, box-shadow 0.16s;
+        /* Linhas compactas: rotulo a esquerda, acao a direita. */
+        #cfg-backup-modal .backup-body { padding: 2px 20px 20px; }
+
+        #cfg-backup-modal .backup-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--cfg-border);
         }
-        #cfg-root .backup-section:hover { border-color: #cbd5e1; box-shadow: var(--cfg-shadow-sm); }
-        #cfg-root .backup-section:last-child { margin-bottom: 0; }
-        #cfg-root .backup-section-title {
-            font-size: 10.5px; font-weight: 700; color: var(--text-3);
-            text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 11px;
+        #cfg-backup-modal .backup-row:last-of-type { border-bottom: none; }
+        #cfg-backup-modal .backup-row-text { flex: 1; min-width: 0; }
+        #cfg-backup-modal .backup-row-title {
+            font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3;
+        }
+        #cfg-backup-modal .backup-row-hint {
+            font-size: 11.5px; color: var(--text-3); margin-top: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        #cfg-backup-modal .backup-row button,
+        #cfg-backup-modal .file-pick {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 8px 13px; border-radius: 9px;
+            border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2);
+            font-size: 12.5px; font-weight: 600; font-family: inherit;
+            cursor: pointer; white-space: nowrap;
+            transition: border-color 0.16s, color 0.16s, background 0.16s;
+        }
+        #cfg-backup-modal .backup-row button:hover,
+        #cfg-backup-modal .file-pick:hover {
+            border-color: var(--cfg-primary); color: var(--cfg-primary); background: var(--cfg-primary-light);
         }
         #cfg-download-btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 18px;
-            background: linear-gradient(135deg, var(--cfg-success), #22c55e); color: #fff;
-            border: none; border-radius: 10px;
-            font-size: 13px; font-weight: 600; font-family: inherit;
-            cursor: pointer; transition: transform 0.16s, box-shadow 0.16s, filter 0.16s;
-            box-shadow: 0 6px 14px -5px rgba(22,163,74,0.6);
+            border-color: rgba(22,163,74,0.3) !important; color: var(--cfg-success) !important;
         }
-        #cfg-download-btn:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 10px 20px -6px rgba(22,163,74,0.7); }
-        #cfg-download-btn:active { transform: translateY(0); }
-        #cfg-upload-file {
-            display: block; width: 100%; padding: 11px 13px;
-            border: 1.5px dashed #cbd5e1; border-radius: 10px;
-            font-size: 12.5px; font-family: inherit; cursor: pointer;
-            margin-bottom: 11px; color: var(--text-2); background: #fff;
-            transition: border-color 0.16s, background 0.16s;
+        #cfg-download-btn:hover {
+            border-color: var(--cfg-success) !important; background: rgba(22,163,74,0.08) !important;
         }
-        #cfg-upload-file:hover { border-color: var(--cfg-primary); background: var(--cfg-primary-light); }
-        #cfg-upload-btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 18px; background: var(--cfg-danger-light); color: var(--cfg-danger);
-            border: none; border-radius: 10px;
-            font-size: 13px; font-weight: 600; font-family: inherit;
-            cursor: pointer; transition: all 0.16s;
+        #cfg-upload-file { display: none; }
+
+        /* === ZONA DE PERIGO (recolhida por padrao) === */
+        #cfg-backup-modal .danger-details { margin-top: 14px; }
+        #cfg-backup-modal .danger-details summary {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 600; color: var(--cfg-danger);
+            cursor: pointer; list-style: none; user-select: none;
+            padding: 4px 0;
         }
-        #cfg-upload-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); box-shadow: 0 8px 16px -6px rgba(220,38,38,0.6); }
-        #cfg-upload-btn:active { transform: translateY(0); }
+        #cfg-backup-modal .danger-details summary::-webkit-details-marker { display: none; }
+        #cfg-backup-modal .danger-details summary::after {
+            content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+            font-size: 9px; opacity: 0.7; transition: transform 0.18s;
+        }
+        #cfg-backup-modal .danger-details[open] summary::after { transform: rotate(180deg); }
+        #cfg-backup-modal .danger-note {
+            font-size: 12px; line-height: 1.5; color: var(--text-2); margin: 8px 0 0;
+        }
+        #cfg-backup-modal .danger-shared {
+            font-size: 11.5px; line-height: 1.45; color: #92400e; margin: 7px 0 0;
+        }
+        #cfg-wipe-btn {
+            display: inline-flex; align-items: center; gap: 7px; margin-top: 11px;
+            padding: 8px 14px; background: var(--cfg-danger); color: #fff;
+            border: none; border-radius: 9px;
+            font-size: 12.5px; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: filter 0.16s, opacity 0.16s;
+        }
+        #cfg-wipe-btn:hover { filter: brightness(1.08); }
+        #cfg-wipe-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* === MODAL DE CONFIRMACAO === */
+        /* Compartilhado entre #cfg-confirm-modal e #cfg-reset-password-modal
+           (mesma estrutura .modal-content.confirm-content). */
+        #cfg-confirm-modal, #cfg-reset-password-modal { z-index: 2600; }
+        #cfg-confirm-modal .confirm-content, #cfg-reset-password-modal .confirm-content { max-width: 380px; }
+        #cfg-confirm-modal .confirm-content::before, #cfg-reset-password-modal .confirm-content::before {
+            background: linear-gradient(90deg, #dc2626, #f87171);
+        }
+        /* Variante neutra, usada por acoes que nao sao destrutivas. */
+        #cfg-confirm-modal .confirm-content.is-neutral::before, #cfg-reset-password-modal .confirm-content.is-neutral::before {
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+        }
+
+        #cfg-confirm-modal .confirm-head, #cfg-reset-password-modal .confirm-head {
+            padding: 26px 24px 0; text-align: center;
+        }
+        #cfg-confirm-modal .confirm-icon, #cfg-reset-password-modal .confirm-icon {
+            width: 50px; height: 50px; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 15px; font-size: 20px; color: #fff;
+            background: linear-gradient(135deg, #dc2626, #f87171);
+            box-shadow: 0 10px 22px -8px rgba(220,38,38,0.7);
+        }
+        #cfg-confirm-modal .confirm-content.is-neutral .confirm-icon, #cfg-reset-password-modal .confirm-content.is-neutral .confirm-icon {
+            background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
+            box-shadow: 0 10px 22px -8px rgba(37,99,235,0.7);
+        }
+        #cfg-confirm-modal .confirm-head h2, #cfg-reset-password-modal .confirm-head h2 {
+            font-size: 16.5px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.3px; margin-bottom: 7px;
+        }
+        #cfg-confirm-modal .confirm-head p, #cfg-reset-password-modal .confirm-head p {
+            font-size: 13px; line-height: 1.55; color: var(--text-2);
+        }
+
+        #cfg-confirm-modal .confirm-details, #cfg-reset-password-modal .confirm-details {
+            list-style: none; margin: 16px 24px 0; padding: 12px 14px;
+            background: var(--bg); border: 1px solid var(--cfg-border); border-radius: 12px;
+            display: grid; gap: 7px;
+        }
+        #cfg-confirm-modal .confirm-details:empty, #cfg-reset-password-modal .confirm-details:empty { display: none; }
+        #cfg-confirm-modal .confirm-details li, #cfg-reset-password-modal .confirm-details li {
+            display: flex; align-items: flex-start; gap: 8px;
+            font-size: 12.5px; line-height: 1.45; color: var(--text-2);
+        }
+        #cfg-confirm-modal .confirm-details li::before, #cfg-reset-password-modal .confirm-details li::before {
+            content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+            font-size: 9px; color: var(--text-3); margin-top: 3px; flex-shrink: 0;
+        }
+        #cfg-confirm-modal .confirm-details li.is-alert, #cfg-reset-password-modal .confirm-details li.is-alert { color: #92400e; }
+        #cfg-confirm-modal .confirm-details li.is-alert::before, #cfg-reset-password-modal .confirm-details li.is-alert::before {
+            content: '\f071'; color: #d97706;
+        }
+
+        #cfg-confirm-modal .confirm-field, #cfg-reset-password-modal .confirm-field { padding: 18px 24px 0; }
+        #cfg-confirm-modal .confirm-field label, #cfg-reset-password-modal .confirm-field label {
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--text-2); margin-bottom: 8px;
+            text-transform: none; letter-spacing: 0;
+        }
+        #cfg-confirm-modal .confirm-field label strong, #cfg-reset-password-modal .confirm-field label strong {
+            font-weight: 700; color: var(--text);
+        }
+        #cfg-confirm-modal .confirm-field input, #cfg-reset-password-modal .confirm-field input {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid var(--cfg-border); border-radius: 11px;
+            font-size: 14px; font-family: inherit; font-weight: 600;
+            letter-spacing: 1.5px; text-align: center; text-transform: uppercase;
+            color: var(--text); background: #fafbfc;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        #cfg-confirm-modal .confirm-field input:focus, #cfg-reset-password-modal .confirm-field input:focus {
+            outline: none; border-color: var(--cfg-danger); background: #fff;
+            box-shadow: 0 0 0 4px rgba(220,38,38,0.12);
+        }
+        #cfg-confirm-modal .confirm-content.is-neutral .confirm-field input:focus, #cfg-reset-password-modal .confirm-content.is-neutral .confirm-field input:focus {
+            border-color: var(--cfg-border-focus);
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.13);
+        }
+        #cfg-confirm-modal .confirm-error, #cfg-reset-password-modal .confirm-error {
+            display: none; margin-top: 7px;
+            font-size: 11.5px; font-weight: 500; color: var(--cfg-danger);
+        }
+        #cfg-confirm-modal .confirm-error.active, #cfg-reset-password-modal .confirm-error.active { display: block; }
+
+        #cfg-confirm-modal .confirm-actions, #cfg-reset-password-modal .confirm-actions {
+            display: flex; gap: 9px; padding: 20px 24px 22px;
+        }
+        #cfg-confirm-modal .confirm-actions button, #cfg-reset-password-modal .confirm-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: filter 0.16s, border-color 0.16s, background 0.16s, opacity 0.16s;
+        }
+        #cfg-confirm-modal .confirm-cancel, #cfg-reset-password-modal .confirm-cancel {
+            border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2);
+        }
+        #cfg-confirm-modal .confirm-cancel:hover, #cfg-reset-password-modal .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        #cfg-confirm-modal .confirm-ok, #cfg-reset-password-modal .confirm-ok {
+            border: none; color: #fff; background: var(--cfg-danger);
+            box-shadow: 0 8px 18px -7px rgba(220,38,38,0.65);
+        }
+        #cfg-confirm-modal .confirm-content.is-neutral .confirm-ok, #cfg-reset-password-modal .confirm-content.is-neutral .confirm-ok {
+            background: linear-gradient(135deg, var(--cfg-primary), #3b82f6);
+            box-shadow: 0 8px 18px -7px rgba(37,99,235,0.6);
+        }
+        #cfg-confirm-modal .confirm-ok:hover, #cfg-reset-password-modal .confirm-ok:hover { filter: brightness(1.07); }
+        #cfg-confirm-modal .confirm-ok:disabled, #cfg-reset-password-modal .confirm-ok:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+        /* Modal de import do Histórico — reaproveita .confirm-content mas com
+           select em vez do input de "SIM"; estilos isolados, não entram no
+           bloco compartilhado acima para evitar seletores compostos frágeis. */
+        #cfg-history-import-modal { z-index: 2600; }
+        #cfg-history-import-modal .confirm-content { max-width: 380px; }
+        #cfg-history-import-modal .confirm-content::before { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+        #cfg-history-import-modal .confirm-head { padding: 26px 24px 0; text-align: center; }
+        #cfg-history-import-modal .confirm-icon {
+            width: 50px; height: 50px; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 15px; font-size: 20px; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
+            box-shadow: 0 10px 22px -8px rgba(37,99,235,0.7);
+        }
+        #cfg-history-import-modal .confirm-head h2 { font-size: 16.5px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; margin-bottom: 7px; }
+        #cfg-history-import-modal .confirm-head p { font-size: 13px; line-height: 1.55; color: var(--text-2); }
+        #cfg-history-import-modal .confirm-field { padding: 18px 24px 0; }
+        #cfg-history-import-modal .confirm-field label {
+            display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 8px;
+        }
+        #cfg-history-import-modal .confirm-field select {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid var(--cfg-border); border-radius: 11px;
+            font-size: 13.5px; font-family: inherit; color: var(--text); background: #fafbfc;
+        }
+        #cfg-history-import-modal .confirm-field select:focus {
+            outline: none; border-color: var(--cfg-border-focus); background: #fff;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.13);
+        }
+        #cfg-history-import-modal .confirm-actions { display: flex; gap: 9px; padding: 20px 24px 22px; }
+        #cfg-history-import-modal .confirm-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.16s, border-color 0.16s, background 0.16s;
+        }
+        #cfg-history-import-modal .confirm-cancel { border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2); }
+        #cfg-history-import-modal .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        #cfg-history-import-modal .confirm-ok {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #3b82f6);
+            box-shadow: 0 8px 18px -7px rgba(37,99,235,0.6);
+        }
+        #cfg-history-import-modal .confirm-ok:hover { filter: brightness(1.07); }
+
+        /* Barra da aba Usuários: busca + botão de criar conta. */
+        #cfg-root .users-toolbar {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+        }
+        #cfg-root .users-toolbar .gallery-search { flex: 1; margin-bottom: 0; }
+        #cfg-root .users-toolbar .btn { flex-shrink: 0; white-space: nowrap; }
+
+        /* Modal de criar/editar conta de aluno — campos de texto comuns, sem
+           o visual de "digite SIM" do modal de confirmação. */
+        #cfg-user-form-modal { z-index: 2600; }
+        /* overflow visível para os popovers dos comboboxes não serem cortados
+           pela janela; a faixa do topo recupera o arredondamento por conta. */
+        #cfg-user-form-modal .confirm-content { max-width: 440px; overflow: visible; }
+        #cfg-user-form-modal .confirm-content::before {
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+            border-radius: 18px 18px 0 0;
+        }
+        #cfg-user-form-modal .confirm-head { padding: 26px 24px 0; text-align: center; }
+        #cfg-user-form-modal .confirm-icon {
+            width: 50px; height: 50px; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 15px; font-size: 20px; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
+            box-shadow: 0 10px 22px -8px rgba(37,99,235,0.7);
+        }
+        #cfg-user-form-modal .confirm-head h2 {
+            font-size: 16.5px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.3px; margin-bottom: 7px;
+        }
+        #cfg-user-form-modal .confirm-head p { font-size: 13px; line-height: 1.55; color: var(--text-2); }
+        #cfg-user-form-modal .confirm-field { padding: 16px 24px 0; }
+        #cfg-user-form-modal .confirm-field label {
+            display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 7px;
+        }
+        #cfg-user-form-modal .confirm-field input,
+        #cfg-user-form-modal .confirm-field select {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid var(--cfg-border); border-radius: 11px;
+            font-size: 13.5px; font-family: inherit; color: var(--text); background: #fafbfc;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        #cfg-user-form-modal .confirm-field input:focus,
+        #cfg-user-form-modal .confirm-field select:focus {
+            outline: none; border-color: var(--cfg-border-focus); background: #fff;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.13);
+        }
+        #cfg-user-form-modal .confirm-field .form-hint { display: block; margin-top: 6px; }
+
+        /* Campo digitável com lista de valores válidos em popover. */
+        #cfg-user-form-modal .user-combobox { position: relative; }
+        #cfg-user-form-modal .user-combobox input { padding-right: 34px; }
+        #cfg-user-form-modal .user-combobox-caret {
+            position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+            font-size: 11px; color: var(--text-3); pointer-events: none;
+        }
+        #cfg-user-form-modal .user-combobox-popover {
+            display: none; position: absolute; z-index: 10; top: calc(100% + 5px); left: 0; right: 0;
+            max-height: 210px; overflow-y: auto; padding: 5px;
+            background: #fff; border: 1px solid var(--cfg-border);
+            border-radius: 12px; box-shadow: 0 14px 32px rgba(15,23,42,0.16);
+        }
+        #cfg-user-form-modal .user-combobox-popover.active { display: block; }
+        #cfg-user-form-modal .user-combobox-item {
+            width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+            padding: 8px 11px; border: none; border-radius: 8px; background: transparent;
+            font-family: inherit; text-align: left; cursor: pointer;
+        }
+        #cfg-user-form-modal .user-combobox-item:hover,
+        #cfg-user-form-modal .user-combobox-item.is-active { background: rgba(37,99,235,0.09); }
+        #cfg-user-form-modal .user-combobox-item-label {
+            font-size: 13px; font-weight: 500; color: var(--text);
+        }
+        #cfg-user-form-modal .user-combobox-item-hint { font-size: 11px; color: var(--text-3); }
+        #cfg-user-form-modal .user-combobox-empty {
+            padding: 12px 11px; font-size: 12px; color: var(--text-3); text-align: center;
+        }
+
+        /* Aviso em tempo real da confirmação de senha. */
+        #cfg-user-form-modal .user-password-hint {
+            display: none; align-items: center; gap: 7px;
+            margin: 9px 24px 0; padding: 8px 11px; border-radius: 9px;
+            font-size: 12px; font-weight: 500;
+        }
+        #cfg-user-form-modal .user-password-hint.is-ok,
+        #cfg-user-form-modal .user-password-hint.is-error,
+        #cfg-user-form-modal .user-password-hint.is-warn { display: flex; }
+        #cfg-user-form-modal .user-password-hint.is-ok {
+            background: rgba(16,185,129,0.12); color: #047857;
+        }
+        #cfg-user-form-modal .user-password-hint.is-error {
+            background: rgba(220,38,38,0.10); color: var(--cfg-danger);
+        }
+        #cfg-user-form-modal .user-password-hint.is-warn {
+            background: rgba(245,158,11,0.13); color: #b45309;
+        }
+        #cfg-user-form-modal .user-form-row { display: flex; gap: 10px; }
+        #cfg-user-form-modal .user-form-row .confirm-field { flex: 1; }
+        #cfg-user-form-modal .confirm-error {
+            display: none; margin: 10px 24px 0;
+            font-size: 11.5px; font-weight: 500; color: var(--cfg-danger);
+        }
+        #cfg-user-form-modal .confirm-error.active { display: block; }
+        #cfg-user-form-modal .confirm-actions { display: flex; gap: 9px; padding: 20px 24px 22px; }
+        #cfg-user-form-modal .confirm-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.16s, border-color 0.16s, background 0.16s, opacity 0.16s;
+        }
+        #cfg-user-form-modal .confirm-cancel { border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2); }
+        #cfg-user-form-modal .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        #cfg-user-form-modal .confirm-ok {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #3b82f6);
+            box-shadow: 0 8px 18px -7px rgba(37,99,235,0.6);
+        }
+        #cfg-user-form-modal .confirm-ok:hover { filter: brightness(1.07); }
+        #cfg-user-form-modal .confirm-ok:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+        /* Modal de correção manual de colaborador (Configurações > Colaboradores).
+           Mesma linguagem visual do modal de conta, em verde para separar
+           "corrigir cadastro" de "criar conta". */
+        #cfg-colab-form-modal { z-index: 2600; }
+        #cfg-colab-form-modal .confirm-content { max-width: 430px; }
+        #cfg-colab-form-modal .confirm-content::before {
+            background: linear-gradient(90deg, #059669, #34d399);
+            border-radius: 18px 18px 0 0;
+        }
+        #cfg-colab-form-modal .confirm-head { padding: 26px 24px 0; text-align: center; }
+        #cfg-colab-form-modal .confirm-icon {
+            width: 50px; height: 50px; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 15px; font-size: 20px; color: #fff;
+            background: linear-gradient(135deg, #059669, #34d399);
+            box-shadow: 0 10px 22px -8px rgba(5,150,105,0.7);
+        }
+        #cfg-colab-form-modal .confirm-head h2 {
+            font-size: 16.5px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.3px; margin-bottom: 7px;
+        }
+        #cfg-colab-form-modal .confirm-head p { font-size: 13px; line-height: 1.55; color: var(--text-2); }
+        #cfg-colab-form-modal .confirm-field { padding: 16px 24px 0; }
+        #cfg-colab-form-modal .confirm-field label {
+            display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 7px;
+        }
+        #cfg-colab-form-modal .confirm-field input {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid var(--cfg-border); border-radius: 11px;
+            font-size: 13.5px; font-family: inherit; color: var(--text); background: #fafbfc;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        #cfg-colab-form-modal .confirm-field input:focus {
+            outline: none; border-color: #10b981; background: #fff;
+            box-shadow: 0 0 0 4px rgba(16,185,129,0.15);
+        }
+        #cfg-colab-form-modal .user-form-row { display: flex; gap: 10px; }
+        #cfg-colab-form-modal .user-form-row .confirm-field { flex: 1; min-width: 0; }
+        /* Nota de rodapé explicando o efeito da correção sobre o sync. */
+        #cfg-colab-form-modal .form-hint {
+            display: flex; align-items: flex-start; gap: 8px;
+            margin: 16px 24px 0; padding: 10px 12px; border-radius: 10px;
+            background: rgba(16,185,129,0.10); color: #047857;
+            font-size: 11.5px; line-height: 1.5;
+        }
+        #cfg-colab-form-modal .form-hint::before {
+            content: '\f05a'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+            font-size: 11px; margin-top: 1px; flex-shrink: 0;
+        }
+        #cfg-colab-form-modal .confirm-error {
+            display: none; margin: 10px 24px 0;
+            font-size: 11.5px; font-weight: 500; color: var(--cfg-danger);
+        }
+        #cfg-colab-form-modal .confirm-error.active { display: block; }
+        #cfg-colab-form-modal .confirm-actions { display: flex; gap: 9px; padding: 20px 24px 22px; }
+        #cfg-colab-form-modal .confirm-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.16s, border-color 0.16s, background 0.16s, opacity 0.16s;
+        }
+        #cfg-colab-form-modal .confirm-cancel { border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2); }
+        #cfg-colab-form-modal .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        #cfg-colab-form-modal .confirm-ok {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, #059669, #10b981);
+            box-shadow: 0 8px 18px -7px rgba(5,150,105,0.6);
+        }
+        #cfg-colab-form-modal .confirm-ok:hover { filter: brightness(1.07); }
+        #cfg-colab-form-modal .confirm-ok:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+        /* Modal de mapeamento de Assunto/Tema não reconhecidos no import. */
+        #cfg-history-mapping-modal { z-index: 2600; }
+        #cfg-history-mapping-modal .confirm-content { max-width: 460px; }
+        #cfg-history-mapping-modal .confirm-content::before { background: linear-gradient(90deg, #d97706, #fbbf24); }
+        #cfg-history-mapping-modal .confirm-head { padding: 26px 24px 0; text-align: center; }
+        #cfg-history-mapping-modal .confirm-icon {
+            width: 50px; height: 50px; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 15px; font-size: 20px; color: #fff;
+            background: linear-gradient(135deg, #d97706, #fbbf24);
+            box-shadow: 0 10px 22px -8px rgba(217,119,6,0.7);
+        }
+        #cfg-history-mapping-modal .confirm-head h2 { font-size: 16.5px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; margin-bottom: 7px; }
+        #cfg-history-mapping-modal .confirm-head p { font-size: 13px; line-height: 1.55; color: var(--text-2); }
+        #cfg-history-mapping-modal .confirm-field { padding: 16px 24px 0; max-height: 46vh; overflow-y: auto; }
+        #cfg-history-mapping-modal .mapping-row { margin-bottom: 14px; }
+        #cfg-history-mapping-modal .mapping-row label {
+            display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px;
+        }
+        #cfg-history-mapping-modal .mapping-row label .mapping-pair-count {
+            font-weight: 500; color: var(--text-2); opacity: 0.75;
+        }
+        #cfg-history-mapping-modal .mapping-row select {
+            width: 100%; padding: 10px 12px;
+            border: 1.5px solid var(--cfg-border); border-radius: 10px;
+            font-size: 13px; font-family: inherit; color: var(--text); background: #fafbfc;
+        }
+        #cfg-history-mapping-modal .mapping-row select:focus {
+            outline: none; border-color: var(--cfg-border-focus); background: #fff;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.13);
+        }
+        #cfg-history-mapping-modal .confirm-actions { display: flex; gap: 9px; padding: 20px 24px 22px; }
+        #cfg-history-mapping-modal .confirm-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.16s, border-color 0.16s, background 0.16s;
+        }
+        #cfg-history-mapping-modal .confirm-cancel { border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2); }
+        #cfg-history-mapping-modal .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        #cfg-history-mapping-modal .confirm-ok {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #3b82f6);
+            box-shadow: 0 8px 18px -7px rgba(37,99,235,0.6);
+        }
+        #cfg-history-mapping-modal .confirm-ok:hover { filter: brightness(1.07); }
+
+        /* === HISTÓRICO: COMENTÁRIO E FORMULÁRIO DE REGISTRO === */
+        #cfg-history-comment-modal { z-index: 2700; }
+        #cfg-history-comment-modal .modal-content { max-width: 460px; }
+        .history-comment-meta {
+            display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px;
+            padding-bottom: 12px; border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+        }
+        .history-comment-meta strong { font-size: 13.5px; font-weight: 700; color: var(--text); }
+        .history-comment-meta span { font-size: 12px; color: var(--text-3); }
+        .history-comment-text {
+            font-size: 13.5px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap;
+            background: linear-gradient(160deg, #f9fafb, #f1f5f9);
+            border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 14px; padding: 14px 16px;
+        }
+
+        #cfg-history-form-modal { z-index: 2700; }
+        #cfg-history-form-modal .modal-content {
+            max-width: 660px; max-height: 90vh; display: flex; flex-direction: column;
+        }
+        #cfg-history-form-modal .history-form-body { overflow-y: auto; }
+        .history-form-hint {
+            font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+            background: #f1f5f9; border-radius: 12px; padding: 10px 13px; margin-bottom: 16px;
+        }
+        .history-form-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+        }
+        .history-form-field { display: flex; flex-direction: column; min-width: 0; }
+        .history-form-field.is-wide { grid-column: 1 / -1; }
+        .history-form-field label {
+            font-size: 11.5px; font-weight: 700; color: var(--text-2);
+            text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px;
+        }
+        .history-form-field input,
+        .history-form-field select,
+        .history-form-field textarea {
+            width: 100%; padding: 10px 12px;
+            border: 1.5px solid var(--cfg-border); border-radius: 11px;
+            font-size: 13.5px; font-family: inherit; color: var(--text); background: #fafbfc;
+            transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+        }
+        .history-form-field textarea { resize: vertical; line-height: 1.5; }
+        .history-form-field input:focus,
+        .history-form-field select:focus,
+        .history-form-field textarea:focus {
+            outline: none; border-color: var(--cfg-border-focus); background: #fff;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.13);
+        }
+        .history-form-field.is-locked label { color: var(--text-3); }
+        .history-form-field input:disabled,
+        .history-form-field select:disabled,
+        .history-form-field textarea:disabled {
+            background: #f1f5f9; color: var(--text-3); cursor: not-allowed;
+        }
+        .history-form-lock:not(:empty),
+        .history-form-help {
+            display: block; margin-top: 5px; font-size: 11px; line-height: 1.45; color: var(--text-3);
+        }
+        .history-form-actions {
+            display: flex; gap: 9px; padding: 16px 24px 20px;
+            border-top: 1px solid rgba(148, 163, 184, 0.22);
+        }
+        .history-form-actions button {
+            flex: 1; padding: 11px 16px; border-radius: 11px;
+            font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: filter 0.16s, border-color 0.16s, background 0.16s;
+        }
+        .history-form-actions .confirm-cancel { border: 1px solid var(--cfg-border); background: #fff; color: var(--text-2); }
+        .history-form-actions .confirm-cancel:hover { border-color: #cbd5e1; background: var(--bg); }
+        .history-form-actions .confirm-ok {
+            border: none; color: #fff;
+            background: linear-gradient(135deg, var(--cfg-primary), #3b82f6);
+            box-shadow: 0 8px 18px -7px rgba(37, 99, 235, 0.6);
+        }
+        .history-form-actions .confirm-ok:hover { filter: brightness(1.07); }
+
+        @media (max-width: 560px) {
+            .history-form-grid { grid-template-columns: 1fr; }
+        }
 
         /* === TOAST === */
         .cfg-warning-message {

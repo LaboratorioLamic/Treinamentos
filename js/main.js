@@ -8,7 +8,7 @@
         const CATEGORY_PATHS = {
             'Treinamentos': 'treinamentos',
             'Educação Continuada': 'educacao_continuada',
-            'Estágios': 'treinamentos'
+            'Estágios': 'estagios'
         };
 
         function resolveCategory() {
@@ -23,11 +23,20 @@
         const currentCategorySlug = CATEGORY_PATHS[currentCategory];
 
         async function fetchNames() {
-            const url = 'https://script.google.com/macros/s/AKfycbzUd6efhfzkCmYd88_eIIL6dGIQxIINsw-6Y_qM3PRemUbZ06obtF9xKY1S8WRfvXyq9Q/exec';
+            // URL centralizada em js/colaboradores-sync.js (mesma fonte usada
+            // para sincronizar /uniadmin/colaboradores) — evita duas cópias.
+            const url = window.UniAdmin?.ColaboradoresSync?.SHEETS_NAMES_URL;
+            if (!url) return;
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                const names = await response.json();
+                const payload = await response.json();
+                // A planilha devolve objetos ({colunaB: nome, ...}); o combobox
+                // só usa o nome — normalização compartilhada com o sync.
+                const normalize = window.UniAdmin.ColaboradoresSync.normalizeEntry;
+                const names = (Array.isArray(payload) ? payload : [])
+                    .map(entry => normalize(entry)?.name)
+                    .filter(Boolean);
                 nameOptions = names;
                 const select = document.getElementById('name');
                 if (select) {
@@ -73,7 +82,8 @@
             try {
                 const response = await fetch(`https://uniadmin-708f5-default-rtdb.firebaseio.com/uniadmin/${currentCategorySlug}.json`);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                const data = await response.json();
+                // Categoria ainda sem conteudo no banco: o Firebase devolve null.
+                const data = (await response.json()) || {};
                 orderData = data.order || {};
                 quizData = data.quizData || {};
                 quizStatus = data.quizStatus || {};
@@ -93,8 +103,14 @@
         const dropdownList = document.getElementById('dropdownList');
         const themeBtn = document.getElementById('themeBtn');
         const themeDropdown = document.getElementById('themeDropdown');
-        const themeDropdownContent = document.getElementById('themeDropdownContent');
-        const themeDropdownList = document.getElementById('themeDropdownList');
+        const backToCoursesBtn = document.getElementById('back-to-courses');
+        const selectionDivider = document.getElementById('selection-divider');
+        const courseGallery = document.getElementById('course-gallery');
+        const courseGrid = document.getElementById('course-grid');
+        const galleryEmpty = document.getElementById('gallery-empty');
+        const galleryFilter = document.getElementById('gallery-filter');
+        const gallerySub = document.getElementById('gallery-sub');
+        const galleryTitle = document.getElementById('gallery-title');
         const contentDiv = document.getElementById('content');
         const video = document.getElementById('video');
         const customPlayerContainer = document.getElementById('custom-player');
@@ -357,8 +373,8 @@
             document.getElementById('loading-overlay').style.display = 'flex';
             fetchFirebaseData();
             fetchNames();
-            themeDropdownContent.style.display = 'none';
-            themeDropdownList.innerHTML = '';
+            courseGallery.style.display = 'none';
+            courseGrid.innerHTML = '';
             themeBtn.textContent = 'Escolha um Assunto';
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
@@ -382,44 +398,260 @@
                 .map(id => ({ id, ...trainingData[id] }));
             const sortedSubjects = sortItems(subjects, orderData.subjects, 'id');
             sortedSubjects.forEach(({item: subject}) => {
+                const courseCount = Object.keys(subject.themes || {})
+                    .filter(id => subject.themes[id] && subject.themes[id].name)
+                    .filter(id => themeVisibleForSession(subject.themes[id])).length;
+
                 const subjectLi = document.createElement('li');
                 subjectLi.className = 'subject';
                 subjectLi.dataset.subjectId = subject.id;
-                subjectLi.textContent = subject.name;
+                subjectLi.setAttribute('role', 'option');
+                if (subject.id === currentTrainingId) subjectLi.classList.add('is-selected');
+
+                const icon = document.createElement('span');
+                icon.className = 'subject-icon';
+                icon.style.setProperty('--subject-hue', initialsHue(subject.name));
+                icon.innerHTML = '<i class="fas fa-bookmark"></i>';
+
+                const name = document.createElement('span');
+                name.className = 'subject-name';
+                name.textContent = subject.name;
+
+                const count = document.createElement('span');
+                count.className = 'subject-count';
+                count.textContent = courseCount;
+                count.title = courseCount === 1 ? '1 curso' : `${courseCount} cursos`;
+
+                const check = document.createElement('i');
+                check.className = 'fas fa-check subject-check';
+
+                subjectLi.append(icon, name, count, check);
                 subjectLi.onclick = (e) => {
                     e.stopPropagation();
-                    btn.textContent = subject.name;
-                    dropdownContent.style.display = 'none';
+                    setSubjectLabel(subject.name);
+                    closeSubjectDropdown();
                     currentTrainingId = subject.id;
-                    populateThemeDropdown(subject.id);
+                    dropdownList.querySelectorAll('li.subject').forEach(li => {
+                        li.classList.toggle('is-selected', li.dataset.subjectId === subject.id);
+                    });
                     themeBtn.textContent = 'Escolha um Assunto';
                     contentDiv.style.display = 'none';
-                    document.getElementById('welcome-screen').style.display = 'flex';
                     resetContent();
+                    showCourseGallery(subject.id);
                 };
                 dropdownList.appendChild(subjectLi);
             });
         }
 
-        function populateThemeDropdown(subjectId) {
-            themeDropdownList.innerHTML = '';
-            const themes = trainingData[subjectId].themes;
+        // O rótulo do botão vive num span próprio; o ícone e a seta ficam fixos.
+        function setSubjectLabel(text) {
+            const label = btn.querySelector('.dropdown-btn-label');
+            if (label) label.textContent = text;
+            else btn.textContent = text;
+        }
+
+        function getSubjectLabel() {
+            const label = btn.querySelector('.dropdown-btn-label');
+            return label ? label.textContent : btn.textContent;
+        }
+
+        function openSubjectDropdown() {
+            dropdownContent.style.display = 'block';
+            btn.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeSubjectDropdown() {
+            dropdownContent.style.display = 'none';
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        /* ─── GALERIA DE CURSOS (cards) ─── */
+
+        // Visibilidade por função (cargo). O assunto sem `roles` aparece para
+        // todos; com `roles`, só para quem está logado com uma dessas funções
+        // (a função vem da conta, sincronizada da planilha via Colaboradores).
+        function themeVisibleForSession(theme) {
+            const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
+            if (roles.length === 0) return true;
+            const role = (window.UniAdmin?.StudentAuth?.getSession()?.role || '').trim();
+            if (!role) return false;
+            const key = window.UniAdmin.normalizeName(role);
+            return roles.some(r => window.UniAdmin.normalizeName(r) === key);
+        }
+
+        // Lista de assuntos do tema, já na ordem definida no painel.
+        function getSortedThemes(subjectId) {
+            const themes = trainingData[subjectId]?.themes || {};
             const themeArray = Object.keys(themes)
                 .filter(id => themes[id] && themes[id].name && themes[id].name.trim() !== '')
+                .filter(id => themeVisibleForSession(themes[id]))
                 .map(id => ({ id, ...themes[id] }));
-            const sortedThemes = sortItems(themeArray, orderData.themes?.[subjectId], 'id');
-            sortedThemes.forEach(({item: theme}) => {
-                const themeLi = document.createElement('li');
-                themeLi.className = 'theme';
-                themeLi.dataset.themeId = theme.id;
-                themeLi.textContent = theme.name;
-                themeLi.onclick = (e) => {
-                    e.stopPropagation();
-                    themeBtn.textContent = theme.name;
-                    themeDropdownContent.style.display = 'none';
-                    loadTraining(subjectId, theme.id);
-                };
-                themeDropdownList.appendChild(themeLi);
+            return sortItems(themeArray, orderData.themes?.[subjectId], 'id').map(({ item }) => item);
+        }
+
+        function courseInitials(name) {
+            const clean = (name || '').trim();
+            if (!clean) return '?';
+            const words = clean.split(/\s+/).filter(w => /[a-zA-ZÀ-ÿ0-9]/.test(w));
+            if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+            return clean.slice(0, 2).toUpperCase();
+        }
+
+        // Cor estável derivada do nome: cursos sem imagem ficam distinguíveis entre si.
+        function initialsHue(name) {
+            let hash = 0;
+            for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) % 360;
+            return hash;
+        }
+
+        function courseProgress(subjectId, theme) {
+            const total = (theme.modules || []).length;
+            const done = (completionStatus[subjectId]?.[theme.id] || []).filter(Boolean).length;
+            const approved = assessmentResults[subjectId]?.[theme.id];
+            const pct = total === 0 ? 0 : Math.round((Math.min(done, total) / total) * 100);
+            return { total, done: Math.min(done, total), pct, approved };
+        }
+
+        function buildCourseCard(subjectId, theme) {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'course-card';
+            card.dataset.themeId = theme.id;
+            card.dataset.search = (theme.name + ' ' + (theme.description || '')).toLowerCase();
+
+            const { total, done, pct, approved } = courseProgress(subjectId, theme);
+
+            const thumb = document.createElement('div');
+            thumb.className = 'course-thumb';
+            const imageSrc = window.UniAdminImages
+                ? window.UniAdminImages.resolve(currentCategorySlug, subjectId, theme.id, theme)
+                : (theme.image || null);
+            if (imageSrc) {
+                const img = document.createElement('img');
+                img.src = imageSrc;
+                img.alt = theme.name;
+                img.width = 128; img.height = 128;
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                // Imagem quebrada no banco: cai nas iniciais em vez de deixar o card vazio.
+                img.onerror = () => { thumb.innerHTML = ''; thumb.appendChild(buildInitials(theme.name)); };
+                thumb.appendChild(img);
+            } else {
+                thumb.appendChild(buildInitials(theme.name));
+            }
+            if (approved !== undefined) {
+                const badge = document.createElement('span');
+                badge.className = 'course-badge-done';
+                badge.innerHTML = '<i class="fas fa-circle-check"></i>';
+                badge.title = `Aprovado com nota ${approved}`;
+                thumb.appendChild(badge);
+            }
+
+            const body = document.createElement('div');
+            body.className = 'course-body';
+
+            const h3 = document.createElement('h3');
+            h3.textContent = theme.name;
+            body.appendChild(h3);
+
+            const desc = document.createElement('p');
+            desc.className = 'course-desc';
+            desc.textContent = theme.description || 'Sem descrição cadastrada para este curso.';
+            if (!theme.description) desc.classList.add('is-empty');
+            body.appendChild(desc);
+
+            const meta = document.createElement('div');
+            meta.className = 'course-meta';
+            meta.innerHTML = `
+                <span><i class="fas fa-play-circle"></i> ${total} ${total === 1 ? 'módulo' : 'módulos'}</span>
+                <span><i class="fas fa-clipboard-list"></i> ${quizData[`${subjectId}_${theme.id}`]?.length || 0} questões</span>`;
+            body.appendChild(meta);
+
+            const progress = document.createElement('div');
+            progress.className = 'course-progress';
+            progress.innerHTML = `
+                <div class="course-progress-bar"><span style="width:${pct}%"></span></div>
+                <div class="course-progress-label">${done}/${total} concluídos${approved !== undefined ? ` &bull; nota ${approved}` : ''}</div>`;
+            if (pct === 100) progress.classList.add('is-complete');
+            body.appendChild(progress);
+
+            card.appendChild(thumb);
+            card.appendChild(body);
+            card.onclick = () => openCourse(subjectId, theme.id, theme.name);
+            return card;
+        }
+
+        // O atalho de volta (e a seta que o antecede) só faz sentido com um curso aberto.
+        function setBackToCoursesVisible(visible) {
+            backToCoursesBtn.style.display = visible ? 'inline-flex' : 'none';
+            if (selectionDivider) selectionDivider.style.display = visible ? 'block' : 'none';
+        }
+
+        function buildInitials(name) {
+            const span = document.createElement('span');
+            span.className = 'course-initials';
+            span.textContent = courseInitials(name);
+            span.style.setProperty('--initials-hue', initialsHue(name));
+            return span;
+        }
+
+        function showCourseGallery(subjectId) {
+            currentTrainingId = subjectId;
+            currentThemeId = null;
+            courseGrid.innerHTML = '';
+            const themes = getSortedThemes(subjectId);
+            themes.forEach(theme => courseGrid.appendChild(buildCourseCard(subjectId, theme)));
+
+            galleryTitle.textContent = trainingData[subjectId]?.name || 'Cursos disponíveis';
+            gallerySub.textContent = themes.length === 1
+                ? '1 curso disponível — clique no card para começar'
+                : `${themes.length} cursos disponíveis — clique no card para começar`;
+            galleryEmpty.style.display = themes.length ? 'none' : 'flex';
+            if (galleryFilter) galleryFilter.value = '';
+
+            document.getElementById('welcome-screen').style.display = 'none';
+            contentDiv.style.display = 'none';
+            courseGallery.style.display = 'block';
+            setBackToCoursesVisible(false);
+            themeBtn.textContent = 'Escolha um Assunto';
+        }
+
+        function openCourse(subjectId, themeId, themeName) {
+            themeBtn.textContent = themeName;
+            courseGallery.style.display = 'none';
+            setBackToCoursesVisible(true);
+            loadTraining(subjectId, themeId);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        if (backToCoursesBtn) {
+            backToCoursesBtn.onclick = () => {
+                if (!currentTrainingId) return;
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
+                resetContent();
+                showCourseGallery(currentTrainingId);
+            };
+        }
+
+        // Login/logout ou mudança de função na planilha: a lista de cursos
+        // visíveis muda, então dropdown e galeria são remontados.
+        document.addEventListener('uniadmin:session-updated', () => {
+            populateDropdown();
+            if (currentTrainingId && courseGallery.style.display === 'block') {
+                showCourseGallery(currentTrainingId);
+            }
+        });
+
+        if (galleryFilter) {
+            galleryFilter.addEventListener('input', () => {
+                const term = galleryFilter.value.trim().toLowerCase();
+                let visible = 0;
+                courseGrid.querySelectorAll('.course-card').forEach(card => {
+                    const match = !term || card.dataset.search.includes(term);
+                    card.style.display = match ? '' : 'none';
+                    if (match) visible++;
+                });
+                galleryEmpty.style.display = visible ? 'none' : 'flex';
             });
         }
 
@@ -518,18 +750,19 @@
 
         btn.onclick = (e) => {
             e.stopPropagation();
-            dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
-        };
-
-        themeBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (!currentTrainingId) { showWarning('Selecione o Tema primeiro.'); return; }
-            themeDropdownContent.style.display = themeDropdownContent.style.display === 'block' ? 'none' : 'block';
+            if (dropdownContent.style.display === 'block') closeSubjectDropdown();
+            else openSubjectDropdown();
         };
 
         document.addEventListener('click', (e) => {
-            if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) dropdownContent.style.display = 'none';
-            if (!themeBtn.contains(e.target) && !themeDropdownContent.contains(e.target)) themeDropdownContent.style.display = 'none';
+            if (!btn.contains(e.target) && !dropdownContent.contains(e.target)) closeSubjectDropdown();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dropdownContent.style.display === 'block') {
+                closeSubjectDropdown();
+                btn.focus();
+            }
         });
 
         function loadTraining(subjectId, themeId) {
@@ -540,6 +773,8 @@
             if (!theme || !theme.modules || theme.modules.length === 0) return;
 
             document.getElementById('welcome-screen').style.display = 'none';
+            courseGallery.style.display = 'none';
+            setBackToCoursesVisible(true);
             contentDiv.style.display = 'block';
 
             const sidebarName = document.getElementById('sidebar-course-name');
@@ -590,15 +825,37 @@
                 }
                 const allDone = completionStatus[subjectId][themeId].every(Boolean);
                 if (!allDone) { showWarning('Conclua todos os módulos antes da avaliação.'); return; }
-                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
-                customPlayerContainer.style.display = 'none';
-                video.style.display = 'none';
-                video.src = '';
-                pdfContainer.style.display = 'none';
-                document.body.classList.remove('cinema-active');
-                loadQuiz(subjectId, themeId);
+
+                // Prazo encerrado bloqueia a avaliação; o conteúdo continua
+                // acessível normalmente (só este clique é barrado).
+                const theme = trainingData[subjectId]?.themes?.[themeId];
+                if (window.UniAdmin?.Deadlines?.isAssessmentBlocked(theme?.deadline)) {
+                    showWarning('O prazo deste curso foi encerrado. Fale com o administrador.');
+                    return;
+                }
+
+                // Login obrigatório para realizar a avaliação, exceto em Estágios
+                // (mantém o fluxo de nome digitado livremente, sem conta).
+                if (currentCategory !== 'Estágios' && !window.UniAdmin?.StudentAuth?.getSession()) {
+                    window.UniAdmin.StudentAuth.openModal({
+                        intent: 'assessment',
+                        onSuccess: () => openQuiz(subjectId, themeId)
+                    });
+                    return;
+                }
+                openQuiz(subjectId, themeId);
             };
             modulesDiv.appendChild(assessmentDiv);
+        }
+
+        function openQuiz(subjectId, themeId) {
+            if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
+            customPlayerContainer.style.display = 'none';
+            video.style.display = 'none';
+            video.src = '';
+            pdfContainer.style.display = 'none';
+            document.body.classList.remove('cinema-active');
+            loadQuiz(subjectId, themeId);
         }
 
         function renderAssessmentTitle(completed) {
@@ -671,6 +928,14 @@
                 const h3 = document.createElement('h3');
                 h3.textContent = `${index + 1}. ${q.question}`;
                 card.appendChild(h3);
+                if (q.image) {
+                    const img = document.createElement('img');
+                    img.className = 'quiz-card-image';
+                    img.src = q.image;
+                    img.alt = 'Imagem da questão';
+                    img.loading = 'lazy';
+                    card.appendChild(img);
+                }
                 const order = Array.from({ length: q.options.length }, (_, i) => i);
                 for (let i = order.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -724,7 +989,22 @@
             questions.forEach((q, index) => { if (selectedAnswers[index] === q.correct) correctCount++; });
             const score = Math.round((correctCount / questions.length) * 10);
             const erros = getDetailedIncorrectAnswers(subjectId, themeId);
-            showForm(score, erros);
+            const answerSnapshot = buildAnswerSnapshot(subjectId, themeId);
+            showForm(score, erros, answerSnapshot);
+        }
+
+        // Snapshot completo do quiz respondido (todas as questões, com gabarito
+        // e a opção escolhida) — usado pelo modal de detalhe do Histórico
+        // (Configurações), que mostra certas/erradas com filtro.
+        function buildAnswerSnapshot(subjectId, themeId) {
+            const quizKey = `${subjectId}_${themeId}`;
+            const questions = quizData[quizKey] || [];
+            return questions.map((q, index) => ({
+                question: q.question,
+                options: q.options,
+                correct: q.correct,
+                selected: index in selectedAnswers ? selectedAnswers[index] : null
+            }));
         }
 
         function getDetailedIncorrectAnswers(subjectId, themeId) {
@@ -756,7 +1036,13 @@
             return incorrect.length > 0 ? incorrect.join('\n') : '';
         }
 
-        function showForm(score, erros = '') {
+        // Estágios usa o nome digitado livremente (select alimentado por fetchNames);
+        // as demais categorias exigem sessão e mostram o nome já travado, sem input.
+        function isFreeNameCategory() {
+            return currentCategory === 'Estágios';
+        }
+
+        function showForm(score, erros = '', answerSnapshot = []) {
             resetContent();
             formContainer.style.display = 'flex';
             const submitButton = document.getElementById('submit-form');
@@ -767,6 +1053,18 @@
             newSubmitButton.disabled = false;
             newSubmitButton.style.opacity = '1';
 
+            const freeGroup = document.getElementById('form-name-free-group');
+            const loggedGroup = document.getElementById('form-name-logged-group');
+            if (isFreeNameCategory()) {
+                freeGroup.style.display = 'block';
+                loggedGroup.style.display = 'none';
+            } else {
+                freeGroup.style.display = 'none';
+                loggedGroup.style.display = 'block';
+                const session = window.UniAdmin?.StudentAuth?.getSession();
+                document.getElementById('form-logged-user-name').textContent = session ? session.fullName : '—';
+            }
+
             const ratingContainer = document.getElementById('rating-container');
             const commentToggleBtn = document.getElementById('comment-toggle-btn');
             const commentSection = document.getElementById('comment-section');
@@ -776,30 +1074,39 @@
             commentToggleBtn.innerHTML = '<i class="fas fa-times" style="margin-right:6px;"></i>Fechar Comentário';
             document.getElementById('comment').value = '';
 
-            newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros); };
+            newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros, answerSnapshot); };
         }
 
-        function submitForm(score, erros = '') {
-            const name = document.getElementById('name');
-            const email = document.getElementById('email');
+        function submitForm(score, erros = '', answerSnapshot = []) {
             const loadingSpinner = document.getElementById('loading-spinner');
             const submitButton = document.getElementById('submit-form');
             const ratingContainer = document.getElementById('rating-container');
             const commentSection = document.getElementById('comment-section');
 
-            name.classList.remove('invalid');
-            email.classList.remove('invalid');
+            const freeName = isFreeNameCategory();
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            const session = freeName ? null : window.UniAdmin?.StudentAuth?.getSession();
 
-            if (!name.value) {
-                name.classList.add('invalid');
-                name.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, selecione o Nome.');
-                return;
-            }
-            if (!email.value || !validateEmail(email.value)) {
-                email.classList.add('invalid');
-                email.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                showWarning('Por favor, insira um email válido.');
+            if (freeName) {
+                name.classList.remove('invalid');
+                email.classList.remove('invalid');
+                if (!name.value) {
+                    name.classList.add('invalid');
+                    name.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showWarning('Por favor, selecione o Nome.');
+                    return;
+                }
+                if (!email.value || !validateEmail(email.value)) {
+                    email.classList.add('invalid');
+                    email.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showWarning('Por favor, insira um email válido.');
+                    return;
+                }
+            } else if (!session) {
+                // Sessão pode ter expirado/sido limpa entre abrir o quiz e enviar.
+                showWarning('Sua sessão expirou. Faça login novamente.');
+                window.UniAdmin.StudentAuth.openModal({ intent: 'assessment', onSuccess: () => submitForm(score, erros) });
                 return;
             }
 
@@ -824,38 +1131,88 @@
             submitButton.disabled = true;
             submitButton.style.opacity = '0.6';
 
-            const errosSeguros = erros.replace(/\n/g, '').replace(/---/g, ';');
+            // Grava o status calculado no momento da submissão (não recalcula
+            // depois) — necessário para os indicadores de prazo do dashboard
+            // ficarem estáveis mesmo que o prazo do curso mude posteriormente.
+            const theme = trainingData[currentTrainingId]?.themes?.[currentThemeId];
+            const deadlineStatus = window.UniAdmin?.Deadlines?.computeDeadlineStatus(theme?.deadline) || 'livre';
 
-            const data = {
-                'dateTime': new Date().toLocaleString('pt-BR'),
-                'email': email.value,
-                'tema': themeBtn.textContent !== 'Escolha um Assunto' ? themeBtn.textContent : '',
-                'assunto': btn.textContent !== 'Escolha um Tema' ? btn.textContent : '',
-                'nome': name.value,
-                'nota': score,
-                'erros': errosSeguros,
-                'rating': rating.value,
-                'comentario': document.getElementById('comment')?.value.trim() || ''
+            const resultPayload = {
+                score,
+                approved: score >= 8,
+                rating: ratingValue,
+                comment: commentValue,
+                errors: erros || '',
+                answers: answerSnapshot || [],
+                submittedAt: Date.now(),
+                deadlineStatus
             };
 
-            fetch('https://script.google.com/macros/s/AKfycbzks7XbkiFoLJyCptsDht7e6K5ZYODkV3oD8xYm6gfHCxdpCrSivjol2tLIQPcemFat/exec', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams(data).toString()
-            })
-            .then(response => response.text())
-            .then(() => {
+            const finishSubmit = () => {
                 loadingSpinner.style.display = 'none';
                 submitButton.disabled = false;
                 submitButton.style.opacity = '1';
                 showResult(score);
-            })
-            .catch(() => {
-                loadingSpinner.style.display = 'none';
-                submitButton.disabled = false;
-                submitButton.style.opacity = '1';
-                showResult(score);
+            };
+
+            const saveResult = freeName
+                ? saveEstagioResult({ name: name.value, email: email.value, ...resultPayload })
+                : saveLoggedResult({ session, ...resultPayload });
+
+            saveResult
+                .then(finishSubmit)
+                .catch((error) => {
+                    console.error('Erro ao salvar resultado:', error);
+                    showWarning('Não foi possível registrar sua avaliação. Tente novamente.');
+                    loadingSpinner.style.display = 'none';
+                    submitButton.disabled = false;
+                    submitButton.style.opacity = '1';
+                });
+        }
+
+        // Grava o resultado de um aluno logado nos dois caminhos de fan-out
+        // (por usuário e por curso) numa única atualização atômica — ver
+        // js/student-auth.js e o plano de dados em Configurações > Usuários.
+        function saveLoggedResult({ session, ...result }) {
+            const U = window.UniAdmin;
+            const attemptCount = ((assessmentResults[currentTrainingId]?.[currentThemeId] !== undefined) ? 2 : 1);
+            const record = { ...result, attempt: attemptCount };
+            const basePath = `results/byUser/${session.userId}/${currentCategorySlug}/${currentTrainingId}/${currentThemeId}`;
+            const mirrorPath = `results/byCourse/${currentCategorySlug}/${currentTrainingId}/${currentThemeId}/${session.userId}`;
+            const updates = {};
+            updates[`/${U.dbRoot}/${basePath}`] = record;
+            updates[`/${U.dbRoot}/${mirrorPath}`] = record;
+            return U.db.ref().update(updates);
+        }
+
+        // Estágios: sem conta, cada submissão vira um registro solto (nome
+        // digitado livremente, pode haver homônimos — aceito para este fluxo).
+        function saveEstagioResult({ name, email, ...result }) {
+            const U = window.UniAdmin;
+            const record = { name, email: email || null, ...result };
+            const path = `/${U.dbRoot}/results/estagiosLivre/${currentCategorySlug}/${currentTrainingId}/${currentThemeId}`;
+            const newRef = U.ref(U.db, path).push();
+            return U.set(newRef, record);
+        }
+
+        // Certificado só aparece para aluno logado, aprovado e em curso com
+        // emissão habilitada no cadastro do assunto (Configurações).
+        function appendCertificateButton(score) {
+            const U = window.UniAdmin;
+            const session = U?.StudentAuth?.getSession();
+            const theme = trainingData[currentTrainingId]?.themes?.[currentThemeId];
+            if (!session || score < 8 || !U?.Certificate?.isEnabled(theme)) return;
+
+            const btn = document.createElement('button');
+            btn.className = 'certificate-download-btn';
+            btn.innerHTML = '<i class="fas fa-award" style="margin-right:8px;"></i>Baixar certificado';
+            btn.onclick = () => U.Certificate.download({
+                studentName: session.fullName,
+                course: theme,
+                courseName: theme?.name,
+                submittedAt: Date.now()
             });
+            resultContainer.appendChild(btn);
         }
 
         function showResult(score) {
@@ -891,6 +1248,8 @@
                 successDiv.className = 'success-message';
                 successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
                 resultContainer.appendChild(successDiv);
+
+                appendCertificateButton(score);
 
                 const errors = getDetailedIncorrectAnswers(currentTrainingId, currentThemeId);
                 if (errors) {
@@ -1006,8 +1365,16 @@
                 `;
                 resetCourseBtn.onmouseenter = () => { resetCourseBtn.style.background = 'var(--danger)'; resetCourseBtn.style.color = 'white'; };
                 resetCourseBtn.onmouseleave = () => { resetCourseBtn.style.background = 'transparent'; resetCourseBtn.style.color = 'var(--danger)'; };
-                resetCourseBtn.onclick = () => {
-                    if (confirm('Reiniciar o curso? Todo o progresso será perdido.')) resetCourseProgression();
+                resetCourseBtn.onclick = async () => {
+                    // ui.js e carregado depois deste arquivo, entao a funcao e lida no clique.
+                    const confirmed = await window.UniAdmin.showConfirm({
+                        title: 'Reiniciar curso',
+                        message: 'Todo o progresso deste curso será perdido.',
+                        icon: 'fa-rotate-left',
+                        details: ['Módulos concluídos e o resultado da avaliação voltam ao início.'],
+                        confirmText: 'Reiniciar'
+                    });
+                    if (confirmed) resetCourseProgression();
                 };
                 resultContainer.appendChild(resetCourseBtn);
             }

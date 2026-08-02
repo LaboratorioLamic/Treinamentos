@@ -36,7 +36,7 @@ const PLATFORMS = [
     },
     {
         category: 'Estágios',
-        slug: 'treinamentos',
+        slug: 'estagios',
         kicker: 'Formação de estagiários',
         description: 'Percurso de integração e formação prática para estagiários do laboratório.',
         icon: 'fa-user-graduate',

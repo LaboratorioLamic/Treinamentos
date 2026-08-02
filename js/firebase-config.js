@@ -21,7 +21,7 @@ var UniAdmin = window.UniAdmin || {};
     UniAdmin.categoryPaths = {
         'Treinamentos': 'treinamentos',
         'Educação Continuada': 'educacao_continuada',
-        'Estágios': 'treinamentos'
+        'Estágios': 'estagios'
     };
 
     UniAdmin.getCategoryDbPath = function (category) {

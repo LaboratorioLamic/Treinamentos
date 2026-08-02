@@ -11,25 +11,9 @@
 
     U.MIN_PASSWORD_LENGTH = 6;
 
-    function toHex(buffer) {
-        return Array.from(new Uint8Array(buffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-    }
-
-    async function sha256(text) {
-        const data = new TextEncoder().encode(text);
-        const digest = await crypto.subtle.digest('SHA-256', data);
-        return toHex(digest);
-    }
-
-    function randomSalt() {
-        return toHex(crypto.getRandomValues(new Uint8Array(16)));
-    }
-
-    async function hashWithSalt(password, salt) {
-        return sha256(`${salt}:${password}`);
-    }
+    // Hashing (SHA-256 + salt) vive em js/crypto-utils.js, compartilhado com o
+    // login multiusuário de aluno (js/student-auth.js).
+    const { randomSalt, hashWithSalt } = U.crypto;
 
     async function readAuth() {
         const snapshot = await U.get(U.ref(AUTH_PATH));
