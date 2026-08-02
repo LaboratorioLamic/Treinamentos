@@ -105,6 +105,110 @@
     const colabFormCancel = document.getElementById('cfg-colab-form-cancel');
 
     let editingColabId = null;
+    // Contas de aluno — só para completar as sugestões de setor/função com o
+    // que já existe nelas (elas seguem a planilha, mas podem ter valores
+    // antigos que ainda são válidos).
+    let usersCache = {};
+
+    async function ensureUsers() {
+        if (Object.keys(usersCache).length > 0) return;
+        try {
+            const snapshot = await get(ref(db, USERS_PATH));
+            usersCache = snapshot.exists() ? snapshot.val() : {};
+        } catch (error) {
+            usersCache = {};
+        }
+    }
+
+    // Setor/Função vêm da própria lista sincronizada (e das contas, que a
+    // seguem): digitar continua livre — é o campo que conserta o valor
+    // inválido —, mas a lista evita criar variações do mesmo setor
+    // ("Adminstrativo" x "Administrativo").
+    function distinctValues(field) {
+        const set = new Set();
+        Object.values(colaboradoresCache).forEach(c => { if (c?.[field]) set.add(String(c[field]).trim()); });
+        Object.values(usersCache).forEach(u => { if (u?.[field]) set.add(String(u[field]).trim()); });
+        return [...set].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    // Combobox leve: input digitável + popover com os valores existentes.
+    function setupCombobox({ input, popover, getItems, emptyText }) {
+        if (!input || !popover) return;
+        let items = [];
+        let activeIndex = -1;
+
+        function close() {
+            popover.classList.remove('active');
+            input.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+        }
+
+        function highlight(index) {
+            const nodes = [...popover.querySelectorAll('.user-combobox-item')];
+            if (nodes.length === 0) return;
+            activeIndex = (index + nodes.length) % nodes.length;
+            nodes.forEach((node, i) => node.classList.toggle('is-active', i === activeIndex));
+            nodes[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        function choose(value) {
+            input.value = value;
+            close();
+        }
+
+        function open(term = '') {
+            const query = normalizeName(term);
+            items = getItems().filter(value => !query || normalizeName(value).includes(query)).slice(0, 60);
+            popover.innerHTML = items.length === 0
+                ? `<div class="user-combobox-empty">${escapeHtml(emptyText)}</div>`
+                : items.map((value, i) => `
+                    <button type="button" class="user-combobox-item" data-index="${i}">
+                        <span class="user-combobox-item-label">${escapeHtml(value)}</span>
+                    </button>`).join('');
+
+            popover.querySelectorAll('.user-combobox-item').forEach(node => {
+                // mousedown: o blur do input não pode matar o clique antes dele.
+                node.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    choose(items[Number(node.dataset.index)]);
+                });
+            });
+
+            popover.classList.add('active');
+            input.setAttribute('aria-expanded', 'true');
+            activeIndex = -1;
+        }
+
+        input.addEventListener('focus', () => open(''));
+        input.addEventListener('input', () => open(input.value));
+        input.addEventListener('blur', () => setTimeout(close, 120));
+        input.addEventListener('mousedown', () => { if (document.activeElement === input) open(input.value); });
+        input.addEventListener('keydown', (event) => {
+            const isOpen = popover.classList.contains('active');
+            if (event.key === 'ArrowDown') { event.preventDefault(); if (!isOpen) open(input.value); else highlight(activeIndex + 1); return; }
+            if (event.key === 'ArrowUp') { event.preventDefault(); if (isOpen) highlight(activeIndex - 1); return; }
+            if (event.key === 'Escape' && isOpen) { event.stopPropagation(); close(); return; }
+            if (event.key === 'Enter' && isOpen && activeIndex >= 0) {
+                // Enter escolhendo na lista não pode salvar o formulário junto.
+                event.preventDefault(); event.stopPropagation();
+                choose(items[activeIndex]);
+            }
+        });
+    }
+
+    setupCombobox({
+        input: colabFormUnit,
+        popover: document.getElementById('cfg-colab-form-unit-popover'),
+        emptyText: 'Nenhum setor na lista sincronizada.',
+        getItems: () => distinctValues('unit')
+    });
+
+    setupCombobox({
+        input: colabFormRole,
+        popover: document.getElementById('cfg-colab-form-role-popover'),
+        emptyText: 'Nenhuma função na lista sincronizada.',
+        getItems: () => distinctValues('role')
+    });
 
     function formError(message) {
         if (!colabFormError) return;
@@ -127,6 +231,9 @@
         colabFormRole.value = colab.role || '';
         colabFormModal.style.display = 'flex';
         setTimeout(() => colabFormName.focus(), 60);
+        // Sugestões de setor/função: carregam em segundo plano, o popover só
+        // é montado quando o campo recebe foco.
+        ensureUsers();
     }
 
     // Registros de histórico avulsos (importados de planilha e os de Estágios
@@ -236,8 +343,10 @@
     colabFormCancel?.addEventListener('click', closeColabForm);
     colabFormModal?.addEventListener('click', (event) => { if (event.target === colabFormModal) closeColabForm(); });
     colabFormModal?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') { event.preventDefault(); submitColabForm(); }
-        if (event.key === 'Escape') closeColabForm();
+        // Com um popover de sugestão aberto, Enter/Esc pertencem ao combobox.
+        const comboOpen = !!colabFormModal.querySelector('.user-combobox-popover.active');
+        if (event.key === 'Enter' && !comboOpen) { event.preventDefault(); submitColabForm(); }
+        if (event.key === 'Escape' && !comboOpen) closeColabForm();
     });
 
     // ─── Exclusão manual ───

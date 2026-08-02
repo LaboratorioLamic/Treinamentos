@@ -83,6 +83,10 @@
             + (approvedCounts.byNameKey.get(normalizeName(user.fullName)) || 0);
     }
 
+    // Filtros da barra: unidade e função, cada um com seu popover. Vazio =
+    // todos; combinam com a busca por nome/login.
+    const listFilters = { unit: '', role: '' };
+
     function renderList(filterTerm = '') {
         const container = document.getElementById('cfg-users-container');
         if (!container) return;
@@ -91,10 +95,15 @@
             .map(userId => ({ userId, ...usersCache[userId] }))
             .filter(u => u && u.fullName)
             .filter(u => !term || normalizeName(u.fullName).includes(term) || (u.username || '').includes(term))
+            .filter(u => !listFilters.unit || (u.unit || '') === listFilters.unit)
+            .filter(u => !listFilters.role || (u.role || '') === listFilters.role)
             .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'));
 
         if (entries.length === 0) {
-            container.innerHTML = '<p class="form-hint">Nenhum usuário cadastrado ainda.</p>';
+            const filtering = !!term || !!listFilters.unit || !!listFilters.role;
+            container.innerHTML = `<p class="form-hint">${filtering
+                ? 'Nenhum usuário encontrado com os filtros atuais.'
+                : 'Nenhum usuário cadastrado ainda.'}</p>`;
             return;
         }
 
@@ -166,6 +175,7 @@
         showSpinner(true);
         try {
             usersCache = await fetchUsers();
+            refreshUsersFilterChips();
             renderList(currentFilterTerm());
         } catch (error) {
             showWarning('Erro ao carregar usuários: ' + error.message);
@@ -206,6 +216,84 @@
 
     document.getElementById('cfg-users-filter')?.addEventListener('input', (event) => {
         renderList(event.target.value);
+    });
+
+    // ─── Chips de filtro (unidade / função) ───
+    // Mesma mecânica dos chips do Histórico: um popover por campo, com busca.
+    const usersFilterRow = document.getElementById('cfg-users-filter-row');
+    const usersFilterClear = document.getElementById('cfg-users-filter-clear');
+
+    function filterOptions(field) {
+        const values = new Set();
+        Object.values(usersCache).forEach(u => { if (u?.[field]) values.add(String(u[field]).trim()); });
+        return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    function closeUsersPopovers() {
+        usersFilterRow?.querySelectorAll('.hfilter-chip.is-open').forEach(chip => chip.classList.remove('is-open'));
+    }
+
+    function refreshUsersFilterChips() {
+        ['unit', 'role'].forEach(field => {
+            const chip = usersFilterRow?.querySelector(`.hfilter-chip[data-field="${field}"]`);
+            const label = chip?.querySelector('.hfilter-chip-label');
+            if (!label) return;
+            label.textContent = listFilters[field] || label.dataset.default;
+            chip.classList.toggle('is-active', !!listFilters[field]);
+        });
+        if (usersFilterClear) {
+            usersFilterClear.style.display = (listFilters.unit || listFilters.role) ? 'inline-flex' : 'none';
+        }
+    }
+
+    function renderUsersFilterList(field, searchTerm = '') {
+        const listEl = document.getElementById(`cfg-users-filter-${field}-list`);
+        if (!listEl) return;
+        const term = normalizeName(searchTerm);
+        const options = filterOptions(field).filter(v => !term || normalizeName(v).includes(term));
+        const allLabel = field === 'unit' ? 'Todas' : 'Todas as funções';
+
+        listEl.innerHTML = options.length === 0 && term
+            ? '<div class="hfilter-chip-empty">Nada encontrado.</div>'
+            : [`<div class="hfilter-chip-item ${!listFilters[field] ? 'is-selected' : ''}" data-value="">${allLabel}</div>`]
+                .concat(options.map(v => `<div class="hfilter-chip-item ${listFilters[field] === v ? 'is-selected' : ''}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`))
+                .join('');
+
+        listEl.querySelectorAll('.hfilter-chip-item[data-value]').forEach(item => {
+            item.addEventListener('click', () => {
+                listFilters[field] = item.dataset.value;
+                closeUsersPopovers();
+                refreshUsersFilterChips();
+                renderList(currentFilterTerm());
+            });
+        });
+    }
+
+    usersFilterRow?.querySelectorAll('.hfilter-chip').forEach(chip => {
+        const field = chip.dataset.field;
+        const btn = chip.querySelector('.hfilter-chip-btn');
+        const search = chip.querySelector('.hfilter-chip-search');
+
+        btn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = chip.classList.contains('is-open');
+            closeUsersPopovers();
+            if (isOpen) return;
+            chip.classList.add('is-open');
+            if (search) { search.value = ''; }
+            renderUsersFilterList(field, '');
+            search?.focus();
+        });
+        chip.addEventListener('click', (event) => event.stopPropagation());
+        search?.addEventListener('input', () => renderUsersFilterList(field, search.value));
+    });
+    document.addEventListener('click', closeUsersPopovers);
+
+    usersFilterClear?.addEventListener('click', () => {
+        listFilters.unit = '';
+        listFilters.role = '';
+        refreshUsersFilterChips();
+        renderList(currentFilterTerm());
     });
 
     function bindCardActions() {

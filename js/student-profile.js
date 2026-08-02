@@ -232,15 +232,19 @@
                             <button type="button" class="student-filter-clear" id="student-filter-theme-clear">Limpar</button>
                         </div>
                         <div class="student-filter-options">
-                            ${themes.length === 0 ? '<p class="student-filter-empty">Nenhum tema disponível.</p>' : themes.map(t => `
-                                <label class="student-filter-option">
-                                    <input type="checkbox" value="${escapeHtml(t.key)}" ${filterState.themes.has(t.key) ? 'checked' : ''}>
+                            ${themes.length === 0 ? '<p class="student-filter-empty">Nenhum tema disponível.</p>' : themes.map(t => {
+                                const on = filterState.themes.has(t.key);
+                                return `
+                                <button type="button" class="student-filter-option ${on ? 'is-selected' : ''}"
+                                        data-theme-key="${escapeHtml(t.key)}" aria-pressed="${on}">
+                                    <span class="student-filter-option-mark"><i class="fas fa-check"></i></span>
                                     <span class="student-filter-option-text">
                                         <strong>${escapeHtml(t.label)}</strong>
                                         <small>${escapeHtml(t.category)}</small>
                                     </span>
                                     <span class="student-filter-option-count">${t.count}</span>
-                                </label>`).join('')}
+                                </button>`;
+                            }).join('')}
                         </div>
                     </div>
                 </div>
@@ -300,10 +304,12 @@
         });
 
         // Marcar/desmarcar mantém o popover aberto: a grade atualiza atrás dele.
-        popover?.querySelectorAll('input[type="checkbox"]').forEach(input => {
-            input.addEventListener('change', () => {
-                if (input.checked) filterState.themes.add(input.value);
-                else filterState.themes.delete(input.value);
+        popover?.querySelectorAll('.student-filter-option[data-theme-key]').forEach(option => {
+            option.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const key = option.dataset.themeKey;
+                if (filterState.themes.has(key)) filterState.themes.delete(key);
+                else filterState.themes.add(key);
                 renderGrid({ keepPopoverOpen: true });
             });
         });

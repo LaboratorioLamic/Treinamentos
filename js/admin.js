@@ -606,15 +606,24 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 refreshRolesSummary();
                 return;
             }
-            rolesListEl.innerHTML = visible.map(role => `
-                <label class="roles-popover-option">
-                    <input type="checkbox" value="${escapeHtml(role)}" ${selectedRoles.has(role) ? 'checked' : ''}>
-                    <span>${escapeHtml(role)}</span>
-                </label>`).join('');
-            rolesListEl.querySelectorAll('input[type="checkbox"]').forEach(input => {
-                input.addEventListener('change', () => {
-                    if (input.checked) selectedRoles.add(input.value);
-                    else selectedRoles.delete(input.value);
+            // Cada função é um botão selecionável (seleção múltipla, sem
+            // checkbox): o próprio pill mostra o estado.
+            rolesListEl.innerHTML = visible.map(role => {
+                const on = selectedRoles.has(role);
+                return `
+                <button type="button" class="roles-popover-option ${on ? 'is-selected' : ''}"
+                        data-role="${escapeHtml(role)}" aria-pressed="${on}">
+                    <span class="roles-popover-option-mark"><i class="fas fa-check"></i></span>
+                    <span class="roles-popover-option-label">${escapeHtml(role)}</span>
+                </button>`;
+            }).join('');
+            rolesListEl.querySelectorAll('.roles-popover-option[data-role]').forEach(option => {
+                option.addEventListener('click', () => {
+                    const role = option.dataset.role;
+                    const on = !selectedRoles.has(role);
+                    if (on) selectedRoles.add(role); else selectedRoles.delete(role);
+                    option.classList.toggle('is-selected', on);
+                    option.setAttribute('aria-pressed', String(on));
                     refreshRolesSummary();
                 });
             });

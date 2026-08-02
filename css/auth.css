@@ -609,22 +609,61 @@ body.admin-mode #cfg-root { display: block; }
 .student-filter-options {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    max-height: 210px;
+    gap: 6px;
+    max-height: 230px;
+    padding: 2px;
     overflow-y: auto;
 }
 
+/* Cada tema é um botão selecionável (não um checkbox): a marca de seleção é
+   o próprio pill, com um "check" que só aparece quando ativo. */
 .student-filter-option {
     display: flex;
     align-items: center;
     gap: 9px;
-    padding: 7px 8px;
-    border-radius: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    background: var(--surface);
+    font-family: inherit;
+    text-align: left;
     cursor: pointer;
-    transition: background 0.14s;
+    transition: background 0.16s, border-color 0.16s, transform 0.12s, box-shadow 0.16s;
 }
-.student-filter-option:hover { background: var(--surface); }
-.student-filter-option input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+.student-filter-option:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+.student-filter-option:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.25);
+}
+.student-filter-option.is-selected {
+    background: rgba(79, 142, 247, 0.12);
+    border-color: var(--accent);
+}
+
+.student-filter-option-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 19px;
+    height: 19px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    background: var(--card);
+    color: transparent;
+    font-size: 0.6em;
+    transition: background 0.16s, border-color 0.16s, color 0.16s;
+}
+.student-filter-option.is-selected .student-filter-option-mark {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
 
 .student-filter-option-text { flex: 1; min-width: 0; }
 .student-filter-option-text strong {
@@ -643,9 +682,19 @@ body.admin-mode #cfg-root { display: block; }
 }
 
 .student-filter-option-count {
-    font-size: 0.7em;
+    flex-shrink: 0;
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.07);
+    font-size: 0.68em;
     font-weight: 800;
+    text-align: center;
     color: var(--text-muted);
+}
+.student-filter-option.is-selected .student-filter-option-count {
+    background: var(--accent);
+    color: #fff;
 }
 
 .student-filter-empty {

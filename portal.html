@@ -619,14 +619,25 @@
                 <input type="text" id="cfg-colab-form-name" placeholder="Nome completo" autocomplete="off">
             </div>
 
+            <!-- Setor e Função sugerem os valores já existentes na lista
+                 sincronizada de colaboradores (e nas contas), mas continuam
+                 aceitando texto livre para corrigir o que veio errado. -->
             <div class="user-form-row">
                 <div class="confirm-field">
                     <label for="cfg-colab-form-unit">Setor</label>
-                    <input type="text" id="cfg-colab-form-unit" placeholder="Setor / unidade" autocomplete="off">
+                    <div class="user-combobox">
+                        <input type="text" id="cfg-colab-form-unit" placeholder="Buscar setor" autocomplete="off" role="combobox" aria-expanded="false">
+                        <i class="fas fa-chevron-down user-combobox-caret"></i>
+                        <div class="user-combobox-popover" id="cfg-colab-form-unit-popover"></div>
+                    </div>
                 </div>
                 <div class="confirm-field">
                     <label for="cfg-colab-form-role">Função</label>
-                    <input type="text" id="cfg-colab-form-role" placeholder="Cargo / função" autocomplete="off">
+                    <div class="user-combobox">
+                        <input type="text" id="cfg-colab-form-role" placeholder="Buscar função" autocomplete="off" role="combobox" aria-expanded="false">
+                        <i class="fas fa-chevron-down user-combobox-caret"></i>
+                        <div class="user-combobox-popover" id="cfg-colab-form-role-popover"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1384,6 +1395,33 @@
                                     </div>
                                     <button type="button" class="btn btn-primary btn-sm" id="cfg-users-new">
                                         <i class="fas fa-user-plus"></i> Novo usuário
+                                    </button>
+                                </div>
+                                <!-- Filtros por unidade e função, um popover cada.
+                                     Valores vêm das próprias contas cadastradas. -->
+                                <div class="hfilter-row" id="cfg-users-filter-row">
+                                    <div class="hfilter-chip" data-field="unit">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Unidade">Unidade</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar unidade...">
+                                            <div class="hfilter-chip-list" id="cfg-users-filter-unit-list"></div>
+                                        </div>
+                                    </div>
+                                    <div class="hfilter-chip" data-field="role">
+                                        <button type="button" class="hfilter-chip-btn">
+                                            <span class="hfilter-chip-label" data-default="Função">Função</span>
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <input type="text" class="hfilter-chip-search" placeholder="Buscar função...">
+                                            <div class="hfilter-chip-list" id="cfg-users-filter-role-list"></div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="hfilter-clear-chip" id="cfg-users-filter-clear" style="display:none;">
+                                        <i class="fas fa-xmark"></i> Limpar filtros
                                     </button>
                                 </div>
                                 <div id="cfg-users-container"></div>
