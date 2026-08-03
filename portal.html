@@ -757,6 +757,59 @@
         </div>
     </div>
 
+    <!-- Modal do curso (Dashboard > Por curso): Informações + Gráficos, com opção de resetar -->
+    <div class="modal" id="cfg-dash-course-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-course-modal-title">
+        <div class="modal-content dash-course-modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-pie" style="color:var(--cfg-primary);margin-right:7px;"></i><span id="cfg-dash-course-modal-title">Curso</span></h2>
+                <span class="close" id="cfg-dash-course-modal-close">&times;</span>
+            </div>
+            <div class="dash-course-modal-tabs">
+                <button type="button" class="tab-btn active" data-dash-course-tab="info">Informações</button>
+                <button type="button" class="tab-btn" data-dash-course-tab="charts">Gráficos</button>
+            </div>
+            <div class="modal-body dash-course-modal-body">
+                <div class="tab-content active" id="cfg-dash-course-tab-info">
+                    <div class="panel-card">
+                        <div class="panel-header"><h2>Comentários da Pesquisa de Satisfação</h2></div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-course-comments" class="dashboard-table-wrap"></div>
+                        </div>
+                    </div>
+                    <div class="panel-card">
+                        <div class="panel-header"><h2>Reprovações</h2></div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-course-reprovals" class="dashboard-table-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-content" id="cfg-dash-course-tab-charts">
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Satisfação com o Curso</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-satisfaction-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Realização do Curso</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-completion-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Prazo de Realização</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-deadline-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="dash-course-modal-footer">
+                <button type="button" class="dash-course-reset-btn" id="cfg-dash-course-reset-btn">
+                    <i class="fas fa-rotate-left"></i> Resetar curso
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de importação do Histórico (escolha de categoria) -->
     <div class="modal" id="cfg-history-import-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-history-import-title">
         <div class="modal-content confirm-content" id="cfg-history-import-content">
@@ -1492,37 +1545,6 @@
                         </div>
                     </div>
 
-                    <!-- Painel: por curso -->
-                    <div id="cfg-dash-course-panel" class="dashboard-panel" style="display:none;">
-                        <div class="dashboard-chart-row">
-                            <div class="panel-card dashboard-chart-card">
-                                <div class="panel-header"><h2>Satisfação com o Curso</h2></div>
-                                <div class="panel-body"><canvas id="cfg-dash-course-satisfaction-chart"></canvas></div>
-                            </div>
-                            <div class="panel-card dashboard-chart-card">
-                                <div class="panel-header"><h2>Realização do Curso</h2></div>
-                                <div class="panel-body"><canvas id="cfg-dash-course-completion-chart"></canvas></div>
-                            </div>
-                        </div>
-                        <div class="dashboard-chart-row">
-                            <div class="panel-card dashboard-chart-card">
-                                <div class="panel-header"><h2>Prazo de Realização</h2></div>
-                                <div class="panel-body"><canvas id="cfg-dash-course-deadline-chart"></canvas></div>
-                            </div>
-                        </div>
-                        <div class="panel-card">
-                            <div class="panel-header"><h2>Comentários da Pesquisa de Satisfação</h2></div>
-                            <div class="panel-body">
-                                <div id="cfg-dash-course-comments" class="dashboard-table-wrap"></div>
-                            </div>
-                        </div>
-                        <div class="panel-card">
-                            <div class="panel-header"><h2>Reprovações</h2></div>
-                            <div class="panel-body">
-                                <div id="cfg-dash-course-reprovals" class="dashboard-table-wrap"></div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Histórico Tab -->

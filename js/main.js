@@ -567,6 +567,13 @@
                 <span><i class="fas fa-clipboard-list"></i> ${quizData[`${subjectId}_${theme.id}`]?.length || 0} questões</span>`;
             body.appendChild(meta);
 
+            const certTag = document.createElement('div');
+            certTag.className = theme.certificateEnabled ? 'course-cert-tag has-cert' : 'course-cert-tag no-cert';
+            certTag.innerHTML = theme.certificateEnabled
+                ? '<i class="fas fa-award"></i> Emite certificado'
+                : '<i class="fas fa-ban"></i> Não emite certificado';
+            body.appendChild(certTag);
+
             const progress = document.createElement('div');
             progress.className = 'course-progress';
             progress.innerHTML = `

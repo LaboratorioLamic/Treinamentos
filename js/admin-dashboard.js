@@ -240,7 +240,7 @@
         selectedCourseKey = null;
         const subject = currentTrainingData()[subjectId] || {};
         subjectLabel.textContent = subject.name || subjectId;
-        document.getElementById('cfg-dash-course-panel').style.display = 'none';
+        closeCourseModal();
         renderCourseCards();
     }
 
@@ -376,7 +376,7 @@
             selectedCourseKey = courseKey;
             courseCardsBox.querySelectorAll('.dash-course-card').forEach(c => c.classList.remove('is-selected'));
             card.classList.add('is-selected');
-            renderCourseDashboard(slug, courseKey);
+            openCourseModal(slug, courseKey, theme.name || theme.id);
         };
         return card;
     }
@@ -408,8 +408,7 @@
         closeSubjectPopover();
         updateCategoryChip();
         renderCourseCards();
-        const panel = document.getElementById('cfg-dash-course-panel');
-        if (panel) panel.style.display = 'none';
+        closeCourseModal();
     });
 
     // Linhas do curso selecionado — casadas por IDs (contas reais e
@@ -498,8 +497,6 @@
 
     async function renderCourseDashboard(slug, courseKey) {
         const [subjectId, themeId] = courseKey.split('_');
-        document.getElementById('cfg-dash-empty').style.display = 'none';
-        document.getElementById('cfg-dash-course-panel').style.display = 'flex';
 
         const rows = await fetchCourseResults(slug, subjectId, themeId);
 
@@ -533,6 +530,88 @@
         renderReprovalsTable(rows, slug, subjectId, themeId);
     }
 
+    // ─── Modal do curso: Informações / Gráficos + Resetar curso ───
+    const courseModal = document.getElementById('cfg-dash-course-modal');
+    const courseModalTitle = document.getElementById('cfg-dash-course-modal-title');
+    const courseModalClose = document.getElementById('cfg-dash-course-modal-close');
+    const courseResetBtn = document.getElementById('cfg-dash-course-reset-btn');
+    let openCourseSlug = null;
+    let openCourseKey = null;
+    let openCourseName = null;
+
+    function openCourseModal(slug, courseKey, themeName) {
+        openCourseSlug = slug;
+        openCourseKey = courseKey;
+        openCourseName = themeName;
+        courseModalTitle.textContent = themeName || 'Curso';
+        courseModal.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === 0));
+        courseModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach((tab, i) => tab.classList.toggle('active', i === 0));
+        courseModal.style.display = 'flex';
+        renderCourseDashboard(slug, courseKey);
+    }
+
+    function closeCourseModal() { courseModal.style.display = 'none'; }
+
+    courseModal?.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            courseModal.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const target = btn.dataset.dashCourseTab;
+            courseModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach(tab => {
+                tab.classList.toggle('active', tab.id === `cfg-dash-course-tab-${target}`);
+            });
+        });
+    });
+
+    courseModalClose?.addEventListener('click', closeCourseModal);
+    courseModal?.addEventListener('click', (event) => { if (event.target === courseModal) closeCourseModal(); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && courseModal?.style.display === 'flex') closeCourseModal();
+    });
+
+    async function handleResetCourse() {
+        if (!openCourseSlug || !openCourseKey) return;
+        const [subjectId, themeId] = openCourseKey.split('_');
+
+        const confirmed = await showConfirm({
+            title: 'Resetar curso',
+            message: `Todo o progresso e as avaliações de "${openCourseName || 'este curso'}" serão apagados para todos os colaboradores. Eles poderão assistir e avaliar o curso novamente. Esta ação não pode ser desfeita.`,
+            icon: 'fa-rotate-left',
+            requireWord: 'RESETAR',
+            confirmText: 'Resetar'
+        });
+        if (!confirmed) return;
+
+        try {
+            const updates = {};
+            updates[`/${dbRoot}/results/byCourse/${openCourseSlug}/${subjectId}/${themeId}`] = null;
+
+            const byCourseSnap = await get(ref(db, `/${dbRoot}/results/byCourse/${openCourseSlug}/${subjectId}/${themeId}`));
+            if (byCourseSnap.exists()) {
+                Object.keys(byCourseSnap.val()).forEach(userId => {
+                    updates[`/${dbRoot}/results/byUser/${userId}/${openCourseSlug}/${subjectId}/${themeId}`] = null;
+                });
+            }
+            updates[`/${dbRoot}/results/estagiosLivre/${openCourseSlug}/${subjectId}/${themeId}`] = null;
+
+            // Registros importados de planilha não têm subjectId/themeId, só
+            // casam pelo nome (mesmo critério de fetchCourseResults) — cada um
+            // precisa ser apagado individualmente pelo seu entryId.
+            fetchCourseResults(openCourseSlug, subjectId, themeId)
+                .filter(r => r.imported && r.entryId)
+                .forEach(r => { updates[`/${dbRoot}/results/imported/${openCourseSlug}/${r.entryId}`] = null; });
+
+            await db.ref().update(updates);
+            showWarning('Curso resetado com sucesso.');
+            historyRows = await U.refreshHistoryRows();
+            renderCourseCards();
+            renderCourseDashboard(openCourseSlug, openCourseKey);
+        } catch (error) {
+            showWarning('Erro ao resetar o curso: ' + error.message);
+        }
+    }
+    courseResetBtn?.addEventListener('click', handleResetCourse);
+
     // ─── Alternância de modo ───
     const modeUserBtn = document.getElementById('cfg-dash-mode-user');
     const modeCourseBtn = document.getElementById('cfg-dash-mode-course');
@@ -543,9 +622,9 @@
         document.getElementById('cfg-dash-user-picker').style.display = mode === 'user' ? 'flex' : 'none';
         document.getElementById('cfg-dash-course-picker').style.display = mode === 'course' ? 'flex' : 'none';
         document.getElementById('cfg-dash-user-panel').style.display = 'none';
-        document.getElementById('cfg-dash-course-panel').style.display = 'none';
         document.getElementById('cfg-dash-empty').style.display = 'flex';
         closeSubjectPopover();
+        closeCourseModal();
         if (mode === 'course') { updateCategoryChip(); renderCourseCards(); }
         else if (courseCardsBox) { courseCardsBox.style.display = 'none'; }
     }
