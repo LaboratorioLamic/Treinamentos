@@ -55,10 +55,15 @@ function hideModal() {
     document.getElementById('cfg-category-modal').style.display = 'none';
 }
 
-document.getElementById('cfg-category-submit').addEventListener('click', async () => {
-    const category = document.getElementById('cfg-category-select').value;
-    if (!category) { showWarning('Por favor, selecione uma categoria.'); return; }
+// Plataforma vinda da home (?cat=), quando é uma opção válida do seletor.
+function categoryFromUrl() {
+    const suggested = new URLSearchParams(location.search).get('cat');
+    const select = document.getElementById('cfg-category-select');
+    if (!suggested || !select) return null;
+    return [...select.options].some(o => o.value === suggested) ? suggested : null;
+}
 
+async function applyCategory(category) {
     showLoadingBar();
     try {
         currentCategory = category;
@@ -79,6 +84,12 @@ document.getElementById('cfg-category-submit').addEventListener('click', async (
     } finally {
         hideLoadingBar();
     }
+}
+
+document.getElementById('cfg-category-submit').addEventListener('click', () => {
+    const category = document.getElementById('cfg-category-select').value;
+    if (!category) { showWarning('Por favor, selecione uma categoria.'); return; }
+    return applyCategory(category);
 });
 
 document.getElementById('cfg-category-select').addEventListener('keydown', (event) => {
@@ -555,8 +566,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         }
 
         // ─── Funções (cargos) que enxergam o assunto ───
-        // Lista vinda dos cargos das contas cadastradas (/users), que por sua
-        // vez são sincronizados da planilha via Colaboradores. Seleção vazia =
+        // Lista vinda dos cargos de /colaboradores (planilha, mesma fonte da
+        // aba Colaboradores) somada aos das contas (/users). Seleção vazia =
         // curso visível para todos (inclusive quem não tem cargo definido).
         const rolesBtn = document.getElementById('cfg-theme-roles-btn');
         const rolesPopover = document.getElementById('cfg-theme-roles-popover');
@@ -568,17 +579,23 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         let selectedRoles = new Set();
         let availableRoles = [];
 
-        // Cargos distintos das contas + os já gravados no assunto em edição
-        // (um cargo pode ter sumido da planilha, mas a regra do curso
-        // continua valendo até o admin mudar).
+        // Cargos distintos dos colaboradores (planilha) + das contas + os já
+        // gravados no assunto em edição (um cargo pode ter sumido da planilha,
+        // mas a regra do curso continua valendo até o admin mudar).
         async function loadAvailableRoles() {
             try {
-                const snapshot = await U.get(U.ref(U.db, `/${U.dbRoot}/users`));
-                const users = snapshot.exists() ? snapshot.val() : {};
+                const [colabsSnap, usersSnap] = await Promise.all([
+                    U.get(U.ref(U.db, `/${U.dbRoot}/colaboradores`)),
+                    U.get(U.ref(U.db, `/${U.dbRoot}/users`))
+                ]);
+                const colaboradores = colabsSnap.exists() ? colabsSnap.val() : {};
+                const users = usersSnap.exists() ? usersSnap.val() : {};
                 const roles = new Set();
-                Object.keys(users).forEach(id => {
-                    const role = (users[id]?.role || '').trim();
-                    if (role) roles.add(role);
+                [colaboradores, users].forEach(source => {
+                    Object.keys(source).forEach(id => {
+                        const role = (source[id]?.role || '').trim();
+                        if (role) roles.add(role);
+                    });
                 });
                 selectedRoles.forEach(role => roles.add(role));
                 availableRoles = [...roles].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -601,9 +618,10 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             const visible = availableRoles.filter(role => !term || normalizeName(role).includes(term));
             if (visible.length === 0) {
                 rolesListEl.innerHTML = availableRoles.length === 0
-                    ? '<p class="roles-popover-empty">Nenhuma função encontrada nas contas cadastradas.</p>'
+                    ? '<p class="roles-popover-empty">Nenhuma função encontrada na lista de colaboradores.</p>'
                     : '<p class="roles-popover-empty">Nada encontrado.</p>';
                 refreshRolesSummary();
+                positionRolesPopover();
                 return;
             }
             // Cada função é um botão selecionável (seleção múltipla, sem
@@ -628,6 +646,32 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 });
             });
             refreshRolesSummary();
+            positionRolesPopover();
+        }
+
+        // O card do formulário tem overflow:hidden, então o popover é movido
+        // para o fim de #cfg-root e posicionado em coordenadas de viewport
+        // (CSS position:fixed) — assim nunca fica cortado nem por baixo.
+        function positionRolesPopover() {
+            if (!rolesPopover || rolesPopover.hidden) return;
+            const rect = rolesBtn.getBoundingClientRect();
+            const gap = 6;
+            const margin = 10;
+            rolesPopover.style.width = `${rect.width}px`;
+            rolesPopover.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - rect.width - margin))}px`;
+            // Mede a altura real para decidir se abre para baixo ou para cima.
+            rolesPopover.style.top = '0px';
+            const height = rolesPopover.offsetHeight;
+            const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+            const openUp = spaceBelow < height && rect.top - gap - margin > spaceBelow;
+            const available = Math.max(180, openUp ? rect.top - gap - margin : spaceBelow);
+            // Só a lista rola; o resto do popover (busca) fica sempre visível.
+            const chrome = height - rolesListEl.offsetHeight;
+            rolesListEl.style.maxHeight = `${Math.max(120, available - chrome)}px`;
+            const finalHeight = Math.min(rolesPopover.offsetHeight, available);
+            rolesPopover.style.top = openUp
+                ? `${rect.top - gap - finalHeight}px`
+                : `${rect.bottom + gap}px`;
         }
 
         function closeRolesPopover() {
@@ -635,6 +679,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             rolesPopover.hidden = true;
             rolesBtn.setAttribute('aria-expanded', 'false');
             document.removeEventListener('click', onRolesOutsideClick, true);
+            window.removeEventListener('resize', positionRolesPopover);
+            window.removeEventListener('scroll', positionRolesPopover, true);
         }
         function onRolesOutsideClick(event) {
             if (!rolesPopover.contains(event.target) && !rolesBtn.contains(event.target)) closeRolesPopover();
@@ -643,19 +689,17 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         rolesBtn?.addEventListener('click', () => {
             const willOpen = rolesPopover.hidden;
             if (!willOpen) { closeRolesPopover(); return; }
+            const cfgRoot = document.getElementById('cfg-root') || document.body;
+            if (rolesPopover.parentElement !== cfgRoot) cfgRoot.appendChild(rolesPopover);
             rolesPopover.hidden = false;
             rolesBtn.setAttribute('aria-expanded', 'true');
-            // O card do formulário corta o que passa da borda: se não couber
-            // abaixo do botão, o popover abre para cima.
-            const card = rolesBtn.closest('.panel-card') || rolesBtn.closest('.tab-content');
             rolesSearchInput.value = '';
             renderRolesList();
-            const spaceBelow = card
-                ? card.getBoundingClientRect().bottom - rolesBtn.getBoundingClientRect().bottom
-                : Number.POSITIVE_INFINITY;
-            rolesPopover.classList.toggle('is-up', spaceBelow < rolesPopover.offsetHeight + 12);
+            positionRolesPopover();
             loadAvailableRoles();
             document.addEventListener('click', onRolesOutsideClick, true);
+            window.addEventListener('resize', positionRolesPopover);
+            window.addEventListener('scroll', positionRolesPopover, true);
             setTimeout(() => rolesSearchInput.focus(), 40);
         });
         rolesSearchInput?.addEventListener('input', renderRolesList);
@@ -1535,8 +1579,12 @@ function openAdminPanel() {
         adminInitialized = true;
         initializeTabs();
     }
-    // Sem categoria escolhida ainda: pede a categoria.
-    if (!currentDbPath) showModal();
+    if (currentDbPath) return;
+    // Abrindo a partir de uma plataforma (?cat=), o painel já entra nela;
+    // o seletor só aparece quando não dá para saber qual é.
+    const fromPortal = categoryFromUrl();
+    if (fromPortal) applyCategory(fromPortal);
+    else showModal();
 }
 
 function closeAdminPanel() {

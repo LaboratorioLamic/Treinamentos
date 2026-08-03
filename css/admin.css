@@ -451,16 +451,16 @@
         #cfg-root .roles-picker-text small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
         #cfg-root .roles-picker-arrow { color: var(--text-3); font-size: 12px; }
 
+        /* O painel do formulário tem overflow:hidden e cortaria a lista: o
+           popover é movido para o fim de #cfg-root e posicionado em
+           coordenadas de viewport (position:fixed) por js/admin.js. */
         #cfg-root .roles-popover {
-            position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 6px);
+            position: fixed; z-index: 1200;
             background: #fff; border: 1.5px solid var(--cfg-border); border-radius: 12px;
             box-shadow: 0 18px 44px -16px rgba(15,34,68,0.4);
             padding: 10px; display: flex; flex-direction: column; gap: 8px;
         }
         #cfg-root .roles-popover[hidden] { display: none; }
-        /* O painel do formulário tem overflow:hidden; quando não sobra espaço
-           abaixo do botão, o popover abre para cima em vez de ser cortado. */
-        #cfg-root .roles-popover.is-up { top: auto; bottom: calc(100% + 6px); }
         #cfg-root .roles-popover-head { display: flex; gap: 7px; align-items: center; }
         #cfg-root .roles-popover-search {
             flex: 1; min-width: 0; padding: 7px 10px; font-size: 12.5px; font-family: inherit;
@@ -790,6 +790,31 @@
         #cfg-root .dash-course-stats { margin-top: 6px; }
         #cfg-root .dash-course-meta span,
         #cfg-root .dash-course-stats span { display: inline-flex; align-items: center; gap: 5px; }
+
+        /* Cobertura do público-alvo (funções configuradas no assunto). */
+        #cfg-root .dash-course-audience {
+            margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--cfg-border);
+            display: flex; flex-direction: column; gap: 5px;
+        }
+        #cfg-root .dash-course-audience-top {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        #cfg-root .dash-course-audience-label {
+            display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+            font-size: 11px; color: var(--text-3);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .dash-course-audience-pct { font-size: 12px; font-weight: 700; color: var(--cfg-primary); }
+        #cfg-root .dash-course-audience-bar {
+            height: 6px; border-radius: 999px; background: var(--cfg-border); overflow: hidden;
+        }
+        #cfg-root .dash-course-audience-bar span {
+            display: block; height: 100%; border-radius: 999px;
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+            transition: width 0.3s ease;
+        }
+        #cfg-root .dash-course-audience-missing { font-size: 10.5px; color: var(--text-3); }
+        #cfg-root .dash-course-audience.is-empty { color: var(--text-3); }
 
         @media (max-width: 640px) {
             #cfg-root .dash-course-grid { grid-template-columns: 1fr; }

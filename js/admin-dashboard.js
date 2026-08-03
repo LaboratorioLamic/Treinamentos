@@ -13,8 +13,13 @@
         muted: '#94a3b8', purple: '#8b5cf6'
     };
 
+    // Categorias sem público definido por função: estágio é individual, não
+    // tem "quem falta fazer" a calcular.
+    const AUDIENCE_EXEMPT_SLUGS = ['estagios'];
+
     let initialized = false;
     let allUsers = {};
+    let allColaboradores = {};
     // Linhas do histórico (mesma fonte que a aba Histórico: results/byUser +
     // estagiosLivre + imported, já com nomes de assunto/tema resolvidos) —
     // o dashboard não lê mais results/byUser diretamente, para não ficar
@@ -39,13 +44,15 @@
     // ─── Carga inicial (uma vez por sessão do painel) ───
     async function loadBaseData() {
         const slugs = Object.keys(CATEGORY_LABELS);
-        const [usersSnap, rows, ...snaps] = await Promise.all([
+        const [usersSnap, colabsSnap, rows, ...snaps] = await Promise.all([
             get(ref(db, `/${dbRoot}/users`)),
+            get(ref(db, `/${dbRoot}/colaboradores`)),
             U.getHistoryRows(),
             ...slugs.map(slug => get(ref(db, `/${dbRoot}/${slug}/trainingData`))),
             ...slugs.map(slug => get(ref(db, `/${dbRoot}/${slug}/quizData`)))
         ]);
         allUsers = usersSnap.exists() ? usersSnap.val() : {};
+        allColaboradores = colabsSnap.exists() ? colabsSnap.val() : {};
         historyRows = rows;
         allTrainingData = {};
         allQuizData = {};
@@ -237,18 +244,82 @@
         renderCourseCards();
     }
 
+    // ─── Público-alvo do curso (funções configuradas no assunto) ───
+    // Sem funções marcadas = todos os colaboradores. A lista base é
+    // /colaboradores (espelho da planilha), a mesma que alimenta o seletor
+    // de funções do assunto.
+    function courseAudience(theme) {
+        const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
+        const roleKeys = new Set(roles.map(role => normalizeName(role)));
+        return Object.keys(allColaboradores)
+            .map(id => ({ id, ...allColaboradores[id] }))
+            .filter(colab => colab.fullName)
+            .filter(colab => roleKeys.size === 0 || roleKeys.has(normalizeName(colab.role || '')));
+    }
+
+    // Uma pessoa pode aparecer no histórico pela conta (userId) ou só pelo
+    // nome (registros importados/sem conta) — as duas chaves são aceitas.
+    function personKeysOfRow(row) {
+        return [row.userId || null, row.fullName ? normalizeName(row.fullName) : null].filter(Boolean);
+    }
+    function personKeysOfColaborador(colab) {
+        return [colab.accountUserId || null, normalizeName(colab.fullNameKey || colab.fullName || '')].filter(Boolean);
+    }
+
     // Números do card: quantos fizeram, média e aprovação — do mesmo
-    // historyRows usado pelos gráficos, para não divergir.
-    function courseStats(subjectId, themeId) {
-        const rows = fetchCourseResults(currentSlug(), subjectId, themeId);
+    // historyRows usado pelos gráficos, para não divergir. Quando a
+    // categoria tem público-alvo (tudo menos estágios), também conta
+    // quantos do público já realizaram o curso.
+    function courseStats(subjectId, theme) {
+        const slug = currentSlug();
+        const themeId = typeof theme === 'string' ? theme : theme?.id;
+        const rows = fetchCourseResults(slug, subjectId, themeId);
         const scores = rows.map(r => Number(r.score) || 0);
         const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
         const approved = rows.filter(r => r.approved).length;
+
+        let audienceTotal = null;
+        let audienceDone = null;
+        if (typeof theme === 'object' && theme && !AUDIENCE_EXEMPT_SLUGS.includes(slug)) {
+            const doneKeys = new Set();
+            rows.forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
+            const audience = courseAudience(theme);
+            audienceTotal = audience.length;
+            audienceDone = audience.filter(colab => personKeysOfColaborador(colab).some(key => doneKeys.has(key))).length;
+        }
+
         return {
             attempts: rows.length,
             avg,
-            approvalPct: rows.length ? Math.round((approved / rows.length) * 100) : null
+            approvalPct: rows.length ? Math.round((approved / rows.length) * 100) : null,
+            audienceTotal,
+            audienceDone,
+            audiencePct: audienceTotal ? Math.round((audienceDone / audienceTotal) * 100) : null
         };
+    }
+
+    // Barra "x de N do público já fizeram" + quem falta. O público vem das
+    // funções configuradas no assunto (ou todos, se nenhuma foi marcada).
+    function audienceHtml(theme, stats) {
+        if (stats.audienceTotal === null) return '';
+        const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
+        const scope = roles.length === 0
+            ? 'todas as funções'
+            : roles.length === 1 ? roles[0] : `${roles.length} funções`;
+        if (stats.audienceTotal === 0) {
+            return `<div class="dash-course-audience is-empty">
+                <span class="dash-course-audience-label">Nenhum colaborador em ${escapeHtml(scope)}</span>
+            </div>`;
+        }
+        const missing = stats.audienceTotal - stats.audienceDone;
+        return `<div class="dash-course-audience">
+            <div class="dash-course-audience-top">
+                <span class="dash-course-audience-label"><i class="fas fa-user-check"></i> ${stats.audienceDone}/${stats.audienceTotal} assistiram &bull; ${escapeHtml(scope)}</span>
+                <strong class="dash-course-audience-pct">${stats.audiencePct}%</strong>
+            </div>
+            <div class="dash-course-audience-bar"><span style="width:${stats.audiencePct}%"></span></div>
+            <span class="dash-course-audience-missing">${missing === 0 ? 'Todos do público já realizaram.' : `${missing} ${missing === 1 ? 'pessoa falta' : 'pessoas faltam'} realizar`}</span>
+        </div>`;
     }
 
     function themeInitials(name) {
@@ -258,7 +329,7 @@
     function buildCourseCard(subjectId, theme) {
         const slug = currentSlug();
         const courseKey = `${subjectId}_${theme.id}`;
-        const stats = courseStats(subjectId, theme.id);
+        const stats = courseStats(subjectId, theme);
         const modules = (theme.modules || []).length;
         const questions = (allQuizData[slug]?.[courseKey] || []).length;
 
@@ -296,7 +367,8 @@
                 <span><i class="fas fa-users"></i> ${stats.attempts} ${stats.attempts === 1 ? 'realização' : 'realizações'}</span>
                 <span><i class="fas fa-star"></i> Média ${stats.avg === null ? '—' : stats.avg.toFixed(1).replace('.', ',')}</span>
                 <span><i class="fas fa-circle-check"></i> ${stats.approvalPct === null ? '—' : stats.approvalPct + '% aprovação'}</span>
-            </div>`;
+            </div>
+            ${audienceHtml(theme, stats)}`;
 
         card.appendChild(thumb);
         card.appendChild(body);
