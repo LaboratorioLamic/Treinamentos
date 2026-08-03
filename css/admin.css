@@ -1102,11 +1102,46 @@
         .history-attempt-pill.is-active {
             background: var(--cfg-primary); border-color: var(--cfg-primary); color: #fff;
         }
+        .history-attempt-group-chip { position: relative; display: inline-flex; }
+        .history-attempt-group-btn { display: inline-flex; align-items: center; gap: 6px; }
+        .history-attempt-group-btn.is-reproved-group { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+        .history-attempt-group-btn.is-reproved-group:hover { border-color: #fca5a5; background: #fee2e2; }
+        .history-attempt-group-btn.is-reproved-group.is-active { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+        .history-attempt-group-btn.is-approved-group { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+        .history-attempt-group-btn.is-approved-group:hover { border-color: #86efac; background: #dcfce7; }
+        .history-attempt-group-btn.is-approved-group.is-active { background: #15803d; border-color: #15803d; color: #fff; }
+        .history-attempt-group-chip .hfilter-chip-popover { top: calc(100% + 8px); left: 0; width: 220px; }
+        .history-attempt-group-chip .hfilter-chip-popover.is-open { display: block; }
+        .history-attempt-group-item { cursor: pointer; font-size: 12.5px; }
 
         /* Modal de histórico do usuário (card clicável em Usuários) */
         #cfg-user-history-modal { z-index: 2600; }
         #cfg-user-history-modal .modal-content { max-width: 980px; max-height: 88vh; display: flex; flex-direction: column; }
         #cfg-user-history-modal .history-detail-body { overflow-y: auto; }
+
+        .user-reproved-chip { position: relative; display: flex; justify-content: flex-end; margin-bottom: 14px; }
+        .user-reproved-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 14px; border: 1.5px solid #fecaca; border-radius: 999px;
+            background: #fef2f2; color: #b91c1c;
+            font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer;
+            transition: border-color 0.14s, background 0.14s;
+        }
+        .user-reproved-btn:hover { border-color: #fca5a5; background: #fee2e2; }
+        .user-reproved-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+            background: #b91c1c; color: #fff; font-size: 11px; font-weight: 800;
+        }
+        .user-reproved-chip .hfilter-chip-popover {
+            top: calc(100% + 8px); left: auto; right: 0; width: 300px;
+        }
+        .user-reproved-chip .hfilter-chip-popover.is-open { display: block; }
+        .user-reproved-item {
+            display: flex; flex-direction: column; gap: 2px; cursor: pointer;
+        }
+        .user-reproved-item strong { font-size: 12.5px; color: var(--text); }
+        .user-reproved-item small { font-size: 11.5px; color: var(--text-3); }
 
         .user-course-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 18px;

@@ -400,7 +400,9 @@
             sortedSubjects.forEach(({item: subject}) => {
                 const courseCount = Object.keys(subject.themes || {})
                     .filter(id => subject.themes[id] && subject.themes[id].name)
+                    .filter(id => subject.themes[id].active !== false)
                     .filter(id => themeVisibleForSession(subject.themes[id])).length;
+                if (courseCount === 0) return;
 
                 const subjectLi = document.createElement('li');
                 subjectLi.className = 'subject';
@@ -484,6 +486,7 @@
             const themes = trainingData[subjectId]?.themes || {};
             const themeArray = Object.keys(themes)
                 .filter(id => themes[id] && themes[id].name && themes[id].name.trim() !== '')
+                .filter(id => themes[id].active !== false)
                 .filter(id => themeVisibleForSession(themes[id]))
                 .map(id => ({ id, ...themes[id] }));
             return sortItems(themeArray, orderData.themes?.[subjectId], 'id').map(({ item }) => item);

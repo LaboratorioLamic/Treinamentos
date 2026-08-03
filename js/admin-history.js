@@ -1467,13 +1467,46 @@
 
         if (attempts && attempts.length > 1) {
             detailAttempts.style.display = 'flex';
-            detailAttempts.innerHTML = attempts.map((a, i) => `
-                <button type="button" class="history-attempt-pill ${a === row ? 'is-active' : ''}" data-index="${i}">
-                    ${a.submittedAt ? new Date(a.submittedAt).toLocaleDateString('pt-BR') : '—'} &bull; ${a.score}/10
-                </button>
-            `).join('');
-            detailAttempts.querySelectorAll('.history-attempt-pill').forEach(btn => {
-                btn.addEventListener('click', () => openDetail(attempts[Number(btn.dataset.index)], attempts));
+            const approvedAttempts = attempts.filter(a => a.approved);
+            const reprovedAttempts = attempts.filter(a => !a.approved);
+            const pillLabel = a => `${a.submittedAt ? new Date(a.submittedAt).toLocaleDateString('pt-BR') : '—'} &bull; ${a.score}/10`;
+
+            const attemptGroupHtml = (list, kind) => {
+                if (list.length === 0) return '';
+                const isReproved = kind === 'reproved';
+                const btnId = `history-attempt-${kind}-btn`;
+                const popoverId = `history-attempt-${kind}-popover`;
+                return `
+                <div class="history-attempt-group-chip">
+                    <button type="button" class="history-attempt-pill history-attempt-group-btn ${isReproved ? 'is-reproved-group' : 'is-approved-group'} ${list.includes(row) ? 'is-active' : ''}" id="${btnId}">
+                        <i class="fas ${isReproved ? 'fa-circle-xmark' : 'fa-circle-check'}"></i> ${isReproved ? 'Reprovações' : 'Aprovações'}
+                        <span class="user-reproved-count">${list.length}</span>
+                    </button>
+                    <div class="hfilter-chip-popover" id="${popoverId}">
+                        <div class="hfilter-chip-list">
+                            ${list.map(a => `
+                                <div class="hfilter-chip-item history-attempt-group-item" data-index="${attempts.indexOf(a)}">
+                                    ${pillLabel(a)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            };
+
+            detailAttempts.innerHTML = attemptGroupHtml(approvedAttempts, 'approved') + attemptGroupHtml(reprovedAttempts, 'reproved');
+
+            detailAttempts.querySelectorAll('.history-attempt-group-btn').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    document.getElementById(btn.id.replace('-btn', '-popover'))?.classList.toggle('is-open');
+                });
+            });
+            detailAttempts.querySelectorAll('.history-attempt-group-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    detailAttempts.querySelectorAll('.hfilter-chip-popover').forEach(p => p.classList.remove('is-open'));
+                    openDetail(attempts[Number(item.dataset.index)], attempts);
+                });
             });
         } else {
             detailAttempts.style.display = 'none';
@@ -1510,6 +1543,14 @@
     }
 
     function closeDetail() { detailModal.style.display = 'none'; }
+
+    // Popovers "Aprovações"/"Reprovações" da barra de tentativas: um único
+    // listener global (os botões são remontados a cada troca de tentativa,
+    // então não podem religar um novo listener por vez sem acumular).
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('#cfg-history-detail-attempts')) return;
+        detailAttempts?.querySelectorAll('.hfilter-chip-popover.is-open').forEach(p => p.classList.remove('is-open'));
+    });
 
     closeBtn?.addEventListener('click', closeDetail);
     detailModal?.addEventListener('click', (event) => { if (event.target === detailModal) closeDetail(); });

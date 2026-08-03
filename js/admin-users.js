@@ -335,7 +335,11 @@
     }
 
     // Agrupa as tentativas por curso (subject+theme), preservando as
-    // tentativas ordenadas da mais recente para a mais antiga.
+    // tentativas ordenadas da mais recente para a mais antiga. Uma aprovação
+    // em qualquer tentativa já basta para o curso contar como aprovado; o
+    // card do curso sempre representa a aprovação mais recente (não
+    // necessariamente a última tentativa, que pode ter sido uma reprovação
+    // posterior a uma aprovação anterior).
     function groupRowsByCourse(rows) {
         const groups = new Map();
         rows.forEach(r => {
@@ -345,7 +349,12 @@
         });
         return [...groups.values()]
             .map(attempts => attempts.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0)))
-            .sort((a, b) => (b[0].submittedAt || 0) - (a[0].submittedAt || 0));
+            .map(attempts => {
+                const isApproved = attempts.some(a => a.approved);
+                const latest = isApproved ? attempts.find(a => a.approved) : attempts[0];
+                return { attempts, latest, isApproved };
+            })
+            .sort((a, b) => (b.latest.submittedAt || 0) - (a.latest.submittedAt || 0));
     }
 
     // Mostra as tentativas de um curso; se houver só uma, pula direto para o
@@ -354,6 +363,16 @@
         if (attempts.length === 1) { U.openHistoryDetail?.(attempts[0]); return; }
         U.openHistoryDetail?.(latest, attempts);
     }
+
+    // Popover "Reprovações": um único listener global (o botão é remontado a
+    // cada render do histórico, então não pode religar um novo listener por
+    // vez sem acumular).
+    document.addEventListener('click', (event) => {
+        const popover = document.getElementById('user-reproved-popover');
+        if (!popover || !popover.classList.contains('is-open')) return;
+        if (event.target.closest('#user-reproved-popover') || event.target.closest('#user-reproved-btn')) return;
+        popover.classList.remove('is-open');
+    });
 
     async function openUserHistory(userId) {
         const user = usersCache[userId] ? { userId, ...usersCache[userId] } : null;
@@ -389,44 +408,83 @@
             }
 
             const groups = groupRowsByCourse(rows);
+            const approvedGroups = groups.filter(g => g.isApproved);
+            const reprovedGroups = groups.filter(g => !g.isApproved);
 
-            userHistoryTableWrap.innerHTML = `<div class="user-course-grid">
-                ${groups.map((attempts, i) => {
-                    const latest = attempts[0];
-                    const course = courseIndex.get(normalizeName(`${latest.subject}|${latest.theme}`));
-                    const rating = latest.rating;
-                    return `
-                    <button type="button" class="user-course-card" data-group-index="${i}" style="--card-i:${i};">
-                        <div class="user-course-thumb">
-                            ${courseCardThumbHtml(course, latest.theme)}
-                            ${latest.approved ? '<span class="user-course-badge"><i class="fas fa-circle-check"></i></span>' : ''}
-                            <span class="user-course-hover"><i class="fas fa-clipboard-list"></i> Ver avaliação</span>
+            const cardsHtml = approvedGroups.map((group, i) => {
+                const { attempts, latest } = group;
+                const course = courseIndex.get(normalizeName(`${latest.subject}|${latest.theme}`));
+                const rating = latest.rating;
+                return `
+                <button type="button" class="user-course-card" data-group-index="${i}" style="--card-i:${i};">
+                    <div class="user-course-thumb">
+                        ${courseCardThumbHtml(course, latest.theme)}
+                        <span class="user-course-badge"><i class="fas fa-circle-check"></i></span>
+                        <span class="user-course-hover"><i class="fas fa-clipboard-list"></i> Ver avaliação</span>
+                    </div>
+                    <div class="user-course-body">
+                        <h4 title="${escapeHtml(latest.theme)}">${escapeHtml(latest.theme)}</h4>
+                        <p class="user-course-subject">${escapeHtml(latest.subject)}</p>
+                        ${course?.description ? `<p class="user-course-desc">${escapeHtml(course.description)}</p>` : ''}
+                        <div class="user-course-stats">
+                            ${rating ? U.starsHtml(rating) : '<span class="user-course-no-rating">Sem avaliação</span>'}
+                            <span class="user-course-score">${latest.score}/10</span>
                         </div>
-                        <div class="user-course-body">
-                            <h4 title="${escapeHtml(latest.theme)}">${escapeHtml(latest.theme)}</h4>
-                            <p class="user-course-subject">${escapeHtml(latest.subject)}</p>
-                            ${course?.description ? `<p class="user-course-desc">${escapeHtml(course.description)}</p>` : ''}
-                            <div class="user-course-stats">
-                                ${rating ? U.starsHtml(rating) : '<span class="user-course-no-rating">Sem avaliação</span>'}
-                                <span class="user-course-score">${latest.score}/10</span>
-                            </div>
-                            <div class="user-course-foot">
-                                <span class="history-status-pill ${latest.approved ? 'is-approved' : 'is-reproved'}">${latest.approved ? 'Aprovado' : 'Reprovado'}</span>
-                                <span class="user-course-attempts"><i class="fas fa-rotate-right"></i> ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</span>
-                            </div>
-                            ${(latest.approved && U.Certificate?.isEnabled(course)) ? `
-                                <span class="user-course-cert" role="button" tabindex="0" data-cert-index="${i}">
-                                    <i class="fas fa-award"></i> Baixar certificado
-                                </span>` : ''}
+                        <div class="user-course-foot">
+                            <span class="history-status-pill is-approved">Aprovado</span>
+                            <span class="user-course-attempts"><i class="fas fa-rotate-right"></i> ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</span>
                         </div>
-                    </button>`;
-                }).join('')}
-            </div>`;
+                        ${U.Certificate?.isEnabled(course) ? `
+                            <span class="user-course-cert" role="button" tabindex="0" data-cert-index="${i}">
+                                <i class="fas fa-award"></i> Baixar certificado
+                            </span>` : ''}
+                    </div>
+                </button>`;
+            }).join('');
+
+            const reprovedBtnHtml = reprovedGroups.length === 0 ? '' : `
+                <div class="user-reproved-chip">
+                    <button type="button" class="user-reproved-btn" id="user-reproved-btn">
+                        <i class="fas fa-circle-xmark"></i> Reprovações
+                        <span class="user-reproved-count">${reprovedGroups.length}</span>
+                    </button>
+                    <div class="hfilter-chip-popover" id="user-reproved-popover">
+                        <div class="hfilter-chip-list">
+                            ${reprovedGroups.map((group, i) => {
+                                const { latest, attempts } = group;
+                                return `
+                                <div class="hfilter-chip-item user-reproved-item" data-reproved-index="${i}">
+                                    <strong>${escapeHtml(latest.theme)}</strong>
+                                    <small>${escapeHtml(latest.subject)} · ${formatDate(latest.submittedAt)} · ${latest.score}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>`;
+
+            userHistoryTableWrap.innerHTML = `
+                ${reprovedBtnHtml}
+                <div class="user-course-grid">${cardsHtml || (reprovedGroups.length ? '' : '<p class="dashboard-table-empty">Nenhuma avaliação registrada para este usuário.</p>')}</div>
+            `;
 
             userHistoryTableWrap.querySelectorAll('.user-course-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    const attempts = groups[Number(card.dataset.groupIndex)];
-                    openCourseAttempts(attempts[0], attempts);
+                    const { attempts, latest } = approvedGroups[Number(card.dataset.groupIndex)];
+                    openCourseAttempts(latest, attempts);
+                });
+            });
+
+            const reprovedBtn = document.getElementById('user-reproved-btn');
+            const reprovedPopover = document.getElementById('user-reproved-popover');
+            reprovedBtn?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                reprovedPopover.classList.toggle('is-open');
+            });
+            userHistoryTableWrap.querySelectorAll('.user-reproved-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const { attempts, latest } = reprovedGroups[Number(item.dataset.reprovedIndex)];
+                    reprovedPopover?.classList.remove('is-open');
+                    openCourseAttempts(latest, attempts);
                 });
             });
 
@@ -435,7 +493,7 @@
             userHistoryTableWrap.querySelectorAll('.user-course-cert').forEach(el => {
                 el.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    const latest = groups[Number(el.dataset.certIndex)][0];
+                    const { latest } = approvedGroups[Number(el.dataset.certIndex)];
                     U.Certificate.download({
                         studentName: latest.fullName,
                         course: courseIndex.get(normalizeName(`${latest.subject}|${latest.theme}`)),

@@ -130,8 +130,11 @@
         return row.theme || courseOf(row)?.name || 'Curso';
     }
 
-    // Agrupa as avaliações por curso (categoria+disciplina+tema): o card
-    // mostra a tentativa mais recente e o detalhe lista todas.
+    // Agrupa as avaliações por curso (categoria+disciplina+tema): uma
+    // aprovação em qualquer tentativa já basta para o curso contar como
+    // aprovado; o card sempre representa a aprovação mais recente (não
+    // necessariamente a última tentativa, que pode ter sido uma reprovação
+    // posterior a uma aprovação anterior).
     function groupRowsByCourse(rows) {
         const groups = new Map();
         rows.forEach(r => {
@@ -141,13 +144,19 @@
         });
         return [...groups.values()]
             .map(attempts => attempts.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0)))
-            .sort((a, b) => (b[0].submittedAt || 0) - (a[0].submittedAt || 0));
+            .map(attempts => {
+                const isApproved = attempts.some(a => a.approved);
+                const latest = isApproved ? attempts.find(a => a.approved) : attempts[0];
+                return { attempts, latest, isApproved };
+            })
+            .sort((a, b) => (b.latest.submittedAt || 0) - (a.latest.submittedAt || 0));
     }
 
     // Estado da aba Histórico: linhas carregadas, cursos e grupos exibidos.
     let courseImagesCache = null;
     let courseGroups = [];
     let visibleCache = [];
+    let reprovedVisibleCache = [];
 
     function downloadCertificate(row) {
         U.Certificate.download({
@@ -164,6 +173,7 @@
         if (rows.length === 0) {
             courseGroups = [];
             visibleCache = [];
+            reprovedVisibleCache = [];
             renderFilterBar(false);
             listEl.innerHTML = '<p class="form-hint">Você ainda não concluiu nenhuma avaliação.</p>';
             approvedCountEl.textContent = '0';
@@ -190,8 +200,8 @@
 
     function availableThemes() {
         const map = new Map();
-        courseGroups.forEach(attempts => {
-            const r = attempts[0];
+        courseGroups.forEach(group => {
+            const r = group.latest;
             const key = themeKeyOf(r);
             if (!map.has(key)) {
                 map.set(key, { key, label: r.subject || 'Sem disciplina', category: CATEGORY_LABELS[r.slug] || r.slug, count: 0 });
@@ -201,14 +211,14 @@
         return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     }
 
-    function groupHasCertificate(attempts) {
-        return attempts.some(r => r.approved && U.Certificate?.isEnabled(courseOf(r)));
+    function groupHasCertificate(group) {
+        return group.isApproved && U.Certificate?.isEnabled(courseOf(group.latest));
     }
 
     function visibleGroups() {
-        return courseGroups.filter(attempts => {
-            if (filterState.themes.size > 0 && !filterState.themes.has(themeKeyOf(attempts[0]))) return false;
-            if (filterState.onlyCertificate && !groupHasCertificate(attempts)) return false;
+        return courseGroups.filter(group => {
+            if (filterState.themes.size > 0 && !filterState.themes.has(themeKeyOf(group.latest))) return false;
+            if (filterState.onlyCertificate && !groupHasCertificate(group)) return false;
             return true;
         });
     }
@@ -332,13 +342,17 @@
 
         if (groups.length === 0) {
             visibleCache = [];
+            reprovedVisibleCache = [];
             listEl.innerHTML = '<p class="form-hint">Nenhum curso corresponde aos filtros selecionados.</p>';
             if (options.keepPopoverOpen === true) reopenThemePopover();
             return;
         }
 
-        listEl.innerHTML = `<div class="student-course-grid">${groups.map((attempts, i) => {
-            const r = attempts[0];
+        const approvedGroups = groups.filter(g => g.isApproved);
+        const reprovedGroups = groups.filter(g => !g.isApproved);
+
+        const cardsHtml = approvedGroups.map((group, i) => {
+            const { attempts, latest: r } = group;
             const course = courseOf(r);
             const courseName = courseNameOf(r);
             const categoryLabel = CATEGORY_LABELS[r.slug] || r.slug;
@@ -348,7 +362,7 @@
                         title="Ver histórico de ${escapeHtml(courseName)}">
                     <div class="student-course-thumb">
                         ${courseThumbHtml(course, courseName, r.slug, r.subjectId, r.themeId)}
-                        ${r.approved ? '<span class="student-course-badge"><i class="fas fa-circle-check"></i></span>' : ''}
+                        <span class="student-course-badge"><i class="fas fa-circle-check"></i></span>
                         <span class="student-course-hover"><i class="fas fa-clock-rotate-left"></i> Ver histórico</span>
                     </div>
                     <div class="student-course-body">
@@ -356,26 +370,53 @@
                         <p class="student-course-category">${escapeHtml(categoryLabel)} &bull; ${formatDate(r.submittedAt)}</p>
                         <div class="student-course-stats">
                             ${starsHtml(r.rating)}
-                            <span class="student-course-score ${r.approved ? 'is-approved' : 'is-reproved'}">${r.score}/10</span>
+                            <span class="student-course-score is-approved">${r.score}/10</span>
                         </div>
                         <div class="student-course-foot">
-                            <span class="student-profile-item-score ${r.approved ? 'is-approved' : 'is-reproved'}" style="padding:3px 9px;font-size:0.78em;">${r.approved ? 'Aprovado' : 'Reprovado'}</span>
+                            <span class="student-profile-item-score is-approved" style="padding:3px 9px;font-size:0.78em;">Aprovado</span>
                             <span class="student-course-attempt">${attempts.length > 1
                                 ? `${attempts.length} tentativas`
                                 : `tentativa ${r.attempt || 1}`}</span>
                         </div>
-                        ${isLate ? `<div class="student-course-late"><i class="fas fa-triangle-exclamation"></i> ${U.Deadlines?.STATUS_LABELS?.[r.deadlineStatus] || 'Fora do prazo'}</div>` : ''}
-                        ${(r.approved && U.Certificate?.isEnabled(course)) ? `
+                        ${isLate ? `<div class="student-course-late"><i class="fas fa-triangle-exclamation"></i> Concluído em atraso</div>` : ''}
+                        ${U.Certificate?.isEnabled(course) ? `
                             <span class="student-cert-btn" role="button" tabindex="0" data-cert-index="${i}">
                                 <i class="fas fa-award"></i> Baixar certificado
                             </span>` : ''}
                     </div>
                 </button>`;
-        }).join('')}</div>`;
+        }).join('');
 
-        // Os índices dos cards apontam para a lista filtrada, não para
-        // courseGroups — guardada aqui para os handlers e para o detalhe.
-        visibleCache = groups;
+        const reprovedBtnHtml = reprovedGroups.length === 0 ? '' : `
+            <div class="user-reproved-chip">
+                <button type="button" class="user-reproved-btn" id="student-reproved-btn">
+                    <i class="fas fa-circle-xmark"></i> Reprovações
+                    <span class="user-reproved-count">${reprovedGroups.length}</span>
+                </button>
+                <div class="hfilter-chip-popover" id="student-reproved-popover">
+                    <div class="hfilter-chip-list">
+                        ${reprovedGroups.map((group, i) => {
+                            const { latest: r, attempts } = group;
+                            return `
+                            <div class="hfilter-chip-item user-reproved-item" data-reproved-index="${i}">
+                                <strong>${escapeHtml(courseNameOf(r))}</strong>
+                                <small>${escapeHtml(r.subject || '')} · ${formatDate(r.submittedAt)} · ${r.score}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>`;
+
+        listEl.innerHTML = `
+            ${reprovedBtnHtml}
+            <div class="student-course-grid">${cardsHtml}</div>
+        `;
+
+        // Os índices dos cards apontam para as listas filtradas (aprovados/
+        // reprovados), não para courseGroups — guardadas aqui para os
+        // handlers e para o detalhe.
+        visibleCache = approvedGroups;
+        reprovedVisibleCache = reprovedGroups;
 
         if (options.keepPopoverOpen === true) reopenThemePopover();
 
@@ -383,18 +424,31 @@
             card.addEventListener('click', () => openCourseDetail(Number(card.dataset.groupIndex)));
         });
 
+        const reprovedBtn = document.getElementById('student-reproved-btn');
+        const reprovedPopover = document.getElementById('student-reproved-popover');
+        reprovedBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            reprovedPopover.classList.toggle('is-open');
+        });
+        listEl.querySelectorAll('.user-reproved-item').forEach(item => {
+            item.addEventListener('click', () => {
+                reprovedPopover?.classList.remove('is-open');
+                openCourseDetail(Number(item.dataset.reprovedIndex), 0, true);
+            });
+        });
+
         // O certificado vive dentro do card (que é um botão): o clique nele
         // não deve também abrir o detalhe do curso.
         listEl.querySelectorAll('.student-cert-btn').forEach(el => {
             el.addEventListener('click', (event) => {
                 event.stopPropagation();
-                downloadCertificate(visibleCache[Number(el.dataset.certIndex)][0]);
+                downloadCertificate(visibleCache[Number(el.dataset.certIndex)].latest);
             });
             el.addEventListener('keydown', (event) => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
                 event.stopPropagation();
-                downloadCertificate(visibleCache[Number(el.dataset.certIndex)][0]);
+                downloadCertificate(visibleCache[Number(el.dataset.certIndex)].latest);
             });
         });
     }
@@ -405,11 +459,28 @@
         filterHost()?.querySelector('#student-filter-theme-btn')?.click();
     }
 
+    // Popovers "Reprovações" (grid) e "Aprovações"/"Reprovações" (barra de
+    // tentativas do detalhe): um único listener global, já que os botões são
+    // remontados a cada render.
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('#student-reproved-popover, #student-reproved-btn, .history-attempt-group-chip')) return;
+        document.getElementById('student-reproved-popover')?.classList.remove('is-open');
+        listEl?.querySelectorAll('.hfilter-chip-popover.is-open').forEach(p => p.classList.remove('is-open'));
+    });
+
     // ─── Detalhe do curso (dentro da própria aba Histórico) ───
-    function openCourseDetail(groupIndex, attemptIndex = 0) {
-        const attempts = visibleCache[groupIndex];
-        if (!attempts) return;
-        const row = attempts[attemptIndex] || attempts[0];
+    // `fromReproved`: o card veio do popover de Reprovações (índice em
+    // reprovedVisibleCache) em vez do grid principal (índice em
+    // visibleCache). `attemptIndex`, quando omitido, cai na aprovação mais
+    // recente do grupo (ou na tentativa mais recente, se nenhuma aprovada).
+    function openCourseDetail(groupIndex, attemptIndex, fromReproved = false) {
+        const group = (fromReproved ? reprovedVisibleCache : visibleCache)[groupIndex];
+        if (!group) return;
+        const { attempts } = group;
+        if (attemptIndex === undefined || attemptIndex === null) {
+            attemptIndex = attempts.indexOf(group.latest);
+        }
+        const row = attempts[attemptIndex] || group.latest;
         const course = courseOf(row);
         const courseName = courseNameOf(row);
         const categoryLabel = CATEGORY_LABELS[row.slug] || row.slug;
@@ -437,13 +508,31 @@
 
                 ${course?.description ? `<p class="student-detail-desc">${escapeHtml(course.description)}</p>` : ''}
 
-                ${attempts.length > 1 ? `
-                    <div class="student-detail-attempts">
-                        ${attempts.map((a, i) => `
-                            <button type="button" class="student-attempt-pill ${i === attemptIndex ? 'is-active' : ''}" data-attempt="${i}">
-                                ${formatDate(a.submittedAt)} &bull; ${a.score}/10
-                            </button>`).join('')}
-                    </div>` : ''}
+                ${attempts.length > 1 ? (() => {
+                    const approvedAttempts = attempts.filter(a => a.approved);
+                    const reprovedAttempts = attempts.filter(a => !a.approved);
+                    const pillLabel = a => `${formatDate(a.submittedAt)} &bull; ${a.score}/10`;
+                    const attemptGroupHtml = (list, kind) => {
+                        if (list.length === 0) return '';
+                        const isReproved = kind === 'reproved';
+                        return `
+                        <div class="history-attempt-group-chip">
+                            <button type="button" class="student-attempt-pill history-attempt-group-btn ${isReproved ? 'is-reproved-group' : 'is-approved-group'} ${list.includes(row) ? 'is-active' : ''}" data-attempt-group="${kind}">
+                                <i class="fas ${isReproved ? 'fa-circle-xmark' : 'fa-circle-check'}"></i> ${isReproved ? 'Reprovações' : 'Aprovações'}
+                                <span class="user-reproved-count">${list.length}</span>
+                            </button>
+                            <div class="hfilter-chip-popover" data-attempt-popover="${kind}">
+                                <div class="hfilter-chip-list">
+                                    ${list.map(a => `
+                                        <div class="hfilter-chip-item history-attempt-group-item" data-attempt="${attempts.indexOf(a)}">
+                                            ${pillLabel(a)}
+                                        </div>`).join('')}
+                                </div>
+                            </div>
+                        </div>`;
+                    };
+                    return `<div class="student-detail-attempts">${attemptGroupHtml(approvedAttempts, 'approved')}${attemptGroupHtml(reprovedAttempts, 'reproved')}</div>`;
+                })() : ''}
 
                 <div class="student-detail-stats">
                     <div class="student-detail-stat"><span class="label">Nota</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${row.score}/10</span></div>
@@ -467,8 +556,17 @@
             </div>`;
 
         listEl.querySelector('.student-detail-back')?.addEventListener('click', renderGrid);
-        listEl.querySelectorAll('.student-attempt-pill').forEach(pill => {
-            pill.addEventListener('click', () => openCourseDetail(groupIndex, Number(pill.dataset.attempt)));
+        listEl.querySelectorAll('.history-attempt-group-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                listEl.querySelector(`[data-attempt-popover="${btn.dataset.attemptGroup}"]`)?.classList.toggle('is-open');
+            });
+        });
+        listEl.querySelectorAll('.history-attempt-group-item').forEach(item => {
+            item.addEventListener('click', () => {
+                listEl.querySelectorAll('.hfilter-chip-popover').forEach(p => p.classList.remove('is-open'));
+                openCourseDetail(groupIndex, Number(item.dataset.attempt), fromReproved);
+            });
         });
         listEl.querySelector('.student-detail-cert')?.addEventListener('click', () => downloadCertificate(row));
         listEl.scrollTop = 0;

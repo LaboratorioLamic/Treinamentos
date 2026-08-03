@@ -496,6 +496,17 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         const themeSaveBtn = document.getElementById('cfg-theme-save');
         const themeDeleteBtn = document.getElementById('cfg-theme-delete');
         const themesContainer = document.getElementById('cfg-themes-container');
+        const themeStatusActiveBtn = document.getElementById('cfg-theme-status-active');
+        const themeStatusInactiveBtn = document.getElementById('cfg-theme-status-inactive');
+        let themeActive = true;
+
+        function setThemeActive(isActive) {
+            themeActive = isActive;
+            themeStatusActiveBtn.classList.toggle('active', isActive);
+            themeStatusInactiveBtn.classList.toggle('active', !isActive);
+        }
+        themeStatusActiveBtn.addEventListener('click', () => setThemeActive(true));
+        themeStatusInactiveBtn.addEventListener('click', () => setThemeActive(false));
 
         // Imagem em edição no formulário de assunto.
         // null = sem alteração pendente; { dataUrl, version } = nova; { removed: true } = apagar.
@@ -874,6 +885,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             pendingThemeImage = null;
             updateDescCount();
             renderThemeImagePreview(null, 'Sem imagem — o card mostra as iniciais.');
+            setThemeActive(true);
             resetDeadlineFields();
             resetRolesConfig();
             resetCertConfig();
@@ -945,11 +957,14 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const rolesBadge = roles.length
                     ? `<span class="roles-badge" title="Visível apenas para: ${escapeHtml(roles.join(', '))}"><i class="fas fa-user-tag"></i> ${roles.length} função(ões)</span>`
                     : '';
+                const statusBadge = theme.active === false
+                    ? `<span class="user-status-badge">Inativo</span>`
+                    : '';
                 card.innerHTML = `
                     <div class="theme-card-head">
                         ${thumb}
                         <div class="theme-card-title">
-                            <h3>${escapeHtml(theme.name)} ${deadlineBadge} ${rolesBadge}</h3>
+                            <h3>${escapeHtml(theme.name)} ${statusBadge} ${deadlineBadge} ${rolesBadge}</h3>
                             ${theme.description ? `<p class="card-desc">${escapeHtml(theme.description)}</p>` : ''}
                         </div>
                     </div>
@@ -959,6 +974,10 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                             <button class="order-btn" data-id="${id}" data-direction="down" ${isLast ? 'disabled' : ''} title="Mover para baixo"><i class="fas fa-chevron-down"></i></button>
                         </div>
                         <div class="card-actions">
+                            <label class="toggle-switch" title="${theme.active === false ? 'Ativar assunto' : 'Desativar assunto'}">
+                                <input type="checkbox" class="toggle-theme-active" data-id="${id}" ${theme.active === false ? '' : 'checked'}>
+                                <span class="toggle-slider"></span>
+                            </label>
                             <button class="btn btn-ghost btn-sm edit-theme" data-id="${id}"><i class="fas fa-pencil-alt"></i> Editar</button>
                             <button class="btn btn-danger btn-sm delete-theme" data-id="${id}"><i class="fas fa-trash"></i></button>
                         </div>
@@ -978,6 +997,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                         editing.image || null,
                         editing.image ? 'Imagem atual do curso.' : 'Sem imagem — o card mostra as iniciais.'
                     );
+                    setThemeActive(editing.active !== false);
                     loadDeadlineFields(editing.deadline);
                     loadRolesConfig(editing);
                     loadCertConfig(editing);
@@ -998,9 +1018,32 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             themesContainer.querySelectorAll('.delete-theme').forEach(btn => {
                 btn.addEventListener('click', () => { deleteTheme(themeSubjectSelect.value, btn.dataset.id); });
             });
+            themesContainer.querySelectorAll('.toggle-theme-active').forEach(input => {
+                input.addEventListener('change', () => { toggleThemeActive(themeSubjectSelect.value, input.dataset.id, input.checked); });
+            });
             themesContainer.querySelectorAll('.order-btn').forEach(btn => {
                 btn.addEventListener('click', async () => { await moveTheme(themeSubjectSelect.value, btn.dataset.id, btn.dataset.direction); });
             });
+        }
+
+        async function toggleThemeActive(subjectId, id, isActive) {
+            const theme = data.trainingData[subjectId]?.themes[id];
+            if (!theme) { showWarning('Assunto não encontrado.'); return; }
+            const wasActive = theme.active !== false;
+            if (isActive) delete theme.active;
+            else theme.active = false;
+            try {
+                if (await saveData()) {
+                    if (currentThemeId === id) setThemeActive(isActive);
+                } else {
+                    if (wasActive) delete theme.active; else theme.active = false;
+                }
+            } catch (error) {
+                if (wasActive) delete theme.active; else theme.active = false;
+                showWarning('Erro ao atualizar status do assunto. Tente novamente.');
+            } finally {
+                populateThemes();
+            }
         }
 
         async function deleteTheme(subjectId, id) {
@@ -1110,6 +1153,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 id,
                 name,
                 modules: previous.modules || [],
+                ...(!themeActive && { active: false }),
                 ...(description && { description }),
                 ...(image && { image, imageVersion }),
                 ...(deadline && { deadline }),
