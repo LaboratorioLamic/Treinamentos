@@ -322,13 +322,24 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             return false;
         }
 
-        async function moveModule(subjectId, themeId, index, direction) {
-            if (!data.order?.modules?.[subjectId]?.[themeId]) return false;
-            const newIndex = direction === 'up' ? index - 1 : index + 1;
-            if (newIndex < 0 || newIndex >= data.order.modules[subjectId][themeId].length) return false;
-            [data.order.modules[subjectId][themeId][index], data.order.modules[subjectId][themeId][newIndex]] = [data.order.modules[subjectId][themeId][newIndex], data.order.modules[subjectId][themeId][index]];
-            const modules = data.trainingData[subjectId].themes[themeId].modules || [];
-            [modules[index], modules[newIndex]] = [modules[newIndex], modules[index]];
+        async function moveModule(subjectId, themeId, position, direction) {
+            // Ensure order array exists for this subject/theme. The UI passes
+            // `position` as the displayed position (0..n-1) in the ordered list,
+            // so we must swap entries in the order array (not the modules array
+            // directly).
+            const modules = data.trainingData[subjectId]?.themes?.[themeId]?.modules || [];
+            if (!data.order) data.order = { subjects: [], themes: {}, modules: {} };
+            if (!data.order.modules) data.order.modules = {};
+            if (!data.order.modules[subjectId]) data.order.modules[subjectId] = {};
+            if (!data.order.modules[subjectId][themeId]) {
+                data.order.modules[subjectId][themeId] = Array.from({ length: modules.length }, (_, i) => i);
+            }
+            const orderArray = data.order.modules[subjectId][themeId];
+            const currentIndex = position;
+            const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (currentIndex < 0 || currentIndex >= orderArray.length) return false;
+            if (newIndex < 0 || newIndex >= orderArray.length) return false;
+            [orderArray[currentIndex], orderArray[newIndex]] = [orderArray[newIndex], orderArray[currentIndex]];
             if (await saveData()) { populateModules(); showWarning('Ordem dos módulos atualizada!'); return true; }
             return false;
         }
@@ -1301,8 +1312,10 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             modulesContainer.querySelectorAll('.order-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const index = parseInt(btn.dataset.index);
-                    const actualIndex = modules.indexOf(orderedModules[index]);
-                    await moveModule(subjectId, themeId, actualIndex, btn.dataset.direction);
+                    // `index` here is the position in the displayed (ordered)
+                    // list; pass it directly to moveModule which operates on
+                    // the order array positions.
+                    await moveModule(subjectId, themeId, index, btn.dataset.direction);
                 });
             });
         }
