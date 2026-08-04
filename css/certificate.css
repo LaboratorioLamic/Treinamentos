@@ -328,13 +328,15 @@
 }
 
 .cert-name {
-    font-size: 62px;
+    font-size: clamp(42px, 4vw, 62px);
     font-weight: 700;
     letter-spacing: 0.02em;
     line-height: 1.12;
-    margin-top: 20px;
+    margin: 20px auto 0;
     color: #12294c;
     max-width: 1000px;
+    width: min(1000px, 100%);
+    text-wrap: balance;
 }
 
 .cert-diamonds {

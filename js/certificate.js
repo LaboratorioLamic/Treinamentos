@@ -87,8 +87,7 @@
                     </div>
                     <div class="cert-text">
                         concluiu com êxito o curso de <strong>${escapeHtml(courseTitle)}</strong>, com carga horária total de
-                        <strong>${escapeHtml(String(hours))} horas</strong>, realizado em <strong>${escapeHtml(dateLabel)}</strong>.<br>
-                        Certificamos que o(a) participante demonstrou desempenho satisfatório e cumpriu integralmente
+                        <strong>${escapeHtml(String(hours))} horas</strong>, realizado em <strong>${escapeHtml(dateLabel)}</strong>. Certificamos que o(a) participante demonstrou desempenho satisfatório e cumpriu integralmente
                         todas as exigências necessárias para a obtenção deste certificado de conclusão.
                     </div>
                 </div>
