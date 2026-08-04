@@ -15,7 +15,7 @@
 
     const SIGNERS = [
         { name: 'Dr. Fellipe Brito', role: 'Analista da Qualidade' },
-        { name: 'Dr. Leonardo Bezerra', role: 'Diretor Clínico' }
+        { name: 'Dr. Leonardo Bezerra', role: 'Diretor Técnico' }
     ];
 
     function escapeHtml(value) {
