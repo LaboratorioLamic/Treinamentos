@@ -14,6 +14,16 @@
         return n.toFixed(1).replace('.', ',');
     }
 
+    // Duração da avaliação (segundos) em mm:ss — ausente em registros
+    // anteriores ao timer da prova.
+    function formatDuration(seconds) {
+        const n = Number(seconds);
+        if (!Number.isFinite(n) || n < 0) return '—';
+        const m = Math.floor(n / 60).toString().padStart(2, '0');
+        const s = Math.floor(n % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
     // Balão colorido da nota (mesmo padrão visual do Histórico).
     function scoreBadgeHtml(score) {
         const n = Number(score);
@@ -27,6 +37,55 @@
         accent: '#4f8ef7', success: '#10b981', danger: '#ef4444', warning: '#f59e0b',
         muted: '#94a3b8', purple: '#8b5cf6'
     };
+    const MONTH_LABELS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+    // Média de duração de prova (segundos), ignorando linhas sem timer
+    // (registros anteriores ao recurso, ver formatDuration).
+    function avgDuration(rows) {
+        const durations = rows.map(r => Number(r.durationSeconds)).filter(Number.isFinite);
+        if (!durations.length) return null;
+        return durations.reduce((a, b) => a + b, 0) / durations.length;
+    }
+
+    // Agrupa linhas por mês (YYYY-MM de submittedAt), retorna os últimos
+    // `months` meses em ordem cronológica, mesmo os sem nenhuma linha (para
+    // a tendência não "pular" períodos vazios).
+    function groupByMonth(rows, dateField = 'submittedAt', months = 6) {
+        const now = new Date();
+        const buckets = [];
+        for (let i = months - 1; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `${MONTH_LABELS[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, count: 0 });
+        }
+        const byKey = new Map(buckets.map(b => [b.key, b]));
+        rows.forEach(r => {
+            const ts = r[dateField];
+            if (!ts) return;
+            const d = new Date(ts);
+            const bucket = byKey.get(`${d.getFullYear()}-${d.getMonth()}`);
+            if (bucket) bucket.count++;
+        });
+        return buckets;
+    }
+
+    // Agrupa linhas por pessoa+curso (mesma chave de personKeysOfRow) para
+    // contar quantas tentativas cada um teve e se aprovou ao final —
+    // usado no gráfico de retentativas.
+    function attemptsByPerson(rows) {
+        const byPerson = new Map();
+        rows.forEach(row => {
+            const keys = personKeysOfRow(row);
+            const key = keys[0];
+            if (!key) return;
+            if (!byPerson.has(key)) byPerson.set(key, []);
+            byPerson.get(key).push(row);
+        });
+        return [...byPerson.values()].map(personRows => {
+            const sorted = personRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
+            const last = sorted[sorted.length - 1];
+            return { attempts: sorted.length, approved: !!last.approved };
+        });
+    }
 
     // Categorias sem público definido por função: estágio é individual, não
     // tem "quem falta fazer" a calcular.
@@ -302,7 +361,7 @@
         }
         const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         container.innerHTML = `<table class="is-sticky">
-            <thead><tr><th>Data</th><th>Curso</th><th>Nota</th><th>Prazo</th><th>Situação</th></tr></thead>
+            <thead><tr><th>Data</th><th>Curso</th><th>Nota</th><th>Tempo</th><th>Prazo</th><th>Situação</th></tr></thead>
             <tbody>${sorted.map((r, i) => {
                 const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
                 const situationOk = !!r.approved;
@@ -310,6 +369,7 @@
                     <td>${dateLabel}</td>
                     <td>${escapeHtml(r.theme || r.subject || '—')}</td>
                     <td>${scoreBadgeHtml(r.score)}</td>
+                    <td>${formatDuration(r.durationSeconds)}</td>
                     <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
                     <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
                 </tr>`;
@@ -317,11 +377,22 @@
         </table>`;
     }
 
+    // Média móvel simples (janela de 3 tentativas) — mostra tendência de
+    // melhora/piora ao longo do tempo em vez de uma média fixa horizontal.
+    function movingAverage(values, window = 3) {
+        return values.map((_, i) => {
+            const start = Math.max(0, i - window + 1);
+            const slice = values.slice(start, i + 1);
+            return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+    }
+
     function renderUserDashboard(colab, heroStatsEl) {
         const rows = flattenColaboradorResults(colab);
         const labels = rows.map(r => new Date(r.submittedAt || 0).toLocaleDateString('pt-BR'));
         const scores = rows.map(r => r.score);
         const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        const trend = movingAverage(scores);
 
         renderChart('userScores', 'cfg-dash-user-scores-chart', {
             type: 'bar',
@@ -329,7 +400,7 @@
                 labels,
                 datasets: [
                     { type: 'bar', label: 'Nota', data: scores, backgroundColor: CHART_COLORS.accent, borderRadius: 4 },
-                    { type: 'line', label: 'Média', data: labels.map(() => avg), borderColor: CHART_COLORS.danger, borderDash: [6, 4], pointRadius: 0 }
+                    { type: 'line', label: 'Média móvel', data: trend, borderColor: CHART_COLORS.danger, pointRadius: 0, tension: 0.3 }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 10 } } }
@@ -351,15 +422,74 @@
             options: { responsive: true, maintainAspectRatio: false }
         });
 
+        renderUserPendingChart(colab, rows);
+
+        const monthBuckets = groupByMonth(rows);
+        const onTimeByMonth = groupByMonth(rows.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
+        const lateByMonth = groupByMonth(rows.filter(r => !['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
+        renderChart('userDeadlineTrend', 'cfg-dash-user-deadlinetrend-chart', {
+            type: 'bar',
+            data: {
+                labels: monthBuckets.map(b => b.label),
+                datasets: [
+                    { label: 'No prazo', data: onTimeByMonth.map(b => b.count), backgroundColor: CHART_COLORS.accent },
+                    { label: 'Fora do prazo', data: lateByMonth.map(b => b.count), backgroundColor: CHART_COLORS.danger }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } } }
+        });
+
         if (heroStatsEl) {
             const avgLabel = scores.length ? avg.toFixed(1).replace('.', ',') : '—';
+            const durationLabel = formatDuration(avgDuration(rows));
             heroStatsEl.innerHTML = `
                 <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'curso realizado' : 'cursos realizados'}</span>
                 <span class="hero-stat"><i class="fas fa-star"></i> Média ${avgLabel}</span>
+                <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
                 ${late > 0 ? `<span class="hero-stat is-warn"><i class="fas fa-triangle-exclamation"></i> ${late} ${late === 1 ? 'atraso' : 'atrasos'}</span>` : ''}
             `;
         }
         renderUserHistoryTable(rows);
+    }
+
+    // Cursos exigidos pelo cargo do colaborador que ele ainda não concluiu,
+    // com o % de módulos já assistidos (progress/byUser) — o gráfico mais
+    // acionável para o gestor: mostra onde a pessoa está travada, não só o
+    // que já foi feito.
+    function renderUserPendingChart(colab, doneRows) {
+        const slug = currentSlug();
+        const doneThemeKeys = new Set(doneRows.filter(r => r.subjectId && r.themeId).map(r => `${r.slug}_${r.subjectId}_${r.themeId}`));
+        const roleKey = normalizeName(colab.role || '');
+        const pending = [];
+        if (!AUDIENCE_EXEMPT_SLUGS.includes(slug)) {
+            const trainingData = allTrainingData[slug] || {};
+            Object.keys(trainingData).forEach(subjectId => {
+                const themes = trainingData[subjectId]?.themes || {};
+                Object.keys(themes).forEach(themeId => {
+                    const theme = themes[themeId];
+                    const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
+                    const targeted = roles.length === 0 || roles.some(role => normalizeName(role) === roleKey);
+                    if (!targeted) return;
+                    if (doneThemeKeys.has(`${slug}_${subjectId}_${themeId}`)) return;
+                    const pct = progressPctFor(colab, slug, subjectId, themeId);
+                    pending.push({ name: theme.name || themeId, pct });
+                });
+            });
+        }
+        pending.sort((a, b) => b.pct - a.pct);
+
+        renderChart('userPending', 'cfg-dash-user-pending-chart', {
+            type: 'bar',
+            data: {
+                labels: pending.map(p => p.name),
+                datasets: [{ data: pending.map(p => p.pct), backgroundColor: CHART_COLORS.warning, borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x}% assistido` } } },
+                scales: { x: { min: 0, max: 100 } }
+            }
+        });
     }
 
     // ─── Modo: por curso ───
@@ -658,6 +788,10 @@
         updateCategoryChip();
         renderCourseCards();
         closeCourseModal();
+        // O gráfico "Progresso em Cursos Pendentes" do colaborador é
+        // filtrado pela categoria atual (ver renderUserPendingChart) —
+        // fecha o modal para não ficar mostrando dados da categoria antiga.
+        closeUserModal();
     });
 
     // Linhas do curso selecionado — casadas por IDs (contas reais e
@@ -994,11 +1128,26 @@
             options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
         });
 
-        // "Realização do curso": denominador = total de usuários cadastrados
-        // (decisão registrada no plano — sem campo de público-alvo por curso).
-        const totalUsers = Object.keys(allUsers).length;
-        const realizou = rows.filter(r => r.userId).length; // só contas reais entram no denominador de usuários
-        const faltaram = Math.max(0, totalUsers - realizou);
+        // "Realização do curso": denominador = público-alvo do curso (mesma
+        // base de courseAudience usada nos cards e na tabela "Faltam
+        // realizar"), não só contas de login — evita subestimar "Realizou"
+        // quando boa parte das conclusões vem de colaboradores sem conta
+        // própria (estágio livre, importados).
+        const theme = allTrainingData[slug]?.[subjectId]?.themes?.[themeId];
+        let realizou, faltaram;
+        if (theme && !AUDIENCE_EXEMPT_SLUGS.includes(slug)) {
+            const doneKeys = new Set();
+            rows.forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
+            const audience = courseAudience(theme);
+            realizou = audience.filter(colab => personKeysOfColaborador(colab).some(key => doneKeys.has(key))).length;
+            faltaram = Math.max(0, audience.length - realizou);
+        } else {
+            // Sem público-alvo definido (ex.: estágios): volta ao total de
+            // contas cadastradas, mesmo critério de antes.
+            const totalUsers = Object.keys(allUsers).length;
+            realizou = rows.filter(r => r.userId).length;
+            faltaram = Math.max(0, totalUsers - realizou);
+        }
         renderChart('courseCompletion', 'cfg-dash-course-completion-chart', {
             type: 'pie',
             data: { labels: ['Realizou', 'Falta'], datasets: [{ data: [realizou, faltaram], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
@@ -1016,12 +1165,59 @@
         renderCommentsTable(rows);
         renderReprovalsTable(rows, slug, subjectId, themeId);
 
-        const theme = allTrainingData[slug]?.[subjectId]?.themes?.[themeId];
         renderCompletedTable(rows);
         if (theme) renderMissingTable(rows, slug, subjectId, { id: themeId, ...theme });
 
+        renderCourseRetriesChart(rows);
+        renderCourseByUnitChart(rows);
+
         renderCourseHero(rows);
         updateTabCounts(rows);
+    }
+
+    // Quantos precisaram de mais de uma tentativa para passar — sinaliza
+    // dificuldade real do curso (prova mal calibrada, conteúdo confuso etc).
+    function renderCourseRetriesChart(rows) {
+        const people = attemptsByPerson(rows);
+        const firstTry = people.filter(p => p.approved && p.attempts === 1).length;
+        const retried = people.filter(p => p.approved && p.attempts > 1).length;
+        const stillFailed = people.filter(p => !p.approved).length;
+        renderChart('courseRetries', 'cfg-dash-course-retries-chart', {
+            type: 'bar',
+            data: {
+                labels: ['Retentativas'],
+                datasets: [
+                    { label: 'Aprovado na 1ª tentativa', data: [firstTry], backgroundColor: CHART_COLORS.success },
+                    { label: 'Aprovado após retentativa', data: [retried], backgroundColor: CHART_COLORS.warning },
+                    { label: 'Ainda reprovado', data: [stillFailed], backgroundColor: CHART_COLORS.danger }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } } }
+        });
+    }
+
+    // Comparativo de realização por unidade — ajuda o gestor a identificar
+    // qual unidade está atrasada para cobrar localmente.
+    function renderCourseByUnitChart(rows) {
+        const byUnit = new Map();
+        rows.forEach(r => {
+            const unit = r.unit || 'Sem unidade';
+            if (!byUnit.has(unit)) byUnit.set(unit, { onTime: 0, late: 0 });
+            const entry = byUnit.get(unit);
+            if (['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)) entry.onTime++; else entry.late++;
+        });
+        const units = [...byUnit.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        renderChart('courseByUnit', 'cfg-dash-course-byunit-chart', {
+            type: 'bar',
+            data: {
+                labels: units,
+                datasets: [
+                    { label: 'No prazo', data: units.map(u => byUnit.get(u).onTime), backgroundColor: CHART_COLORS.accent },
+                    { label: 'Fora do prazo', data: units.map(u => byUnit.get(u).late), backgroundColor: CHART_COLORS.danger }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } } }
+        });
     }
 
     // Resumo rápido no topo do modal: concluídos, pendentes e média — dá o
@@ -1031,10 +1227,12 @@
         const scores = rows.map(r => Number(r.score) || 0);
         const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1).replace('.', ',') : '—';
         const pendentes = missingRowsCache.length;
+        const durationLabel = formatDuration(avgDuration(rows));
         courseHeroStats.innerHTML = `
             <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'concluído' : 'concluídos'}</span>
             <span class="hero-stat is-warn"><i class="fas fa-hourglass-half"></i> ${pendentes} ${pendentes === 1 ? 'pendente' : 'pendentes'}</span>
             <span class="hero-stat"><i class="fas fa-star"></i> Média ${avg}</span>
+            <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
         `;
     }
 

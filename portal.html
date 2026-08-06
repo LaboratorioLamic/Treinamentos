@@ -370,7 +370,11 @@
                 </div>
 
                 <!-- Painel de cadastro -->
-                <div id="student-auth-register-panel" style="display:none;">
+                <div id="student-auth-register-panel" style="display:none; position:relative;">
+                    <div class="student-register-loading" id="student-register-loading">
+                        <span class="student-register-spinner"></span>
+                        <span>Carregando lista de colaboradores…</span>
+                    </div>
                     <label for="student-register-name">Nome completo</label>
                     <div class="student-name-combobox">
                         <input type="text" id="student-register-name" placeholder="Digite para buscar seu nome" autocomplete="off">
@@ -378,7 +382,7 @@
                     </div>
                     <small class="form-hint">Seu nome precisa estar na lista de colaboradores cadastrada pelo administrador.</small>
                     <label for="student-register-username">Login</label>
-                    <input type="text" id="student-register-username" placeholder="ex: pedrolima" autocomplete="username">
+                    <input type="text" id="student-register-username" placeholder="ex: fulano" autocomplete="username">
                     <small class="form-hint">Apenas letras minúsculas, sem espaços ou caracteres especiais.</small>
                     <label for="student-register-password">Senha</label>
                     <input type="password" id="student-register-password" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
@@ -923,6 +927,16 @@
                             <div class="panel-header"><h2>Prazo de Realização</h2></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-deadline-chart"></canvas></div>
                         </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Realização por Unidade</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-byunit-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Retentativas</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-retries-chart"></canvas></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -972,6 +986,16 @@
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header"><h2>Tentativas das Avaliações</h2></div>
                             <div class="panel-body"><canvas id="cfg-dash-user-approval-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Progresso em Cursos Pendentes</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-pending-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Prazo por Mês</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-deadlinetrend-chart"></canvas></div>
                         </div>
                     </div>
                 </div>

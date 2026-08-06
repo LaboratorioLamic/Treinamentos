@@ -367,6 +367,42 @@ body.admin-mode #cfg-root { display: block; }
     line-height: 1.5;
 }
 
+/* Overlay de carregamento enquanto busca a lista de colaboradores no cadastro */
+.student-register-loading {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: var(--card);
+    border-radius: 12px;
+    text-align: center;
+    padding: 20px;
+}
+
+.student-register-loading.active { display: flex; }
+
+.student-register-spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--surface-2, #f1f5f9);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: studentRegisterSpin 0.75s linear infinite;
+}
+
+.student-register-loading span:last-child {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+@keyframes studentRegisterSpin {
+    to { transform: rotate(360deg); }
+}
+
 /* ─── Modal de perfil do aluno ─── */
 .student-profile-card { max-width: 720px; }
 

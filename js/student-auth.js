@@ -306,6 +306,11 @@
     const registerPasswordInput = document.getElementById('student-register-password');
     const registerConfirmInput = document.getElementById('student-register-confirm');
     const registerSubmitBtn = document.getElementById('student-register-submit');
+    const registerLoading = document.getElementById('student-register-loading');
+    const registerFields = [
+        registerNameInput, registerUsernameInput, registerPasswordInput,
+        registerConfirmInput, registerSubmitBtn
+    ];
 
     // Força o formato do login em tempo real (minúsculas, sem espaço/especiais)
     // nos dois campos — o aluno digita livre, mas nunca vê caracteres inválidos.
@@ -345,11 +350,19 @@
         if (!isLogin) loadAvailableNames();
     }
 
+    function setRegisterLoading(isLoading) {
+        registerLoading?.classList.toggle('active', isLoading);
+        registerFields.forEach(field => { if (field) field.disabled = isLoading; });
+    }
+
     async function loadAvailableNames() {
+        setRegisterLoading(true);
         try {
             availableColabs = await fetchAvailableColaboradores();
         } catch (error) {
             availableColabs = [];
+        } finally {
+            setRegisterLoading(false);
         }
     }
 

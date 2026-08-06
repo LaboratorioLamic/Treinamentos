@@ -102,6 +102,10 @@ async function openAuthModal() {
     // Já autenticado nesta sessão: abre direto.
     if (isUnlocked()) { openPanel(); return; }
 
+    // Gestores (isManager na conta) acessam as configurações sem senha.
+    const session = U.StudentAuth?.getSession?.();
+    if (session?.isManager) { U.unlock(); openPanel(); return; }
+
     clearError();
     passwordInput.value = '';
     confirmInput.value = '';
