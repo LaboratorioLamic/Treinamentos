@@ -15,6 +15,28 @@
         return n.toFixed(1).replace('.', ',');
     }
 
+    // Duração da avaliação (segundos) em mm:ss — ausente em registros antigos
+    // (anteriores ao timer) ou importados sem essa coluna.
+    function formatDuration(seconds) {
+        const n = Number(seconds);
+        if (!Number.isFinite(n) || n < 0) return '—';
+        const m = Math.floor(n / 60).toString().padStart(2, '0');
+        const s = Math.floor(n % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    // Aceita "mm:ss" (formato exportado por esta tela) ou segundos puros
+    // (planilha editada manualmente). Ausente/inválido vira null, não 0 —
+    // evita mostrar "00:00" para registros que nunca tiveram esse dado.
+    function parseDurationValue(raw) {
+        const text = String(raw ?? '').trim();
+        if (!text) return null;
+        const clockMatch = text.match(/^(\d+):(\d{1,2})$/);
+        if (clockMatch) return (Number(clockMatch[1]) * 60) + Number(clockMatch[2]);
+        const n = Number(text);
+        return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
 
     let allRows = [];
@@ -371,6 +393,7 @@
         { key: 'theme', label: 'Assunto', colClass: 'hc-theme', render: r => tagHtml(r.theme, 'subject') },
         { key: 'fullName', label: 'Nome', colClass: 'hc-name', render: r => `<span class="hist-name">${escapeHtml(r.fullName)}</span>` },
         { key: 'score', label: 'Nota', colClass: 'hc-score', render: scoreHtml },
+        { key: 'durationSeconds', label: 'Tempo', colClass: 'hc-duration', render: r => `<span class="hist-duration">${formatDuration(r.durationSeconds)}</span>` },
         { key: '__errors', label: 'Erros', colClass: 'hc-errors', sortable: false, render: errorsBadge },
         { key: 'rating', label: 'Avaliação', colClass: 'hc-rating', render: r => starsHtml(r.rating) },
         { key: 'deadlineStatus', label: 'Prazo', colClass: 'hc-deadline', render: deadlinePreview },
@@ -667,6 +690,7 @@
             'Tema': r.subject,
             'Nome': r.fullName,
             'Nota': r.score,
+            'Tempo': formatDuration(r.durationSeconds),
             'Erros': r.errorsText || r.errors || '',
             'Avaliação': r.rating || '',
             'Comentários': r.comment || '',
@@ -882,6 +906,7 @@
             const situacao = get('Situação', 'situacao').toString().trim().toLowerCase();
             const errorsText = get('Erros', 'erros').toString().trim();
             const answers = buildAnswersFromErrorsText(errorsText, courseMatch.questions);
+            const durationSeconds = parseDurationValue(get('Tempo', 'tempo', 'Duração', 'duracao'));
 
             return {
                 name,
@@ -899,6 +924,7 @@
                 unit: get('Unidade', 'unidade').toString().trim(),
                 role: get('Cargo', 'cargo').toString().trim(),
                 submittedAt,
+                durationSeconds,
                 deadlineStatus: parseDeadlineStatus(get('Prazo', 'prazo')),
                 imported: true
             };
@@ -1531,6 +1557,7 @@
             <div class="history-detail-summary-item"><span class="label">Categoria</span><span class="value">${escapeHtml(CATEGORY_LABELS[row.slug] || row.slug)}</span></div>
             <div class="history-detail-summary-item"><span class="label">Nota</span><span class="value">${formatScore(row.score)}/10</span></div>
             <div class="history-detail-summary-item"><span class="label">Situação</span><span class="value">${row.approved ? 'Aprovado' : 'Reprovado'}</span></div>
+            <div class="history-detail-summary-item"><span class="label">Tempo</span><span class="value">${formatDuration(row.durationSeconds)}</span></div>
             <div class="history-detail-summary-item"><span class="label">Data</span><span class="value">${dateLabel}</span></div>
             ${(row.deadlineStatus && row.deadlineStatus !== 'livre' && row.deadlineStatus !== 'on_time' && row.deadlineStatus !== 'not_started') ? `<div class="history-detail-summary-item"><span class="label">Prazo</span><span class="value">${escapeHtml(U.Deadlines?.STATUS_LABELS?.[row.deadlineStatus] || row.deadlineStatus)}</span></div>` : ''}
             ${row.unit ? `<div class="history-detail-summary-item"><span class="label">Unidade</span><span class="value">${escapeHtml(row.unit)}</span></div>` : ''}

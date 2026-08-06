@@ -533,6 +533,11 @@
                 subjectLi.append(icon, name, count, check);
                 subjectLi.onclick = (e) => {
                     e.stopPropagation();
+                    if (currentTrainingId && currentThemeId != null && loadQuizAttempt(currentTrainingId, currentThemeId)) {
+                        closeSubjectDropdown();
+                        showWarning('Termine a avaliação em andamento antes de trocar de tema.');
+                        return;
+                    }
                     setSubjectLabel(subject.name);
                     closeSubjectDropdown();
                     currentTrainingId = subject.id;
@@ -743,6 +748,10 @@
         if (backToCoursesBtn) {
             backToCoursesBtn.onclick = () => {
                 if (!currentTrainingId) return;
+                if (currentThemeId != null && loadQuizAttempt(currentTrainingId, currentThemeId)) {
+                    showWarning('Termine a avaliação em andamento antes de sair do curso.');
+                    return;
+                }
                 if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
                 resetContent();
                 showCourseGallery(currentTrainingId);
@@ -944,6 +953,12 @@
                 div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][originalIndex]);
                 if (completionStatus[subjectId][themeId][originalIndex]) div.classList.add('completed');
                 div.onclick = () => {
+                    // Avaliação em andamento: nada de módulo destrava o aluno
+                    // dela — nem reload nem clique na sidebar.
+                    if (loadQuizAttempt(subjectId, themeId)) {
+                        showWarning('Termine a avaliação em andamento antes de voltar ao conteúdo.');
+                        return;
+                    }
                     document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
                     div.classList.add('active');
                     loadModule(mod, modules, displayIndex);
@@ -988,6 +1003,52 @@
                 openQuiz(subjectId, themeId);
             };
             modulesDiv.appendChild(assessmentDiv);
+
+            // Prova em andamento (não finalizada) para este curso: força a
+            // retomada direto na tela do quiz, mesmo após recarregar a página
+            // — impede "escapar" da avaliação voltando para os módulos.
+            if (loadQuizAttempt(subjectId, themeId)) {
+                assessmentDiv.classList.add('active');
+                document.querySelectorAll('.module').forEach(m => { if (m !== assessmentDiv) m.classList.remove('active'); });
+                openQuiz(subjectId, themeId);
+            }
+        }
+
+        // ─── TENTATIVA DE AVALIAÇÃO PERSISTENTE (localStorage) ───
+        // Guarda início real (timestamp) + respostas parciais, para o timer
+        // sobreviver a reload/fechar a página e para forçar o envio ao expirar
+        // sem depender da aba continuar aberta.
+        function quizAttemptKey(subjectId, themeId) {
+            return `quizAttempt_${subjectId}_${themeId}`;
+        }
+
+        function loadQuizAttempt(subjectId, themeId) {
+            try {
+                const raw = localStorage.getItem(quizAttemptKey(subjectId, themeId));
+                return raw ? JSON.parse(raw) : null;
+            } catch (error) { return null; }
+        }
+
+        function saveQuizAttempt(subjectId, themeId, attempt) {
+            try { localStorage.setItem(quizAttemptKey(subjectId, themeId), JSON.stringify(attempt)); }
+            catch (error) { /* indisponível */ }
+        }
+
+        function clearQuizAttempt(subjectId, themeId) {
+            try { localStorage.removeItem(quizAttemptKey(subjectId, themeId)); }
+            catch (error) { /* indisponível */ }
+        }
+
+        // Minutos da prova = 3 min por questão.
+        function quizDurationMs(questionCount) {
+            return questionCount * 3 * 60 * 1000;
+        }
+
+        function formatClock(ms) {
+            const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+            const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const s = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
         }
 
         function openQuiz(subjectId, themeId) {
@@ -997,7 +1058,79 @@
             video.src = '';
             pdfContainer.style.display = 'none';
             document.body.classList.remove('cinema-active');
-            loadQuiz(subjectId, themeId);
+
+            const quizKey = `${subjectId}_${themeId}`;
+            if (quizStatus[quizKey] === false) { showWarning('Avaliação indisponível no momento.'); return; }
+            const questions = quizData[quizKey];
+            if (!questions) { showWarning('Nenhuma avaliação disponível para este tema.'); return; }
+
+            // Tentativa já em andamento (reload/reabertura): pula intro e
+            // confirmação, retoma direto no ponto (bloqueia "voltar" da prova).
+            const existing = loadQuizAttempt(subjectId, themeId);
+            if (existing) { loadQuiz(subjectId, themeId); return; }
+
+            openQuizIntro(subjectId, themeId, questions.length);
+        }
+
+        function openQuizIntro(subjectId, themeId, questionCount) {
+            resetContent();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const minutes = questionCount * 3;
+            document.getElementById('quiz-intro-count').textContent = `${questionCount} questões`;
+            document.getElementById('quiz-intro-time').textContent = `${minutes} minutos`;
+
+            const modal = document.getElementById('quiz-intro-modal');
+            const startBtn = document.getElementById('quiz-intro-start-btn');
+            const cancelBtn = document.getElementById('quiz-intro-cancel-btn');
+
+            const close = () => { modal.classList.remove('active'); cleanup(); };
+            const handleStart = () => { close(); openQuizConfirm(subjectId, themeId); };
+            const handleCancel = () => close();
+            const handleOverlayClick = (e) => { if (e.target === modal) handleCancel(); };
+
+            function cleanup() {
+                startBtn.removeEventListener('click', handleStart);
+                cancelBtn.removeEventListener('click', handleCancel);
+                modal.removeEventListener('click', handleOverlayClick);
+            }
+
+            startBtn.addEventListener('click', handleStart);
+            cancelBtn.addEventListener('click', handleCancel);
+            modal.addEventListener('click', handleOverlayClick);
+
+            modal.classList.add('active');
+        }
+
+        function openQuizConfirm(subjectId, themeId) {
+            const modal = document.getElementById('quiz-confirm-modal');
+            const startBtn = document.getElementById('quiz-confirm-start-btn');
+            const backBtn = document.getElementById('quiz-confirm-back-btn');
+
+            const close = () => { modal.classList.remove('active'); cleanup(); };
+            const handleStart = () => {
+                close();
+                const questions = quizData[`${subjectId}_${themeId}`] || [];
+                saveQuizAttempt(subjectId, themeId, {
+                    startedAt: Date.now(),
+                    durationMs: quizDurationMs(questions.length),
+                    selectedAnswers: {}
+                });
+                loadQuiz(subjectId, themeId);
+            };
+            const handleBack = () => { close(); openQuizIntro(subjectId, themeId, (quizData[`${subjectId}_${themeId}`] || []).length); };
+            const handleOverlayClick = (e) => { if (e.target === modal) handleBack(); };
+
+            function cleanup() {
+                startBtn.removeEventListener('click', handleStart);
+                backBtn.removeEventListener('click', handleBack);
+                modal.removeEventListener('click', handleOverlayClick);
+            }
+
+            startBtn.addEventListener('click', handleStart);
+            backBtn.addEventListener('click', handleBack);
+            modal.addEventListener('click', handleOverlayClick);
+
+            modal.classList.add('active');
         }
 
         function renderAssessmentTitle(completed) {
@@ -1056,8 +1189,39 @@
             const questions = quizData[quizKey];
             if (!questions) { showWarning('Nenhuma avaliação disponível para este tema.'); return; }
 
+            // Tentativa deve existir neste ponto (criada na confirmação, ou
+            // retomada de um reload/reabertura anterior). Sem ela não há como
+            // saber o prazo real — recria defensivamente para não travar o aluno.
+            let attempt = loadQuizAttempt(subjectId, themeId);
+            if (!attempt) {
+                attempt = { startedAt: Date.now(), durationMs: quizDurationMs(questions.length), selectedAnswers: {} };
+                saveQuizAttempt(subjectId, themeId, attempt);
+            }
+            selectedAnswers = { ...attempt.selectedAnswers };
+
+            const deadline = attempt.startedAt + attempt.durationMs;
+            if (Date.now() >= deadline) {
+                // Prazo já esgotado (fechou a página e voltou depois): envia
+                // automaticamente com o que estava marcado, sem reabrir a prova.
+                finalizeQuizAttempt(subjectId, themeId, questions, true);
+                return;
+            }
+
             quizContainer.innerHTML = '';
-            selectedAnswers = {};
+
+            const timerBox = document.createElement('div');
+            timerBox.className = 'quiz-timer-box';
+            timerBox.id = 'quiz-timer-box';
+            timerBox.innerHTML = `
+                <div class="quiz-timer-icon"><i class="fas fa-hourglass-half"></i></div>
+                <div class="quiz-timer-body">
+                    <div class="quiz-timer-top">
+                        <span class="quiz-timer-label">Tempo restante</span>
+                        <span class="quiz-timer-clock" id="quiz-timer-clock">--:--</span>
+                    </div>
+                    <div class="quiz-timer-track"><div class="quiz-timer-fill" id="quiz-timer-fill"></div></div>
+                </div>`;
+            quizContainer.appendChild(timerBox);
 
             const header = document.createElement('div');
             header.className = 'quiz-header-section';
@@ -1092,11 +1256,18 @@
                     input.type = 'radio';
                     input.name = `q${index}`;
                     input.value = optIndex;
+                    if (selectedAnswers[index] === optIndex) { input.checked = true; label.classList.add('selected'); }
                     input.onchange = () => {
                         selectedAnswers[index] = parseInt(input.value, 10);
                         card.querySelectorAll('.quiz-option').forEach(o => o.classList.remove('selected'));
                         label.classList.add('selected');
                         card.classList.remove('missing');
+                        // Persiste a resposta parcial — sobrevive a reload/fechar aba.
+                        const current = loadQuizAttempt(subjectId, themeId);
+                        if (current) {
+                            current.selectedAnswers = { ...selectedAnswers };
+                            saveQuizAttempt(subjectId, themeId, current);
+                        }
                     };
                     label.appendChild(input);
                     label.appendChild(document.createTextNode(opt));
@@ -1108,6 +1279,64 @@
             quizContainer.appendChild(quizSubmit);
             quizContainer.style.display = 'flex';
             quizSubmit.onclick = () => calculateScore(subjectId, themeId);
+
+            startQuizTimer(subjectId, themeId, questions, deadline);
+        }
+
+        // Timer baseado em timestamp real (deadline fixo), não em contador
+        // incremental — assim recarregar a página não "ganha" tempo extra e o
+        // valor exibido sempre reflete o tempo restante real.
+        function stopQuizTimer() {
+            if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+        }
+
+        function startQuizTimer(subjectId, themeId, questions, deadline) {
+            stopQuizTimer();
+            const totalMs = deadline - (loadQuizAttempt(subjectId, themeId)?.startedAt || Date.now());
+
+            const tick = () => {
+                const remaining = deadline - Date.now();
+                const clockEl = document.getElementById('quiz-timer-clock');
+                const fillEl = document.getElementById('quiz-timer-fill');
+                const boxEl = document.getElementById('quiz-timer-box');
+                if (!clockEl || !fillEl || !boxEl) { stopQuizTimer(); return; }
+
+                if (remaining <= 0) {
+                    clockEl.textContent = '00:00';
+                    fillEl.style.width = '100%';
+                    stopQuizTimer();
+                    finalizeQuizAttempt(subjectId, themeId, questions, true);
+                    return;
+                }
+
+                clockEl.textContent = formatClock(remaining);
+                const elapsedPct = Math.min(100, Math.max(0, ((totalMs - remaining) / totalMs) * 100));
+                fillEl.style.width = `${elapsedPct}%`;
+                boxEl.classList.toggle('is-urgent', remaining <= 60000);
+            };
+
+            tick();
+            progressTimer = setInterval(tick, 1000);
+        }
+
+        // Envio automático ao esgotar o tempo — questões sem resposta contam
+        // como incorretas. Usado tanto pelo timer ativo quanto ao reabrir a
+        // página já com o prazo vencido.
+        function finalizeQuizAttempt(subjectId, themeId, questions, auto) {
+            stopQuizTimer();
+            const attempt = loadQuizAttempt(subjectId, themeId);
+            const startedAt = attempt?.startedAt || Date.now();
+            selectedAnswers = attempt?.selectedAnswers ? { ...attempt.selectedAnswers } : selectedAnswers;
+
+            let correctCount = 0;
+            questions.forEach((q, index) => { if (selectedAnswers[index] === q.correct) correctCount++; });
+            const score = Math.round((correctCount / questions.length) * 100) / 10;
+            const erros = getDetailedIncorrectAnswers(subjectId, themeId);
+            const answerSnapshot = buildAnswerSnapshot(subjectId, themeId);
+            const durationSeconds = Math.round((Date.now() - startedAt) / 1000);
+
+            if (auto) showWarning('Tempo esgotado! Sua avaliação foi enviada com as respostas selecionadas.');
+            showForm(score, erros, answerSnapshot, durationSeconds);
         }
 
         function calculateScore(subjectId, themeId) {
@@ -1128,12 +1357,17 @@
 
             if (!allAnswered) { showWarning('Por favor, responda todas as questões.'); return; }
 
+            stopQuizTimer();
+            const attempt = loadQuizAttempt(subjectId, themeId);
+            const startedAt = attempt?.startedAt || Date.now();
+            const durationSeconds = Math.round((Date.now() - startedAt) / 1000);
+
             let correctCount = 0;
             questions.forEach((q, index) => { if (selectedAnswers[index] === q.correct) correctCount++; });
             const score = Math.round((correctCount / questions.length) * 100) / 10;
             const erros = getDetailedIncorrectAnswers(subjectId, themeId);
             const answerSnapshot = buildAnswerSnapshot(subjectId, themeId);
-            showForm(score, erros, answerSnapshot);
+            showForm(score, erros, answerSnapshot, durationSeconds);
         }
 
         // Snapshot completo do quiz respondido (todas as questões, com gabarito
@@ -1185,7 +1419,7 @@
             return currentCategory === 'Estágios';
         }
 
-        function showForm(score, erros = '', answerSnapshot = []) {
+        function showForm(score, erros = '', answerSnapshot = [], durationSeconds = null) {
             resetContent();
             formContainer.style.display = 'flex';
             const submitButton = document.getElementById('submit-form');
@@ -1217,10 +1451,10 @@
             commentToggleBtn.innerHTML = '<i class="fas fa-times" style="margin-right:6px;"></i>Fechar Comentário';
             document.getElementById('comment').value = '';
 
-            newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros, answerSnapshot); };
+            newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros, answerSnapshot, false, durationSeconds); };
         }
 
-        function submitForm(score, erros = '', answerSnapshot = [], skipLowRatingCheck = false) {
+        function submitForm(score, erros = '', answerSnapshot = [], skipLowRatingCheck = false, durationSeconds = null) {
             const loadingSpinner = document.getElementById('loading-spinner');
             const submitButton = document.getElementById('submit-form');
             const ratingContainer = document.getElementById('rating-container');
@@ -1249,7 +1483,7 @@
             } else if (!session) {
                 // Sessão pode ter expirado/sido limpa entre abrir o quiz e enviar.
                 showWarning('Sua sessão expirou. Faça login novamente.');
-                window.UniAdmin.StudentAuth.openModal({ intent: 'assessment', onSuccess: () => submitForm(score, erros) });
+                window.UniAdmin.StudentAuth.openModal({ intent: 'assessment', onSuccess: () => submitForm(score, erros, answerSnapshot, false, durationSeconds) });
                 return;
             }
 
@@ -1269,7 +1503,7 @@
                         commentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         commentField.focus();
                     },
-                    onConfirm: () => submitForm(score, erros, answerSnapshot, true)
+                    onConfirm: () => submitForm(score, erros, answerSnapshot, true, durationSeconds)
                 });
                 return;
             }
@@ -1292,13 +1526,17 @@
                 errors: erros || '',
                 answers: answerSnapshot || [],
                 submittedAt: Date.now(),
-                deadlineStatus
+                deadlineStatus,
+                durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : null
             };
 
             const finishSubmit = () => {
                 loadingSpinner.style.display = 'none';
                 submitButton.disabled = false;
                 submitButton.style.opacity = '1';
+                // Tentativa concluída e registrada: libera o localStorage. Só
+                // agora, pois falha no envio deve manter o estado para retry.
+                clearQuizAttempt(currentTrainingId, currentThemeId);
                 showResult(score);
             };
 
@@ -1388,7 +1626,7 @@
                 retryBtn.id = 'retry-btn';
                 retryBtn.style.display = 'inline-block';
                 retryBtn.innerHTML = '<i class="fas fa-redo" style="margin-right:8px;"></i>Tentar Novamente';
-                retryBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
+                retryBtn.onclick = () => openQuiz(currentTrainingId, currentThemeId);
                 resultContainer.appendChild(retryBtn);
             } else {
                 const successDiv = document.createElement('div');
@@ -1462,6 +1700,7 @@
         }
 
         function resetContent() {
+            stopQuizTimer();
             video.src = '';
             video.style.display = 'none';
             pdfContainer.style.display = 'none';

@@ -77,6 +77,52 @@
         </div>
     </div>
 
+    <!-- ─── MODAL: INTRO DA AVALIAÇÃO ─── -->
+    <div class="quiz-intro-modal" id="quiz-intro-modal">
+        <div class="quiz-intro-card">
+            <div class="quiz-intro-icon"><i class="fas fa-clipboard-list"></i></div>
+            <h2>Pronto para a Avaliação Final?</h2>
+            <div class="quiz-intro-facts">
+                <div class="quiz-intro-fact"><i class="fas fa-list-ol"></i><span id="quiz-intro-count">— questões</span></div>
+                <div class="quiz-intro-fact"><i class="fas fa-hourglass-half"></i><span id="quiz-intro-time">— minutos</span></div>
+            </div>
+            <p class="quiz-intro-note">
+                <i class="fas fa-triangle-exclamation"></i>
+                Ao esgotar o tempo, a avaliação será enviada automaticamente apenas com as
+                alternativas já selecionadas. Questões sem resposta serão consideradas incorretas.
+            </p>
+            <div class="quiz-intro-actions">
+                <button type="button" id="quiz-intro-start-btn" class="low-rating-btn low-rating-btn-primary">
+                    <i class="fas fa-play"></i> Realizar Avaliação
+                </button>
+                <button type="button" id="quiz-intro-cancel-btn" class="low-rating-btn low-rating-btn-ghost">
+                    Agora não
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: CONFIRMAÇÃO DE INÍCIO ─── -->
+    <div class="quiz-intro-modal" id="quiz-confirm-modal">
+        <div class="quiz-intro-card quiz-confirm-card">
+            <div class="quiz-intro-icon"><i class="fas fa-circle-question"></i></div>
+            <h2>Tem certeza que deseja iniciar?</h2>
+            <p class="quiz-intro-note">
+                <i class="fas fa-clock"></i>
+                Assim que iniciar, o tempo começa a contar e não é possível pausar. Se sair ou
+                recarregar a página, a contagem continua normalmente.
+            </p>
+            <div class="quiz-intro-actions">
+                <button type="button" id="quiz-confirm-start-btn" class="low-rating-btn low-rating-btn-primary">
+                    <i class="fas fa-check"></i> Sim, iniciar avaliação
+                </button>
+                <button type="button" id="quiz-confirm-back-btn" class="low-rating-btn low-rating-btn-ghost">
+                    Voltar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ─── SELECTION BAR ─── -->
     <div class="selection-bar">
         <div class="selection-inner">

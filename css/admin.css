@@ -1072,15 +1072,16 @@
            em admin-history.js: Data/Hora, Tema, Assunto, Nome, Nota, Erros,
            Avaliação, Prazo, Unidade, Cargo, Coment., Situação, Ações. */
         #cfg-root .history-table-wrap col.hc-date { width: 9%; }
-        #cfg-root .history-table-wrap col.hc-subject { width: 11%; }
-        #cfg-root .history-table-wrap col.hc-theme { width: 11%; }
-        #cfg-root .history-table-wrap col.hc-name { width: 13%; }
+        #cfg-root .history-table-wrap col.hc-subject { width: 10%; }
+        #cfg-root .history-table-wrap col.hc-theme { width: 10%; }
+        #cfg-root .history-table-wrap col.hc-name { width: 12%; }
         #cfg-root .history-table-wrap col.hc-score { width: 6%; }
-        #cfg-root .history-table-wrap col.hc-errors { width: 8%; }
-        #cfg-root .history-table-wrap col.hc-rating { width: 8%; }
-        #cfg-root .history-table-wrap col.hc-deadline { width: 8%; }
-        #cfg-root .history-table-wrap col.hc-unit { width: 9%; }
-        #cfg-root .history-table-wrap col.hc-role { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-duration { width: 6%; }
+        #cfg-root .history-table-wrap col.hc-errors { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-rating { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-deadline { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-unit { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-role { width: 7%; }
         #cfg-root .history-table-wrap col.hc-comment { width: 4%; }
         #cfg-root .history-table-wrap col.hc-approved { width: 7%; }
         #cfg-root .history-table-wrap col.hc-actions { width: 6%; }

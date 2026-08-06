@@ -13,6 +13,16 @@
 
     const CATEGORY_SLUGS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
 
+    // Duração da avaliação (segundos) em mm:ss — ausente em registros
+    // anteriores ao timer da prova.
+    function formatDuration(seconds) {
+        const n = Number(seconds);
+        if (!Number.isFinite(n) || n < 0) return '';
+        const m = Math.floor(n / 60).toString().padStart(2, '0');
+        const s = Math.floor(n % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
     async function fetchUsers() {
         const snapshot = await get(ref(db, `/${dbRoot}/users`));
         return snapshot.exists() ? snapshot.val() : {};
@@ -60,6 +70,7 @@
                             'Curso': courseInfo?.themeName || themeId,
                             'Nome': fullName,
                             'Nota': r.score,
+                            'Tempo': formatDuration(r.durationSeconds),
                             'Avaliação (estrelas)': r.rating || '',
                             'Situação': r.approved ? 'Aprovado' : 'Reprovado',
                             'Unidade': user?.unit || '',
@@ -90,6 +101,7 @@
                             'Curso': courseInfo?.themeName || themeId,
                             'Nome': r.name || '—',
                             'Nota': r.score,
+                            'Tempo': formatDuration(r.durationSeconds),
                             'Avaliação (estrelas)': r.rating || '',
                             'Situação': r.approved ? 'Aprovado' : 'Reprovado',
                             'Unidade': '',

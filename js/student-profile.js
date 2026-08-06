@@ -17,6 +17,16 @@
         return n.toFixed(1).replace('.', ',');
     }
 
+    // Duração da avaliação (segundos) em mm:ss — ausente em registros
+    // anteriores ao timer da prova.
+    function formatDuration(seconds) {
+        const n = Number(seconds);
+        if (!Number.isFinite(n) || n < 0) return '—';
+        const m = Math.floor(n / 60).toString().padStart(2, '0');
+        const s = Math.floor(n % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
     const modal = document.getElementById('student-profile-modal');
     if (!modal) return; // portal.html sem o modal (ainda não integrado)
 
@@ -546,6 +556,7 @@
                     <div class="student-detail-stat"><span class="label">Nota</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${formatScore(row.score)}/10</span></div>
                     <div class="student-detail-stat"><span class="label">Situação</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${row.approved ? 'Aprovado' : 'Reprovado'}</span></div>
                     <div class="student-detail-stat"><span class="label">Tentativa</span><span class="value">${row.attempt || 1}</span></div>
+                    <div class="student-detail-stat"><span class="label">Tempo</span><span class="value">${formatDuration(row.durationSeconds)}</span></div>
                     <div class="student-detail-stat"><span class="label">Data</span><span class="value">${formatDateTime(row.submittedAt)}</span></div>
                     ${showDeadline ? `<div class="student-detail-stat"><span class="label">Prazo</span><span class="value">${escapeHtml(U.Deadlines?.STATUS_LABELS?.[row.deadlineStatus] || row.deadlineStatus)}</span></div>` : ''}
                 </div>
