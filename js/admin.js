@@ -842,7 +842,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         function closeCertModal() { certModal.style.display = 'none'; }
         document.getElementById('cfg-cert-close')?.addEventListener('click', closeCertModal);
         document.getElementById('cfg-cert-cancel')?.addEventListener('click', closeCertModal);
-        certModal?.addEventListener('click', (event) => { if (event.target === certModal) closeCertModal(); });
+        // Clique fora do card não fecha o modal (evita perda acidental de edição).
 
         document.getElementById('cfg-cert-apply')?.addEventListener('click', () => {
             // Um tema digitado e não adicionado ainda não se perde ao aplicar.
