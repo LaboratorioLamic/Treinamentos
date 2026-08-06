@@ -135,6 +135,7 @@
         const captionEl = document.getElementById('caption');
         const attachmentContainer = document.getElementById('attachment-container');
         const modulesDiv = document.getElementById('modules');
+        const playerCard = document.querySelector('.player-card');
         const quizContainer = document.getElementById('quiz-container');
         const resultContainer = document.getElementById('result-container');
         const formContainer = document.getElementById('form-container');
@@ -1013,6 +1014,7 @@
 
         function loadModule(mod, modules, moduleIndex) {
             resetContent();
+            if (playerCard) playerCard.style.display = '';
             currentModuleIndex = moduleIndex;
             if (mod.pdfUrl) {
                 if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
@@ -1469,6 +1471,11 @@
             titleEl.style.display = 'none';
             captionEl.style.display = 'none';
             attachmentContainer.style.display = 'none';
+            // Some por padrão: fica vazio (fundo escuro + module-info branco
+            // colapsados) atrás de quiz/resultado/formulário, criando um 2º
+            // container fantasma acima. loadModule() reexibe explicitamente
+            // ao voltar para vídeo/PDF.
+            if (playerCard) playerCard.style.display = 'none';
             quizContainer.style.display = 'none';
             resultContainer.style.display = 'none';
             formContainer.style.display = 'none';

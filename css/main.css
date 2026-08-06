@@ -1115,13 +1115,23 @@
         .form-container {
             display: none;
             flex-direction: column;
-            gap: 14px;
             background: var(--card);
             padding: 28px;
             border-radius: var(--radius-lg);
             border: 1.5px solid var(--border);
             box-shadow: var(--shadow);
             width: 100%;
+        }
+
+        /* Título ocupa a largura cheia do card; os campos em si ficam
+           reduzidos e centralizados em vez de esticar borda a borda. */
+        .form-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
         }
 
         .form-title {

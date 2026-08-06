@@ -194,48 +194,50 @@
                     <div id="form-container" class="form-container">
                         <div class="form-title"><i class="fas fa-certificate" style="color:var(--accent);margin-right:8px;"></i>Registrar Conclusão</div>
 
-                        <!-- Estágios: nome digitado livremente, sem exigir conta -->
-                        <div id="form-name-free-group">
-                            <label for="name">Nome</label>
-                            <select id="name">
-                                <option value="">Selecione seu nome</option>
-                            </select>
-                            <label for="email">Email</label>
-                            <input type="email" id="email" placeholder="seu@email.com">
-                        </div>
-
-                        <!-- Treinamentos/Educação Continuada: identidade vem da sessão logada -->
-                        <div id="form-name-logged-group" style="display:none;">
-                            <label>Concluindo como</label>
-                            <div class="form-logged-user">
-                                <i class="fas fa-user-circle"></i>
-                                <span id="form-logged-user-name">—</span>
+                        <div class="form-fields">
+                            <!-- Estágios: nome digitado livremente, sem exigir conta -->
+                            <div id="form-name-free-group">
+                                <label for="name">Nome</label>
+                                <select id="name">
+                                    <option value="">Selecione seu nome</option>
+                                </select>
+                                <label for="email">Email</label>
+                                <input type="email" id="email" placeholder="seu@email.com">
                             </div>
-                        </div>
 
-                        <div class="rating-container" id="rating-container" style="display:none;">
-                            <label>Avalie o Curso</label>
-                            <div class="star-rating">
-                                <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 estrelas">★</label>
-                                <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 estrelas">★</label>
-                                <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 estrelas">★</label>
-                                <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 estrelas">★</label>
-                                <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 estrela">★</label>
+                            <!-- Treinamentos/Educação Continuada: identidade vem da sessão logada -->
+                            <div id="form-name-logged-group" style="display:none;">
+                                <label>Concluindo como</label>
+                                <div class="form-logged-user">
+                                    <i class="fas fa-user-circle"></i>
+                                    <span id="form-logged-user-name">—</span>
+                                </div>
                             </div>
+
+                            <div class="rating-container" id="rating-container" style="display:none;">
+                                <label>Avalie o Curso</label>
+                                <div class="star-rating">
+                                    <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 estrelas">★</label>
+                                    <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 estrelas">★</label>
+                                    <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 estrelas">★</label>
+                                    <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 estrelas">★</label>
+                                    <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 estrela">★</label>
+                                </div>
+                            </div>
+
+                            <button type="button" class="comment-toggle-btn" id="comment-toggle-btn" style="display:none;">
+                                <i class="fas fa-comment-alt" style="margin-right:6px;"></i>Deixe um Comentário
+                            </button>
+
+                            <div class="comment-section" id="comment-section" style="display:none;">
+                                <label for="comment">Comentário</label>
+                                <textarea id="comment" placeholder="Críticas, elogios ou sugestões..."></textarea>
+                                <small class="comment-instruction">Sua opinião nos ajuda a melhorar o conteúdo.</small>
+                            </div>
+
+                            <button id="submit-form">Enviar</button>
+                            <div id="loading-spinner" class="loading-spinner"></div>
                         </div>
-
-                        <button type="button" class="comment-toggle-btn" id="comment-toggle-btn" style="display:none;">
-                            <i class="fas fa-comment-alt" style="margin-right:6px;"></i>Deixe um Comentário
-                        </button>
-
-                        <div class="comment-section" id="comment-section" style="display:none;">
-                            <label for="comment">Comentário</label>
-                            <textarea id="comment" placeholder="Críticas, elogios ou sugestões..."></textarea>
-                            <small class="comment-instruction">Sua opinião nos ajuda a melhorar o conteúdo.</small>
-                        </div>
-
-                        <button id="submit-form">Enviar</button>
-                        <div id="loading-spinner" class="loading-spinner"></div>
                     </div>
                 </div>
 
