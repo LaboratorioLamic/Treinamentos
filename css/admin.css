@@ -775,6 +775,11 @@
         }
         #cfg-root .dash-course-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         #cfg-root .dash-course-body { min-width: 0; flex: 1; }
+        #cfg-root .dash-course-subject-tag {
+            display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+            color: var(--cfg-primary); background: var(--cfg-primary-light); border-radius: 20px;
+            padding: 2px 8px; margin-bottom: 5px;
+        }
         #cfg-root .dash-course-body h3 {
             font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 4px; line-height: 1.35;
         }
@@ -815,6 +820,63 @@
         }
         #cfg-root .dash-course-audience-missing { font-size: 10.5px; color: var(--text-3); }
         #cfg-root .dash-course-audience.is-empty { color: var(--text-3); }
+
+        /* ─── Dashboard · seleção de colaborador (busca/filtros + cards) ─── */
+        #cfg-root .dashboard-picker-users { flex-wrap: wrap; max-width: none; }
+        #cfg-root .dashboard-picker-users .hfilter-row { flex-wrap: wrap; }
+
+        /* Grade de colaboradores — até 5 por linha em telas largas. */
+        #cfg-root .dash-user-grid {
+            display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px; margin-bottom: 22px;
+        }
+        @media (max-width: 1400px) { #cfg-root .dash-user-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (max-width: 1140px) { #cfg-root .dash-user-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 860px)  { #cfg-root .dash-user-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 560px)  { #cfg-root .dash-user-grid { grid-template-columns: 1fr; } }
+
+        #cfg-root .dash-user-card {
+            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+            padding: 18px 14px; background: var(--cfg-surface);
+            border: 1.5px solid var(--cfg-border); border-radius: 14px;
+            font-family: inherit; cursor: pointer;
+            transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+        }
+        #cfg-root .dash-user-card:hover {
+            transform: translateY(-2px); border-color: #c5d3e8; box-shadow: var(--cfg-shadow-sm);
+        }
+        #cfg-root .dash-user-card.is-selected {
+            border-color: var(--accent, #4f8ef7); box-shadow: 0 0 0 3px rgba(79,142,247,0.15);
+        }
+        /* Base do avatar de iniciais (mesmo critério de cor por hash usado no
+           modal de curso) — aqui fora do modal, para os cards da grade. */
+        #cfg-root .row-avatar {
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 50%; flex-shrink: 0; font-weight: 800; color: #fff;
+            background: hsl(var(--avatar-hue, 210), 65%, 52%);
+        }
+        #cfg-root .dash-user-card .row-avatar {
+            width: 48px; height: 48px; font-size: 16px;
+        }
+        #cfg-root .dash-user-card-body { min-width: 0; width: 100%; }
+        #cfg-root .dash-user-card-body h3 {
+            font-size: 13.5px; font-weight: 600; color: var(--text); margin: 0 0 6px; line-height: 1.3;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .dash-user-card-tags {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-bottom: 8px;
+        }
+        #cfg-root .dash-user-card-tag {
+            display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600;
+            color: var(--cfg-primary); background: var(--cfg-primary-light); border-radius: 20px;
+            padding: 2px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .dash-user-card-stats {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px;
+            font-size: 10.5px; color: var(--text-3); border-top: 1px dashed var(--cfg-border); padding-top: 8px;
+        }
+        #cfg-root .dash-user-card-stats span { display: inline-flex; align-items: center; gap: 4px; }
+        #cfg-root .dash-user-card-stats span.is-warn { color: var(--cfg-warning); }
 
         @media (max-width: 640px) {
             #cfg-root .dash-course-grid { grid-template-columns: 1fr; }
@@ -871,11 +933,12 @@
         }
 
         /* ─── Estrelas de avaliação (amarelas), reutilizadas em tabela/modal/cards ─── */
-        /* `direction: ltr` é obrigatório: o .star-rating do formulário de
-           satisfação (css/main.css) usa rtl para o efeito de hover com
-           radios, e a regra vazava para estas estrelas só de leitura,
-           preenchendo-as da direita para a esquerda. */
-        .star-rating { display: inline-flex; gap: 1px; letter-spacing: 0; direction: ltr; unicode-bidi: normal; }
+        /* Seletor `.star-rating:has(i)` para não colidir com o widget interativo
+           do formulário de satisfação (css/main.css), que usa <input>/<label> e
+           depende de `flex-direction: row-reverse` para o efeito de hover.
+           `direction: ltr` + `flex-direction: row` garantem que estas estrelas
+           só de leitura (elementos <i>) preencham da esquerda para a direita. */
+        .star-rating:has(i) { display: inline-flex; flex-direction: row; gap: 1px; letter-spacing: 0; direction: ltr; unicode-bidi: normal; }
         .star-rating i { font-size: 12.5px; }
         .star-rating i.is-on { color: #f5b301; text-shadow: 0 1px 1px rgba(245,179,1,0.25); }
         .star-rating i.is-off { color: #e2e5ea; }
@@ -988,20 +1051,43 @@
             .hfilter-chip-popover { width: 90vw; left: -8px; }
         }
 
-        #cfg-root .history-table-wrap { max-height: 640px; }
-        #cfg-root .history-table-wrap table { font-size: 12.5px; }
+        /* A tabela de histórico tem muitas colunas (13); em vez de rolar
+           horizontalmente ela usa layout fixo + colunas compactas para caber
+           inteira na largura do painel, com cada célula truncando o próprio
+           conteúdo (ellipsis) em vez de estourar a coluna. */
+        #cfg-root .history-table-wrap { max-height: 640px; overflow-x: auto; }
+        #cfg-root .history-table-wrap table { font-size: 11.5px; table-layout: fixed; width: 100%; }
         #cfg-root .history-table-wrap thead th {
             position: sticky; top: 0; background: var(--cfg-surface); z-index: 1;
-            cursor: pointer; user-select: none; white-space: nowrap;
+            cursor: pointer; user-select: none;
+            padding: 7px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        #cfg-root .history-table-wrap thead th i { margin-left: 5px; color: var(--text-3); font-size: 10px; }
+        #cfg-root .history-table-wrap thead th i { margin-left: 3px; color: var(--text-3); font-size: 9px; }
         #cfg-root .history-table-wrap thead th:hover { color: var(--cfg-primary); }
         #cfg-root .history-table-wrap tbody tr { cursor: pointer; }
         #cfg-root .history-table-wrap tbody tr:hover { background: var(--bg); }
+        #cfg-root .history-table-wrap td { padding: 6px; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Larguras relativas das 13 colunas (soma ~100%), na ordem de COLUMNS
+           em admin-history.js: Data/Hora, Tema, Assunto, Nome, Nota, Erros,
+           Avaliação, Prazo, Unidade, Cargo, Coment., Situação, Ações. */
+        #cfg-root .history-table-wrap col.hc-date { width: 9%; }
+        #cfg-root .history-table-wrap col.hc-subject { width: 11%; }
+        #cfg-root .history-table-wrap col.hc-theme { width: 11%; }
+        #cfg-root .history-table-wrap col.hc-name { width: 13%; }
+        #cfg-root .history-table-wrap col.hc-score { width: 6%; }
+        #cfg-root .history-table-wrap col.hc-errors { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-rating { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-deadline { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-unit { width: 9%; }
+        #cfg-root .history-table-wrap col.hc-role { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-comment { width: 4%; }
+        #cfg-root .history-table-wrap col.hc-approved { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-actions { width: 6%; }
 
         #cfg-root .history-status-pill {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
         }
         #cfg-root .history-status-pill.is-approved { background: var(--cfg-success-light); color: var(--cfg-success); }
         #cfg-root .history-status-pill.is-reproved { background: var(--cfg-danger-light); color: var(--cfg-danger); }
@@ -1009,51 +1095,56 @@
         /* ─── Células da tabela de histórico ─── */
         #cfg-root .history-table td { vertical-align: middle; }
         #cfg-root .history-table tbody tr:hover { background: #f7f9fc; }
-        #cfg-root .hist-name { font-weight: 600; color: var(--text); }
-
-        #cfg-root .hist-date { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
-        #cfg-root .hist-date > i {
-            font-size: 12px; color: var(--cfg-primary);
-            background: var(--cfg-primary-light); border-radius: 8px; padding: 6px;
+        #cfg-root .hist-name {
+            font-weight: 600; color: var(--text);
+            display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        #cfg-root .hist-date-text { display: inline-flex; flex-direction: column; line-height: 1.25; }
-        #cfg-root .hist-date-text strong { font-size: 12px; font-weight: 700; color: var(--text); }
-        #cfg-root .hist-date-text small { font-size: 10.5px; color: var(--text-3); font-weight: 600; }
+
+        #cfg-root .hist-date { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        #cfg-root .hist-date > i {
+            font-size: 11px; color: var(--cfg-primary);
+            background: var(--cfg-primary-light); border-radius: 7px; padding: 5px;
+        }
+        #cfg-root .hist-date-text { display: inline-flex; flex-direction: column; line-height: 1.2; }
+        #cfg-root .hist-date-text strong { font-size: 11px; font-weight: 700; color: var(--text); }
+        #cfg-root .hist-date-text small { font-size: 10px; color: var(--text-3); font-weight: 600; }
 
         /* Pílulas coloridas por conteúdo (matiz derivada do texto no JS) */
         #cfg-root .hist-tag {
-            display: inline-flex; align-items: center; gap: 5px; max-width: 190px;
-            padding: 5px 10px; border-radius: 999px;
-            font-size: 11.5px; font-weight: 600; line-height: 1.35;
+            display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+            padding: 4px 8px; border-radius: 999px; box-sizing: border-box;
+            font-size: 10.5px; font-weight: 600; line-height: 1.3;
             background: hsl(var(--tag-hue, 220) 70% 96%);
             color: hsl(var(--tag-hue, 220) 45% 34%);
             border: 1px solid hsl(var(--tag-hue, 220) 60% 88%);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        #cfg-root .hist-tag-emoji { font-size: 11.5px; line-height: 1; flex-shrink: 0; }
-        #cfg-root .hist-tag-unit, #cfg-root .hist-tag-role { max-width: 170px; }
+        #cfg-root .hist-tag-emoji { font-size: 10.5px; line-height: 1; flex-shrink: 0; }
+        #cfg-root .hist-tag-unit, #cfg-root .hist-tag-role { max-width: 100%; }
 
         #cfg-root .hist-score {
             display: inline-flex; align-items: baseline; gap: 1px;
-            padding: 5px 10px; border-radius: 10px; font-variant-numeric: tabular-nums;
+            padding: 4px 7px; border-radius: 9px; font-variant-numeric: tabular-nums;
+            white-space: nowrap;
         }
-        #cfg-root .hist-score b { font-size: 13px; font-weight: 800; }
-        #cfg-root .hist-score small { font-size: 10px; font-weight: 700; opacity: 0.65; }
+        #cfg-root .hist-score b { font-size: 12px; font-weight: 800; }
+        #cfg-root .hist-score small { font-size: 9px; font-weight: 700; opacity: 0.65; }
         #cfg-root .hist-score.is-high { background: var(--cfg-success-light); color: var(--cfg-success); }
         #cfg-root .hist-score.is-mid { background: #fef3c7; color: #b45309; }
         #cfg-root .hist-score.is-low { background: var(--cfg-danger-light); color: var(--cfg-danger); }
 
         #cfg-root .hist-errors {
-            display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
-            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+            padding: 4px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis;
         }
         #cfg-root .hist-errors.is-none { background: var(--cfg-success-light); color: var(--cfg-success); }
         #cfg-root .hist-errors.is-some { background: #fef2f2; color: #b91c1c; }
 
         #cfg-root .hist-comment-btn {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 28px; height: 28px; border-radius: 9px; border: 1px solid transparent;
-            font-size: 12.5px; background: transparent; cursor: default; padding: 0;
+            width: 24px; height: 24px; border-radius: 8px; border: 1px solid transparent;
+            font-size: 11px; background: transparent; cursor: default; padding: 0;
         }
         #cfg-root .hist-comment-btn.is-off { color: #cbd5e1; }
         #cfg-root .hist-comment-btn.is-on {
@@ -1065,12 +1156,12 @@
             transform: translateY(-1px); box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.6);
         }
 
-        #cfg-root .hist-actions { display: inline-flex; gap: 5px; }
+        #cfg-root .hist-actions { display: inline-flex; gap: 4px; }
         #cfg-root .hist-act-btn {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 28px; height: 28px; padding: 0; border-radius: 9px;
+            width: 24px; height: 24px; padding: 0; border-radius: 8px;
             border: 1px solid var(--cfg-border); background: var(--cfg-surface);
-            color: var(--text-3); font-size: 11.5px; cursor: pointer;
+            color: var(--text-3); font-size: 10.5px; cursor: pointer;
             transition: color 0.14s, border-color 0.14s, background 0.14s;
         }
         #cfg-root .hist-act-btn:hover { color: var(--cfg-primary); border-color: var(--cfg-primary); background: var(--cfg-primary-light); }
@@ -1078,11 +1169,17 @@
 
         /* Registro de atraso (congelado no envio, não recalculado depois) */
         .history-deadline-pill {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+            padding: 4px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-sizing: border-box;
         }
         .history-deadline-pill.is-late { background: #fef3c7; color: #92400e; }
         .history-deadline-pill.is-forgiven { background: var(--bg); color: var(--text-2); border: 1px solid var(--cfg-border); }
+
+        /* Coluna de avaliação e situação, mais compactas */
+        #cfg-root .history-table-wrap .star-rating { white-space: nowrap; }
+        #cfg-root .history-table-wrap .star-rating i { font-size: 11px; }
+        #cfg-root .history-status-pill { white-space: nowrap; }
 
         /* Modal de detalhe */
         #cfg-history-detail-modal { z-index: 2650; }
@@ -1779,67 +1876,245 @@
         #cfg-wipe-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* === MODAL: DASHBOARD > CURSO (Informações / Gráficos + Resetar) === */
-        #cfg-dash-course-modal .dash-course-modal-content { max-width: 760px; max-height: 88vh; display: flex; flex-direction: column; }
-        #cfg-dash-course-modal .modal-body.dash-course-modal-body { overflow-y: auto; flex: 1; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-content { max-width: 1100px; width: 92vw; max-height: 88vh; display: flex; flex-direction: column; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .modal-body.dash-course-modal-body { overflow-y: auto; flex: 1; }
 
-        #cfg-dash-course-modal .dash-course-modal-tabs {
-            display: flex; gap: 4px; padding: 0 24px 14px; border-bottom: 1px solid var(--cfg-border);
+        /* --- Hero: thumb + título + resumo rápido --- */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero {
+            display: flex; align-items: center; gap: 16px; padding: 20px 24px;
+            background: linear-gradient(135deg, var(--cfg-primary-light), transparent 70%);
+            border-bottom: 1px solid var(--cfg-border); position: relative;
         }
-        #cfg-dash-course-modal .dash-course-modal-tabs .tab-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-thumb {
+            width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
+            color: #fff; font-weight: 700; font-size: 16px;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.28);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-info { flex: 1; min-width: 0; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-info h2 {
+            font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 6px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat {
+            display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 700; background: var(--cfg-surface); color: var(--text-2);
+            border: 1px solid var(--cfg-border);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat i { font-size: 11px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat.is-ok { color: var(--cfg-success); border-color: var(--cfg-success-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat.is-warn { color: var(--cfg-warning); border-color: var(--cfg-warning-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero .close { position: static; flex-shrink: 0; }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs {
+            display: flex; gap: 4px; padding: 12px 24px 14px; border-bottom: 1px solid var(--cfg-border);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn {
+            display: inline-flex; align-items: center; gap: 7px;
             padding: 8px 16px; border: none; background: transparent; border-radius: 8px;
             font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer;
             transition: background 0.15s, color 0.15s;
         }
-        #cfg-dash-course-modal .dash-course-modal-tabs .tab-btn:hover { background: var(--bg); color: var(--text-2); }
-        #cfg-dash-course-modal .dash-course-modal-tabs .tab-btn.active { background: var(--cfg-primary-light); color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn:hover { background: var(--bg); color: var(--text-2); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn.active { background: var(--cfg-primary-light); color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .tab-count {
+            display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+            padding: 0 5px; border-radius: 999px; background: var(--cfg-border); color: var(--text-2);
+            font-size: 10.5px; font-weight: 700; transition: background 0.15s, color 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .tab-btn.active .tab-count { background: var(--cfg-primary); color: #fff; }
 
-        #cfg-dash-course-modal .dash-course-modal-body .tab-content { display: none; }
-        #cfg-dash-course-modal .dash-course-modal-body .tab-content.active {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-body .tab-content { display: none; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-body .tab-content.active {
             display: flex; flex-direction: column; gap: 18px; animation: fadeSlide 0.22s ease;
         }
 
-        #cfg-dash-course-modal .panel-card {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-card {
             background: var(--cfg-surface); border: 1px solid var(--cfg-border);
             border-radius: var(--r-lg); box-shadow: var(--cfg-shadow-sm); overflow: hidden;
         }
-        #cfg-dash-course-modal .panel-header {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header {
             padding: 16px 20px 14px; border-bottom: 1px solid var(--cfg-border);
             display: flex; align-items: center; gap: 11px;
         }
-        #cfg-dash-course-modal .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
-        #cfg-dash-course-modal .panel-body { padding: 18px 20px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-body { padding: 18px 20px; }
 
-        #cfg-dash-course-modal .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-        #cfg-dash-course-modal .dashboard-chart-card .panel-body { height: 260px; display: flex; align-items: center; justify-content: center; }
-        #cfg-dash-course-modal .dashboard-chart-card canvas { max-height: 100%; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .panel-body { height: 260px; display: flex; align-items: center; justify-content: center; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card canvas { max-height: 100%; }
         @media (max-width: 900px) {
-            #cfg-dash-course-modal .dashboard-chart-row { grid-template-columns: 1fr; }
+            :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { grid-template-columns: 1fr; }
         }
 
-        #cfg-dash-course-modal .dashboard-table-wrap { overflow-x: auto; }
-        #cfg-dash-course-modal .dashboard-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        #cfg-dash-course-modal .dashboard-table-wrap th {
-            text-align: left; padding: 8px 10px; color: var(--text-2);
-            font-weight: 600; border-bottom: 1.5px solid var(--cfg-border); white-space: nowrap;
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; border-radius: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) #cfg-dash-course-comments.dashboard-table-wrap { max-height: none; overflow-y: visible; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th {
+            text-align: left; padding: 9px 10px; color: var(--text-2);
+            font-weight: 700; border-bottom: 1.5px solid var(--cfg-border); white-space: nowrap;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;
         }
-        #cfg-dash-course-modal .dashboard-table-wrap td {
-            padding: 8px 10px; border-bottom: 1px solid var(--cfg-border); color: var(--text); vertical-align: top;
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap table.is-sticky thead th {
+            position: sticky; top: 0; background: var(--cfg-surface); z-index: 1;
         }
-        #cfg-dash-course-modal .dashboard-table-wrap tr:last-child td { border-bottom: none; }
-        #cfg-dash-course-modal .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap td {
+            padding: 10px 10px; border-bottom: 1px solid var(--cfg-border); color: var(--text); vertical-align: middle;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tr:last-child td { border-bottom: none; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr {
+            transition: background 0.12s;
+            animation: rowFadeIn 0.25s ease backwards;
+            animation-delay: calc(var(--row-i, 0) * 0.025s);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:nth-child(even) { background: var(--bg); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:hover { background: var(--cfg-primary-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
+        @keyframes rowFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
-        #cfg-dash-course-modal .dash-course-modal-footer {
+        /* Avatar com iniciais coloridas, mesmo critério de cor por hash usado
+           nos cards de curso — identidade visual consistente sem foto. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .row-name { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .row-avatar {
+            width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 800; color: #fff;
+            background: hsl(var(--avatar-hue, 210), 65%, 52%);
+        }
+
+        /* Estado vazio ilustrado (ícone grande + texto), usado nas tabelas
+           de Concluídos e Faltantes. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 8px; padding: 34px 10px; color: var(--text-3); text-align: center;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state i { font-size: 26px; opacity: 0.5; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state p { font-size: 12.5px; }
+
+        /* Badge de prazo com cor por status */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill {
+            display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+            font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-good { background: var(--cfg-success-light); color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-mid { background: var(--cfg-warning-light); color: var(--cfg-warning); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-neutral { background: var(--cfg-border); color: var(--text-2); }
+
+        /* Busca rápida no cabeçalho dos painéis */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search {
+            display: flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px;
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+            font-size: 12px; color: var(--text-3); margin-left: auto; transition: border-color 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search:focus-within { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search i { font-size: 11px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search input {
+            border: none; outline: none; background: transparent; font-size: 12px; color: var(--text);
+            width: 130px; font-family: inherit;
+        }
+
+        /* --- Comentários: cards em vez de tabela crua, com estrelas douradas --- */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-cards { display: flex; flex-direction: column; gap: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card {
+            border: 1px solid var(--cfg-border); border-radius: var(--r-md, 10px);
+            background: var(--bg); padding: 12px 14px; transition: box-shadow 0.15s, border-color 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card:hover { border-color: var(--cfg-primary-light); box-shadow: var(--cfg-shadow-sm); }
+        /* Borda lateral colorida pela nota: leitura rápida em fila de comentários. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card { border-left: 3px solid var(--cfg-border); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-high { border-left-color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-mid { border-left-color: var(--cfg-warning); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-low { border-left-color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name {
+            font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name i { color: var(--cfg-primary); font-size: 14px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text {
+            font-size: 12.5px; color: var(--text-2); line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            cursor: pointer;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text.is-expanded { -webkit-line-clamp: unset; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-more {
+            font-size: 11px; font-weight: 700; color: var(--cfg-primary); cursor: pointer; margin-top: 4px; display: inline-block;
+        }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars { display: inline-flex; gap: 2px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i {
+            font-size: 12px; color: #e2c88a;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i.is-filled {
+            background: linear-gradient(180deg, #ffd76a, #f5a623);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 0.5px 0.5px rgba(191, 130, 8, 0.4));
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i.is-empty { color: var(--cfg-border); }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-comments-pagination {
+            display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 14px; margin-top: 4px;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--cfg-border);
+            background: var(--cfg-surface); color: var(--text-2); cursor: pointer; font-size: 12px;
+            display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn:hover:not(:disabled) {
+            border-color: var(--cfg-primary); color: var(--cfg-primary); background: var(--cfg-primary-light);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn:disabled { opacity: 0.35; cursor: default; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-info { font-size: 12px; font-weight: 600; color: var(--text-3); }
+
+        /* --- Aba Conclusões --- */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header { justify-content: space-between; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation {
+            display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 700; white-space: nowrap;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar {
+            flex: 1; height: 7px; border-radius: 999px; background: var(--cfg-border); overflow: hidden;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span {
+            display: block; height: 100%; border-radius: 999px;
+            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        /* Faixas de cor: vermelho/laranja no início, âmbar no meio, verde perto de concluir. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-low { background: linear-gradient(90deg, #ef4444, #f87171); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-mid { background: linear-gradient(90deg, var(--cfg-warning), #fbbf24); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-high { background: linear-gradient(90deg, #22c55e, var(--cfg-success)); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-pct { font-size: 11.5px; font-weight: 700; color: var(--text-2); width: 34px; text-align: right; }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-copy-missing-btn {
+            display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+            border: 1.5px solid var(--cfg-primary-light); background: var(--cfg-primary-light); color: var(--cfg-primary);
+            font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-copy-missing-btn:hover { background: var(--cfg-primary); color: #fff; transform: translateY(-1px); }
+
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-footer {
             padding: 16px 24px 22px; border-top: 1px solid var(--cfg-border);
             display: flex; justify-content: flex-end;
         }
-        #cfg-dash-course-modal .dash-course-reset-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-reset-btn {
             display: inline-flex; align-items: center; gap: 8px;
             padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--cfg-danger-light);
             background: var(--cfg-danger-light); color: var(--cfg-danger);
             font-size: 13px; font-weight: 700; cursor: pointer;
             transition: background 0.15s, transform 0.15s;
         }
-        #cfg-dash-course-modal .dash-course-reset-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-reset-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); }
 
         /* === MODAL DE CONFIRMACAO === */
         /* Compartilhado entre #cfg-confirm-modal e #cfg-reset-password-modal
@@ -1993,14 +2268,62 @@
         }
         #cfg-history-import-modal .confirm-ok:hover { filter: brightness(1.07); }
 
-        /* Barra da aba Usuários: busca + botão de criar conta. */
+        /* Barra da aba Usuários: só o botão de criar conta agora — busca e
+           filtros vivem juntos na linha de chips (hfilter-row) abaixo. */
         #cfg-root .users-toolbar {
-            display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+            display: flex; align-items: center; justify-content: flex-end;
+            gap: 10px; margin-bottom: 14px;
         }
-        #cfg-root .users-toolbar .gallery-search { flex: 1; margin-bottom: 0; }
-        /* Linha de chips de filtro (unidade/função) logo abaixo da busca. */
         #cfg-root #cfg-users-filter-row { margin-bottom: 14px; }
         #cfg-root .users-toolbar .btn { flex-shrink: 0; white-space: nowrap; }
+
+        /* Botão de busca (lupa) que abre popover com o campo de texto —
+           mesmo padrão visual dos chips de filtro, só que redondo e sem label. */
+        #cfg-root .hfilter-search-chip { position: relative; }
+        #cfg-root .hfilter-search-btn {
+            width: 36px; height: 36px; padding: 0; justify-content: center;
+            border-radius: 50%; font-size: 13px; color: var(--text-2);
+        }
+        #cfg-root .hfilter-search-chip.is-active .hfilter-search-btn,
+        #cfg-root .hfilter-search-chip.is-open .hfilter-search-btn {
+            background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
+        }
+        #cfg-root .hfilter-search-popover { width: 260px; padding: 8px; }
+        #cfg-root .hfilter-search-popover .hfilter-chip-search { margin-bottom: 0; }
+
+        /* Abas de status (Ativos / Inativos / Ambos) */
+        #cfg-root .hfilter-status-tabs {
+            display: inline-flex; align-items: center; gap: 2px;
+            padding: 3px; border-radius: 999px; background: var(--bg);
+            border: 1.5px solid var(--cfg-border);
+        }
+        #cfg-root .hfilter-status-tab {
+            padding: 6px 13px; border: none; border-radius: 999px; background: none;
+            color: var(--text-2); font-size: 12.5px; font-weight: 600; font-family: inherit;
+            cursor: pointer; white-space: nowrap; transition: background 0.14s, color 0.14s;
+        }
+        #cfg-root .hfilter-status-tab:hover { color: var(--text); }
+        #cfg-root .hfilter-status-tab.is-active {
+            background: var(--cfg-surface); color: var(--cfg-primary);
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+        }
+
+        /* Toggle "Gestor" no formulário de conta */
+        #cfg-user-form-modal .user-manager-field {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; margin-bottom: 18px;
+            border: 1.5px solid var(--cfg-border); border-radius: 12px; background: var(--bg);
+        }
+        #cfg-user-form-modal .user-manager-text { display: flex; flex-direction: column; gap: 2px; }
+        #cfg-user-form-modal .user-manager-text strong { font-size: 13px; color: var(--text); }
+        #cfg-user-form-modal .user-manager-text small { font-size: 11.5px; color: var(--text-3); line-height: 1.35; }
+
+        /* Badge "Gestor" no card do usuário */
+        #cfg-root .user-manager-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
+            background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;
+        }
 
         /* Modal de criar/editar conta de aluno — campos de texto comuns, sem
            o visual de "digite SIM" do modal de confirmação. */

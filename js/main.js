@@ -4,6 +4,13 @@
         let quizStatus = {};
         let nameOptions = [];
 
+        // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
+        function formatScore(score) {
+            const n = Number(score);
+            if (!Number.isFinite(n)) return score;
+            return n.toFixed(1).replace('.', ',');
+        }
+
         // Categoria escolhida na home (index.html). Sem escolha, cai em Treinamentos.
         const CATEGORY_PATHS = {
             'Treinamentos': 'treinamentos',
@@ -156,12 +163,107 @@
             const savedAssessments = localStorage.getItem('assessmentResults');
             if (savedCompletion) Object.assign(completionStatus, JSON.parse(savedCompletion));
             if (savedAssessments) Object.assign(assessmentResults, JSON.parse(savedAssessments));
+            loadRemoteProgression();
         }
 
         function saveProgression() {
             localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
             localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
+            syncCourseProgressToCloud();
         }
+
+        // Progressão do curso (% de módulos assistidos) associada à conta do
+        // aluno logado, exceto em Estágios (fluxo sem conta, nome livre).
+        // Grava em uniadmin/progress/byUser — irmão de results/byUser/byCourse
+        // (mesmo padrão de fan-out), assim aparece tanto no Perfil quanto em
+        // Configurações > Usuários mesmo trocando de navegador/dispositivo.
+        function isProgressSyncEligible() {
+            return currentCategory !== 'Estágios' && !!window.UniAdmin?.StudentAuth?.getSession();
+        }
+
+        function progressPathFor(userId) {
+            const U = window.UniAdmin;
+            return `/${U.dbRoot}/progress/byUser/${userId}/${currentCategorySlug}`;
+        }
+
+        // Sincroniza só o curso atualmente aberto (o que acabou de mudar) —
+        // evita reescrever a árvore inteira a cada módulo concluído.
+        function syncCourseProgressToCloud() {
+            if (!isProgressSyncEligible() || !currentTrainingId || !currentThemeId) return;
+            const U = window.UniAdmin;
+            const session = U.StudentAuth.getSession();
+            const theme = trainingData[currentTrainingId]?.themes?.[currentThemeId];
+            if (!theme) return;
+            const { total, done, pct } = courseProgress(currentTrainingId, theme);
+            const approved = assessmentResults[currentTrainingId]?.[currentThemeId];
+            const record = {
+                total, done, pct,
+                approved: approved !== undefined ? approved : null,
+                updatedAt: Date.now()
+            };
+            const path = `${progressPathFor(session.userId)}/${currentTrainingId}/${currentThemeId}`;
+            U.ref(U.db, path).set(record).catch(error => {
+                console.error('Erro ao sincronizar progressão do curso:', error);
+            });
+        }
+
+        // Ao logar (ou recarregar já logado), sincroniza completionStatus/
+        // assessmentResults locais com a progressão gravada na nuvem — cobre
+        // tanto continuar o curso em outro navegador/dispositivo quanto um
+        // reset feito pelo admin (Configurações > Dashboard > Resetar curso),
+        // que apaga o registro em progress/byUser e precisa "puxar" o card do
+        // aluno de volta para 0%/sem nota, não só somar progresso.
+        function loadRemoteProgression() {
+            if (!isProgressSyncEligible()) return;
+            const U = window.UniAdmin;
+            const session = U.StudentAuth.getSession();
+            U.get(U.ref(U.db, progressPathFor(session.userId))).then(snapshot => {
+                const remote = snapshot.exists() ? (snapshot.val() || {}) : {};
+                let changed = false;
+
+                Object.keys(trainingData).forEach(subjectId => {
+                    Object.keys(trainingData[subjectId]?.themes || {}).forEach(themeId => {
+                        const theme = trainingData[subjectId].themes[themeId];
+                        const entry = remote[subjectId]?.[themeId];
+                        const localDone = (completionStatus[subjectId]?.[themeId] || []).filter(Boolean).length;
+                        const remoteDone = entry?.done || 0;
+
+                        // Reconstrói o array de booleans do tamanho certo sempre que a
+                        // progressão remota diverge da local (para mais OU para menos).
+                        if (remoteDone !== localDone) {
+                            if (!completionStatus[subjectId]) completionStatus[subjectId] = {};
+                            const arr = new Array((theme.modules || []).length).fill(false);
+                            for (let i = 0; i < Math.min(remoteDone, arr.length); i++) arr[i] = true;
+                            completionStatus[subjectId][themeId] = arr;
+                            changed = true;
+                        }
+
+                        const remoteApproved = (entry?.approved !== undefined && entry?.approved !== null) ? entry.approved : undefined;
+                        const localApproved = assessmentResults[subjectId]?.[themeId];
+                        if (remoteApproved !== localApproved) {
+                            if (remoteApproved !== undefined) {
+                                if (!assessmentResults[subjectId]) assessmentResults[subjectId] = {};
+                                assessmentResults[subjectId][themeId] = remoteApproved;
+                            } else if (assessmentResults[subjectId]) {
+                                delete assessmentResults[subjectId][themeId];
+                                if (Object.keys(assessmentResults[subjectId]).length === 0) delete assessmentResults[subjectId];
+                            }
+                            changed = true;
+                        }
+                    });
+                });
+
+                if (changed) {
+                    localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
+                    localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
+                    if (currentTrainingId && courseGallery.style.display === 'block') showCourseGallery(currentTrainingId);
+                }
+            }).catch(error => console.error('Erro ao carregar progressão da nuvem:', error));
+        }
+
+        // Login feito depois da página já carregada (modal de avaliação): traz
+        // a progressão da nuvem e atualiza os cards com o % correto.
+        document.addEventListener('uniadmin:session-updated', () => loadRemoteProgression());
 
         function resetCourseProgression() {
             if (currentTrainingId && currentThemeId) {
@@ -472,10 +574,13 @@
         // Visibilidade por função (cargo). O assunto sem `roles` aparece para
         // todos; com `roles`, só para quem está logado com uma dessas funções
         // (a função vem da conta, sincronizada da planilha via Colaboradores).
+        // Gestor (isManager na conta) ignora essa restrição e vê tudo.
         function themeVisibleForSession(theme) {
             const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
             if (roles.length === 0) return true;
-            const role = (window.UniAdmin?.StudentAuth?.getSession()?.role || '').trim();
+            const session = window.UniAdmin?.StudentAuth?.getSession();
+            if (session?.isManager) return true;
+            const role = (session?.role || '').trim();
             if (!role) return false;
             const key = window.UniAdmin.normalizeName(role);
             return roles.some(r => window.UniAdmin.normalizeName(r) === key);
@@ -546,7 +651,7 @@
                 const badge = document.createElement('span');
                 badge.className = 'course-badge-done';
                 badge.innerHTML = '<i class="fas fa-circle-check"></i>';
-                badge.title = `Aprovado com nota ${approved}`;
+                badge.title = `Aprovado com nota ${formatScore(approved)}`;
                 thumb.appendChild(badge);
             }
 
@@ -581,7 +686,7 @@
             progress.className = 'course-progress';
             progress.innerHTML = `
                 <div class="course-progress-bar"><span style="width:${pct}%"></span></div>
-                <div class="course-progress-label">${done}/${total} concluídos${approved !== undefined ? ` &bull; nota ${approved}` : ''}</div>`;
+                <div class="course-progress-label">${done}/${total} concluídos${approved !== undefined ? ` &bull; nota ${formatScore(approved)}` : ''}</div>`;
             if (pct === 100) progress.classList.add('is-complete');
             body.appendChild(progress);
 
@@ -678,6 +783,32 @@
             warningText.textContent = message;
             warningMessage.style.display = 'flex';
             setTimeout(() => { warningMessage.style.display = 'none'; }, 3000);
+        }
+
+        // Modal de confirmação para avaliação <= 4 estrelas sem comentário.
+        // Não bloqueia o envio — apenas confirma que o aluno quer publicar
+        // sem explicar o motivo da nota baixa.
+        function openLowRatingModal({ onBack, onConfirm }) {
+            const modal = document.getElementById('low-rating-modal');
+            const backBtn = document.getElementById('low-rating-back-btn');
+            const confirmBtn = document.getElementById('low-rating-confirm-btn');
+
+            const close = () => { modal.classList.remove('active'); cleanup(); };
+            const handleBack = () => { close(); onBack?.(); };
+            const handleConfirm = () => { close(); onConfirm?.(); };
+            const handleOverlayClick = (e) => { if (e.target === modal) handleBack(); };
+
+            function cleanup() {
+                backBtn.removeEventListener('click', handleBack);
+                confirmBtn.removeEventListener('click', handleConfirm);
+                modal.removeEventListener('click', handleOverlayClick);
+            }
+
+            backBtn.addEventListener('click', handleBack);
+            confirmBtn.addEventListener('click', handleConfirm);
+            modal.addEventListener('click', handleOverlayClick);
+
+            modal.classList.add('active');
         }
 
         function renderPage(pageNum) {
@@ -997,7 +1128,7 @@
 
             let correctCount = 0;
             questions.forEach((q, index) => { if (selectedAnswers[index] === q.correct) correctCount++; });
-            const score = Math.round((correctCount / questions.length) * 10);
+            const score = Math.round((correctCount / questions.length) * 100) / 10;
             const erros = getDetailedIncorrectAnswers(subjectId, themeId);
             const answerSnapshot = buildAnswerSnapshot(subjectId, themeId);
             showForm(score, erros, answerSnapshot);
@@ -1087,7 +1218,7 @@
             newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros, answerSnapshot); };
         }
 
-        function submitForm(score, erros = '', answerSnapshot = []) {
+        function submitForm(score, erros = '', answerSnapshot = [], skipLowRatingCheck = false) {
             const loadingSpinner = document.getElementById('loading-spinner');
             const submitButton = document.getElementById('submit-form');
             const ratingContainer = document.getElementById('rating-container');
@@ -1130,10 +1261,14 @@
             const commentField = document.getElementById('comment');
             const commentValue = commentField?.value.trim() || '';
             const ratingValue = parseInt(rating.value);
-            if (ratingValue <= 4 && !commentValue) {
-                showWarning('Escreva um comentário explicando sua avaliação.');
-                commentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                commentField.focus();
+            if (ratingValue <= 4 && commentValue.length <= 3 && !skipLowRatingCheck) {
+                openLowRatingModal({
+                    onBack: () => {
+                        commentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        commentField.focus();
+                    },
+                    onConfirm: () => submitForm(score, erros, answerSnapshot, true)
+                });
                 return;
             }
 
@@ -1233,7 +1368,7 @@
             const scoreCard = document.createElement('div');
             scoreCard.className = 'result-score-card';
             const h2 = document.createElement('h2');
-            h2.textContent = `${score}/10`;
+            h2.textContent = `${formatScore(score)}/10`;
             scoreCard.appendChild(h2);
             const scoreLabel = document.createElement('p');
             scoreLabel.textContent = score >= 8 ? 'Aprovado' : 'Reprovado';
@@ -1288,7 +1423,6 @@
                 }
             }
 
-            addFinalButtons();
             resultContainer.style.display = 'flex';
         }
 
@@ -1308,7 +1442,7 @@
             const scoreCard = document.createElement('div');
             scoreCard.className = 'result-score-card';
             const h2 = document.createElement('h2');
-            h2.textContent = `${score}/10`;
+            h2.textContent = `${formatScore(score)}/10`;
             scoreCard.appendChild(h2);
             const scoreLabel = document.createElement('p');
             scoreLabel.textContent = 'Aprovado';
@@ -1321,7 +1455,7 @@
             successDiv.className = 'success-message';
             successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
             resultContainer.appendChild(successDiv);
-            addFinalButtons();
+            appendCertificateButton(score);
             resultContainer.style.display = 'flex';
         }
 
@@ -1344,48 +1478,6 @@
             document.getElementById('comment-section').style.display = 'none';
         }
 
-        function addFinalButtons() {
-            let refazerBtn = document.getElementById('refazer-btn');
-            if (!refazerBtn) {
-                refazerBtn = document.createElement('button');
-                refazerBtn.id = 'refazer-btn';
-                refazerBtn.innerHTML = '<i class="fas fa-redo" style="margin-right:8px;"></i>Refazer Avaliação';
-                refazerBtn.style.cssText = `
-                    background: var(--success); color: white; padding: 11px 22px;
-                    border: none; border-radius: var(--radius); cursor: pointer;
-                    font-size: 0.9em; font-weight: 600; font-family: 'Inter', sans-serif;
-                    transition: all 0.2s; margin: 4px;
-                `;
-                refazerBtn.onmouseenter = () => { refazerBtn.style.background = 'var(--success-hover)'; refazerBtn.style.transform = 'translateY(-1px)'; };
-                refazerBtn.onmouseleave = () => { refazerBtn.style.background = 'var(--success)'; refazerBtn.style.transform = 'none'; };
-                refazerBtn.onclick = () => loadQuiz(currentTrainingId, currentThemeId);
-                resultContainer.appendChild(refazerBtn);
-            }
-
-            let resetCourseBtn = document.getElementById('reset-course-btn');
-            if (!resetCourseBtn) {
-                resetCourseBtn = document.createElement('button');
-                resetCourseBtn.id = 'reset-course-btn';
-                resetCourseBtn.innerHTML = '<i class="fas fa-rotate-left" style="margin-right:8px;"></i>Reiniciar Curso';
-                resetCourseBtn.style.cssText = `
-                    background: transparent; color: var(--danger); padding: 11px 22px;
-                    border: 1.5px solid var(--danger); border-radius: var(--radius); cursor: pointer;
-                    font-size: 0.9em; font-weight: 600; font-family: 'Inter', sans-serif;
-                    transition: all 0.2s; margin: 4px;
-                `;
-                resetCourseBtn.onmouseenter = () => { resetCourseBtn.style.background = 'var(--danger)'; resetCourseBtn.style.color = 'white'; };
-                resetCourseBtn.onmouseleave = () => { resetCourseBtn.style.background = 'transparent'; resetCourseBtn.style.color = 'var(--danger)'; };
-                resetCourseBtn.onclick = async () => {
-                    // ui.js e carregado depois deste arquivo, entao a funcao e lida no clique.
-                    const confirmed = await window.UniAdmin.showConfirm({
-                        title: 'Reiniciar curso',
-                        message: 'Todo o progresso deste curso será perdido.',
-                        icon: 'fa-rotate-left',
-                        details: ['Módulos concluídos e o resultado da avaliação voltam ao início.'],
-                        confirmText: 'Reiniciar'
-                    });
-                    if (confirmed) resetCourseProgression();
-                };
-                resultContainer.appendChild(resetCourseBtn);
-            }
-        }
+        // Refazer avaliação e reiniciar curso foram removidos deste fluxo:
+        // reiniciar é ação exclusiva do admin (reseta progresso de todos os
+        // alunos), não algo que o próprio aluno deva poder fazer sozinho.

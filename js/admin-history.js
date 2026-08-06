@@ -8,6 +8,13 @@
     const showWarning = U.showWarning;
     const normalizeName = U.normalizeName;
 
+    // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
+    function formatScore(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return score;
+        return n.toFixed(1).replace('.', ',');
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
 
     let allRows = [];
@@ -299,7 +306,7 @@
         const score = Number(r.score);
         if (!Number.isFinite(score)) return '<span class="stars-empty">—</span>';
         const cls = score >= 8 ? 'is-high' : score >= 6 ? 'is-mid' : 'is-low';
-        return `<span class="hist-score ${cls}"><b>${score}</b><small>/10</small></span>`;
+        return `<span class="hist-score ${cls}"><b>${formatScore(score)}</b><small>/10</small></span>`;
     }
 
     // Quantos erros a linha teve. Prefere o gabarito estruturado (answers[]);
@@ -353,22 +360,25 @@
         return `<span class="history-deadline-pill ${cls}"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(label)}</span>`;
     }
 
+    // `colClass` casa com as larguras definidas em css/admin.css
+    // (#cfg-root .history-table-wrap col.hc-*) — mantém as 13 colunas
+    // cabendo na largura do painel sem scroll horizontal.
     const COLUMNS = [
-        { key: 'submittedAt', label: 'Data/Hora', render: dateCellHtml },
+        { key: 'submittedAt', label: 'Data/Hora', colClass: 'hc-date', render: dateCellHtml },
         // Rótulo x campo interno propositalmente cruzados — ver bloco
         // "Nomenclatura das colunas Assunto/Tema" acima.
-        { key: 'subject', label: 'Tema', render: r => tagHtml(r.subject, 'theme') },
-        { key: 'theme', label: 'Assunto', render: r => tagHtml(r.theme, 'subject') },
-        { key: 'fullName', label: 'Nome', render: r => `<span class="hist-name">${escapeHtml(r.fullName)}</span>` },
-        { key: 'score', label: 'Nota', render: scoreHtml },
-        { key: '__errors', label: 'Erros', sortable: false, render: errorsBadge },
-        { key: 'rating', label: 'Avaliação', render: r => starsHtml(r.rating) },
-        { key: 'deadlineStatus', label: 'Prazo', render: deadlinePreview },
-        { key: 'unit', label: 'Unidade', render: r => tagHtml(r.unit, 'unit') },
-        { key: 'role', label: 'Cargo', render: r => tagHtml(r.role, 'role') },
-        { key: 'comment', label: 'Coment.', sortable: false, render: commentCellHtml },
-        { key: 'approved', label: 'Situação', render: r => `<span class="history-status-pill ${r.approved ? 'is-approved' : 'is-reproved'}">${r.approved ? 'Aprovado' : 'Reprovado'}</span>` },
-        { key: '__actions', label: 'Ações', sortable: false, render: actionsCellHtml }
+        { key: 'subject', label: 'Tema', colClass: 'hc-subject', render: r => tagHtml(r.subject, 'theme') },
+        { key: 'theme', label: 'Assunto', colClass: 'hc-theme', render: r => tagHtml(r.theme, 'subject') },
+        { key: 'fullName', label: 'Nome', colClass: 'hc-name', render: r => `<span class="hist-name">${escapeHtml(r.fullName)}</span>` },
+        { key: 'score', label: 'Nota', colClass: 'hc-score', render: scoreHtml },
+        { key: '__errors', label: 'Erros', colClass: 'hc-errors', sortable: false, render: errorsBadge },
+        { key: 'rating', label: 'Avaliação', colClass: 'hc-rating', render: r => starsHtml(r.rating) },
+        { key: 'deadlineStatus', label: 'Prazo', colClass: 'hc-deadline', render: deadlinePreview },
+        { key: 'unit', label: 'Unidade', colClass: 'hc-unit', render: r => tagHtml(r.unit, 'unit') },
+        { key: 'role', label: 'Cargo', colClass: 'hc-role', render: r => tagHtml(r.role, 'role') },
+        { key: 'comment', label: 'Coment.', colClass: 'hc-comment', sortable: false, render: commentCellHtml },
+        { key: 'approved', label: 'Situação', colClass: 'hc-approved', render: r => `<span class="history-status-pill ${r.approved ? 'is-approved' : 'is-reproved'}">${r.approved ? 'Aprovado' : 'Reprovado'}</span>` },
+        { key: '__actions', label: 'Ações', colClass: 'hc-actions', sortable: false, render: actionsCellHtml }
     ];
 
     function renderTable() {
@@ -380,6 +390,8 @@
             container.innerHTML = '<p class="dashboard-table-empty">Nenhum resultado encontrado.</p>';
             return;
         }
+
+        const colgroupHtml = `<colgroup>${COLUMNS.map(col => `<col class="${col.colClass}">`).join('')}</colgroup>`;
 
         const headerHtml = COLUMNS.map(col => {
             if (col.sortable === false) return `<th style="cursor:default;">${col.label}</th>`;
@@ -394,7 +406,7 @@
             </tr>
         `).join('');
 
-        container.innerHTML = `<table class="history-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+        container.innerHTML = `<table class="history-table">${colgroupHtml}<thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
 
         container.querySelectorAll('thead th[data-key]').forEach(th => {
             th.addEventListener('click', () => {
@@ -862,7 +874,7 @@
                     || courseIndex.get(normalizeName(`${themeRaw}|${subjectRaw}`)));
             if (!courseMatch) { skippedInvalidCourse++; invalidPairs.add(pairText); return null; }
 
-            const score = Number(get('Nota', 'nota')) || 0;
+            const score = Math.round((Number(get('Nota', 'nota')) || 0) * 10) / 10;
             const ratingRaw = Number(get('Avaliação', 'Avaliacao', 'avaliação', 'avaliacao'));
             const rating = Number.isFinite(ratingRaw) && ratingRaw >= 1 && ratingRaw <= 5 ? ratingRaw : null;
             const dateRaw = get('Data/Hora', 'Data', 'data');
@@ -1081,7 +1093,7 @@
             message: `O resultado de ${row.fullName} em "${row.theme}" será apagado.`,
             icon: 'fa-trash-can',
             details: [
-                `Enviado em ${date} — nota ${row.score}/10.`,
+                `Enviado em ${date} — nota ${formatScore(row.score)}/10.`,
                 { text: 'Não há como desfazer.', alert: true }
             ],
             confirmText: 'Excluir'
@@ -1267,8 +1279,9 @@
     });
 
     async function saveRecordForm() {
-        const score = Number(formScore.value);
+        let score = Number(formScore.value);
         if (!Number.isFinite(score) || score < 0 || score > 10) { showWarning('Informe uma nota entre 0 e 10.'); return; }
+        score = Math.round(score * 10) / 10;
 
         const parsedDate = formDate.value ? new Date(formDate.value) : null;
         if (!parsedDate || Number.isNaN(parsedDate.getTime())) { showWarning('Informe uma data/hora válida.'); return; }
@@ -1469,7 +1482,7 @@
             detailAttempts.style.display = 'flex';
             const approvedAttempts = attempts.filter(a => a.approved);
             const reprovedAttempts = attempts.filter(a => !a.approved);
-            const pillLabel = a => `${a.submittedAt ? new Date(a.submittedAt).toLocaleDateString('pt-BR') : '—'} &bull; ${a.score}/10`;
+            const pillLabel = a => `${a.submittedAt ? new Date(a.submittedAt).toLocaleDateString('pt-BR') : '—'} &bull; ${formatScore(a.score)}/10`;
 
             const attemptGroupHtml = (list, kind) => {
                 if (list.length === 0) return '';
@@ -1516,7 +1529,7 @@
         const dateLabel = row.submittedAt ? new Date(row.submittedAt).toLocaleString('pt-BR') : '—';
         detailSummary.innerHTML = `
             <div class="history-detail-summary-item"><span class="label">Categoria</span><span class="value">${escapeHtml(CATEGORY_LABELS[row.slug] || row.slug)}</span></div>
-            <div class="history-detail-summary-item"><span class="label">Nota</span><span class="value">${row.score}/10</span></div>
+            <div class="history-detail-summary-item"><span class="label">Nota</span><span class="value">${formatScore(row.score)}/10</span></div>
             <div class="history-detail-summary-item"><span class="label">Situação</span><span class="value">${row.approved ? 'Aprovado' : 'Reprovado'}</span></div>
             <div class="history-detail-summary-item"><span class="label">Data</span><span class="value">${dateLabel}</span></div>
             ${(row.deadlineStatus && row.deadlineStatus !== 'livre' && row.deadlineStatus !== 'on_time' && row.deadlineStatus !== 'not_started') ? `<div class="history-detail-summary-item"><span class="label">Prazo</span><span class="value">${escapeHtml(U.Deadlines?.STATUS_LABELS?.[row.deadlineStatus] || row.deadlineStatus)}</span></div>` : ''}

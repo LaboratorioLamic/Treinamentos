@@ -60,11 +60,13 @@
             const user = snapshot.val();
             const changed = (session.role || null) !== (user.role || null)
                 || (session.unit || null) !== (user.unit || null)
+                || (session.isManager || false) !== (user.isManager || false)
                 || session.fullName !== user.fullName;
             const merged = updateSession({
                 fullName: user.fullName || session.fullName,
                 unit: user.unit || null,
-                role: user.role || null
+                role: user.role || null,
+                isManager: !!user.isManager
             });
             if (changed) document.dispatchEvent(new CustomEvent('uniadmin:session-updated'));
             return merged;
@@ -74,6 +76,43 @@
     }
 
     U.StudentAuth = { getSession, clearSession, refreshSession };
+
+    // ─── Progressão do curso (% de módulos assistidos) ───
+    // Gravada por js/main.js em uniadmin/progress/byUser/{userId}/{slug}/{subjectId}/{themeId}
+    // (irmã de results/byUser e results/byCourse). Lida aqui para o Perfil do
+    // aluno (js/student-profile.js) e para Configurações > Usuários
+    // (js/admin-users.js) mostrarem o mesmo dado sem duplicar a leitura.
+    const PROGRESS_PATH = `/${dbRoot}/progress/byUser`;
+
+    async function getCourseProgressForUser(userId) {
+        if (!userId) return [];
+        try {
+            const snapshot = await get(ref(db, `${PROGRESS_PATH}/${userId}`));
+            if (!snapshot.exists()) return [];
+            const bySlug = snapshot.val() || {};
+            const rows = [];
+            Object.keys(bySlug).forEach(slug => {
+                Object.keys(bySlug[slug] || {}).forEach(subjectId => {
+                    Object.keys(bySlug[slug][subjectId] || {}).forEach(themeId => {
+                        const entry = bySlug[slug][subjectId][themeId] || {};
+                        rows.push({
+                            slug, subjectId, themeId,
+                            total: entry.total || 0,
+                            done: entry.done || 0,
+                            pct: entry.pct || 0,
+                            approved: entry.approved ?? null,
+                            updatedAt: entry.updatedAt || null
+                        });
+                    });
+                });
+            });
+            return rows;
+        } catch (error) {
+            console.error('Erro ao carregar progressão de cursos:', error);
+            return [];
+        }
+    }
+    U.StudentAuth.getCourseProgressForUser = getCourseProgressForUser;
 
     // ─── Dados de colaboradores ───
     // Sincronização com a planilha do Google Sheets (fonte oficial e
@@ -205,7 +244,7 @@
 
         setSession({
             userId: user.userId, fullName: user.fullName, username: user.username,
-            unit: user.unit || null, role: user.role || null,
+            unit: user.unit || null, role: user.role || null, isManager: !!user.isManager,
             loggedInAt: Date.now()
         });
         document.dispatchEvent(new CustomEvent('uniadmin:session-updated'));

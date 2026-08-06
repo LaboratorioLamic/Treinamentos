@@ -8,6 +8,13 @@
     const normalizeName = U.normalizeName;
     const { randomSalt, hashWithSalt } = U.crypto;
 
+    // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
+    function formatScore(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return score;
+        return n.toFixed(1).replace('.', ',');
+    }
+
     const USERS_PATH = `/${dbRoot}/users`;
     const COLABS_PATH = `/${dbRoot}/colaboradores`;
 
@@ -83,9 +90,11 @@
             + (approvedCounts.byNameKey.get(normalizeName(user.fullName)) || 0);
     }
 
-    // Filtros da barra: unidade e função, cada um com seu popover. Vazio =
-    // todos; combinam com a busca por nome/login.
-    const listFilters = { unit: '', role: '' };
+    // Filtros da barra: unidade, função e status, cada um com seu popover/aba.
+    // unit/role vazios = todos; status default = só contas ativas (mesmo
+    // comportamento de antes, quando não havia esse filtro). Combinam com a
+    // busca por nome/login.
+    const listFilters = { unit: '', role: '', status: 'active' };
 
     function renderList(filterTerm = '') {
         const container = document.getElementById('cfg-users-container');
@@ -97,6 +106,11 @@
             .filter(u => !term || normalizeName(u.fullName).includes(term) || (u.username || '').includes(term))
             .filter(u => !listFilters.unit || (u.unit || '') === listFilters.unit)
             .filter(u => !listFilters.role || (u.role || '') === listFilters.role)
+            .filter(u => {
+                if (listFilters.status === 'active') return !u.disabled;
+                if (listFilters.status === 'inactive') return !!u.disabled;
+                return true; // 'all'
+            })
             .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'));
 
         if (entries.length === 0) {
@@ -117,6 +131,7 @@
                     <div class="theme-card-title">
                         <h3>${escapeHtml(u.fullName)}</h3>
                         ${u.disabled ? '<span class="user-status-badge">Desativado</span>' : ''}
+                        ${u.isManager ? '<span class="user-manager-badge"><i class="fas fa-user-shield"></i> Gestor</span>' : ''}
                         <p class="card-desc">
                             <span><i class="fas fa-at"></i> ${escapeHtml(u.username || '—')}</span>
                             <span class="user-card-metric" data-user-metric="${escapeHtml(u.userId)}"><i class="fas fa-circle-check"></i> ${approvedCount === null ? '…' : `${approvedCount} curso(s)`}</span>
@@ -216,6 +231,17 @@
 
     document.getElementById('cfg-users-filter')?.addEventListener('input', (event) => {
         renderList(event.target.value);
+        usersFilterRow?.querySelector('.hfilter-search-chip')?.classList.toggle('is-active', !!event.target.value);
+    });
+
+    // ─── Abas de status (Ativos / Inativos / Ambos) ───
+    const usersStatusTabs = document.getElementById('cfg-users-status-tabs');
+    usersStatusTabs?.querySelectorAll('.hfilter-status-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            listFilters.status = tab.dataset.status;
+            usersStatusTabs.querySelectorAll('.hfilter-status-tab').forEach(t => t.classList.toggle('is-active', t === tab));
+            renderList(currentFilterTerm());
+        });
     });
 
     // ─── Chips de filtro (unidade / função) ───
@@ -241,6 +267,10 @@
             label.textContent = listFilters[field] || label.dataset.default;
             chip.classList.toggle('is-active', !!listFilters[field]);
         });
+        // Botão de busca: fica marcado como "ativo" quando há termo digitado,
+        // mesmo tratamento visual dos demais chips.
+        const searchChip = usersFilterRow?.querySelector('.hfilter-search-chip');
+        searchChip?.classList.toggle('is-active', !!currentFilterTerm());
         if (usersFilterClear) {
             usersFilterClear.style.display = (listFilters.unit || listFilters.role) ? 'inline-flex' : 'none';
         }
@@ -271,6 +301,7 @@
 
     usersFilterRow?.querySelectorAll('.hfilter-chip').forEach(chip => {
         const field = chip.dataset.field;
+        const isSearchChip = field === 'search';
         const btn = chip.querySelector('.hfilter-chip-btn');
         const search = chip.querySelector('.hfilter-chip-search');
 
@@ -280,12 +311,15 @@
             closeUsersPopovers();
             if (isOpen) return;
             chip.classList.add('is-open');
+            // O chip de busca reabre com o termo já digitado (não é uma lista
+            // de opções para filtrar/zerar como unidade/função).
+            if (isSearchChip) { search?.focus(); return; }
             if (search) { search.value = ''; }
             renderUsersFilterList(field, '');
             search?.focus();
         });
         chip.addEventListener('click', (event) => event.stopPropagation());
-        search?.addEventListener('input', () => renderUsersFilterList(field, search.value));
+        if (!isSearchChip) search?.addEventListener('input', () => renderUsersFilterList(field, search.value));
     });
     document.addEventListener('click', closeUsersPopovers);
 
@@ -319,7 +353,42 @@
     const userHistoryModal = document.getElementById('cfg-user-history-modal');
     const userHistoryTitle = document.getElementById('cfg-user-history-title');
     const userHistorySummary = document.getElementById('cfg-user-history-summary');
+    const userHistoryProgressBlock = document.getElementById('cfg-user-history-progress');
+    const userHistoryProgressList = document.getElementById('cfg-user-history-progress-list');
     const userHistoryTableWrap = document.getElementById('cfg-user-history-table-wrap');
+
+    // % de módulos assistidos por curso (progress/byUser, gravado por
+    // js/main.js) — mesmo dado exibido no Perfil do próprio aluno
+    // (js/student-profile.js), aqui do lado do admin.
+    function renderUserProgress(progressRows, courseIndex) {
+        if (!userHistoryProgressBlock || !userHistoryProgressList) return;
+        const courseByIds = new Map();
+        courseIndex.forEach(course => courseByIds.set(`${course.slug}|${course.subjectId}|${course.themeId}`, course));
+
+        const withCourse = progressRows
+            .map(p => ({ ...p, course: courseByIds.get(`${p.slug}|${p.subjectId}|${p.themeId}`) }))
+            .filter(p => p.course && p.total > 0)
+            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        if (withCourse.length === 0) {
+            userHistoryProgressBlock.style.display = 'none';
+            userHistoryProgressList.innerHTML = '';
+            return;
+        }
+
+        userHistoryProgressBlock.style.display = 'block';
+        userHistoryProgressList.innerHTML = withCourse.map(p => {
+            const isComplete = p.pct >= 100;
+            return `
+                <div class="student-progress-item ${isComplete ? 'is-complete' : ''}">
+                    <div class="student-progress-item-head">
+                        <span class="student-progress-item-name" title="${escapeHtml(p.course.theme)}">${escapeHtml(p.course.theme)}</span>
+                        <span class="student-progress-item-pct">${p.pct}%</span>
+                    </div>
+                    <div class="student-progress-bar"><span style="width:${p.pct}%"></span></div>
+                </div>`;
+        }).join('');
+    }
     const userHistoryClose = document.getElementById('cfg-user-history-close');
 
     function courseCardThumbHtml(course, name) {
@@ -380,15 +449,22 @@
 
         userHistoryTitle.textContent = `Histórico — ${user.fullName}`;
         userHistorySummary.innerHTML = '';
+        if (userHistoryProgressBlock) userHistoryProgressBlock.style.display = 'none';
+        if (userHistoryProgressList) userHistoryProgressList.innerHTML = '';
         userHistoryTableWrap.innerHTML = '<p class="dashboard-table-empty">Carregando...</p>';
         userHistoryModal.style.display = 'flex';
 
         showSpinner(true);
         try {
-            const [historyRows, courseIndex] = await Promise.all([U.getHistoryRows(), U.getCourseIndex()]);
+            const [historyRows, courseIndex, progressRows] = await Promise.all([
+                U.getHistoryRows(),
+                U.getCourseIndex(),
+                U.StudentAuth.getCourseProgressForUser(userId)
+            ]);
             historyRowsCache = historyRows;
             buildApprovedCounts();
             const rows = historyRowsForUser(user);
+            renderUserProgress(progressRows, courseIndex);
 
             const approvedCount = rows.filter(r => r.approved).length;
             const { unit, role } = unitRoleOf(user);
@@ -428,7 +504,7 @@
                         ${course?.description ? `<p class="user-course-desc">${escapeHtml(course.description)}</p>` : ''}
                         <div class="user-course-stats">
                             ${rating ? U.starsHtml(rating) : '<span class="user-course-no-rating">Sem avaliação</span>'}
-                            <span class="user-course-score">${latest.score}/10</span>
+                            <span class="user-course-score">${formatScore(latest.score)}/10</span>
                         </div>
                         <div class="user-course-foot">
                             <span class="history-status-pill is-approved">Aprovado</span>
@@ -455,7 +531,7 @@
                                 return `
                                 <div class="hfilter-chip-item user-reproved-item" data-reproved-index="${i}">
                                     <strong>${escapeHtml(latest.theme)}</strong>
-                                    <small>${escapeHtml(latest.subject)} · ${formatDate(latest.submittedAt)} · ${latest.score}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                                    <small>${escapeHtml(latest.subject)} · ${formatDate(latest.submittedAt)} · ${formatScore(latest.score)}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
                                 </div>`;
                             }).join('')}
                         </div>
@@ -537,6 +613,7 @@
     const userFormPasswordHint = document.getElementById('cfg-user-form-password-hint');
     const userFormUnit = document.getElementById('cfg-user-form-unit');
     const userFormRole = document.getElementById('cfg-user-form-role');
+    const userFormManager = document.getElementById('cfg-user-form-manager');
     const userFormError = document.getElementById('cfg-user-form-error');
     const userFormOk = document.getElementById('cfg-user-form-ok');
     const userFormCancel = document.getElementById('cfg-user-form-cancel');
@@ -762,6 +839,7 @@
         userFormPassword2.value = '';
         userFormUnit.value = '';
         userFormRole.value = '';
+        if (userFormManager) userFormManager.checked = false;
         renderPasswordHint();
 
         // As sugestões (nome, setor, função) saem da lista de colaboradores.
@@ -780,6 +858,7 @@
             userFormUsername.value = user.username || '';
             userFormUnit.value = user.unit || '';
             userFormRole.value = user.role || '';
+            if (userFormManager) userFormManager.checked = !!user.isManager;
             userFormOk.textContent = 'Salvar';
         } else {
             userFormTitle.textContent = 'Novo usuário';
@@ -795,7 +874,7 @@
         setTimeout(() => (editingUserId ? userFormName : userFormColab).focus(), 60);
     }
 
-    async function createUser({ colabId, username, password, unit, role }) {
+    async function createUser({ colabId, username, password, unit, role, isManager }) {
         const colab = colabsCache[colabId];
         if (!colab?.fullName) throw new Error('Selecione um colaborador.');
 
@@ -825,6 +904,7 @@
             colaboradorId: colabId,
             unit: unit || null,
             role: role || null,
+            isManager: !!isManager,
             disabled: false,
             createdAt: Date.now()
         };
@@ -838,13 +918,14 @@
         }
     }
 
-    async function updateUser(userId, { fullName, username, unit, role }) {
+    async function updateUser(userId, { fullName, username, unit, role, isManager }) {
         await ref(db, `${USERS_PATH}/${userId}`).update({
             fullName,
             fullNameKey: normalizeName(fullName),
             username,
             unit: unit || null,
-            role: role || null
+            role: role || null,
+            isManager: !!isManager
         });
     }
 
@@ -852,6 +933,7 @@
         const username = sanitizeUsername(userFormUsername.value);
         const unit = userFormUnit.value.trim();
         const role = userFormRole.value.trim();
+        const isManager = !!userFormManager?.checked;
 
         if (!username || !USERNAME_RULE.test(username)) {
             formError('O login deve conter apenas letras minúsculas e números, sem espaços.');
@@ -868,7 +950,7 @@
             if (editingUserId) {
                 const fullName = userFormName.value.trim();
                 if (!fullName) { formError('Informe o nome completo.'); return; }
-                await updateUser(editingUserId, { fullName, username, unit, role });
+                await updateUser(editingUserId, { fullName, username, unit, role, isManager });
                 showWarning('Usuário atualizado com sucesso.');
             } else {
                 const colabId = selectedColabId;
@@ -879,7 +961,7 @@
                     return;
                 }
                 if (password !== userFormPassword2.value) { formError('As senhas não conferem.'); return; }
-                await createUser({ colabId, username, password, unit, role });
+                await createUser({ colabId, username, password, unit, role, isManager });
                 showWarning('Conta criada com sucesso.');
             }
             closeUserForm();

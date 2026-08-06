@@ -10,6 +10,13 @@
     const ref = U.ref, get = U.get, db = U.db, dbRoot = U.dbRoot;
     const normalizeName = U.normalizeName;
 
+    // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
+    function formatScore(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return score;
+        return n.toFixed(1).replace('.', ',');
+    }
+
     const modal = document.getElementById('student-profile-modal');
     if (!modal) return; // portal.html sem o modal (ainda não integrado)
 
@@ -23,6 +30,7 @@
     const infoCreatedEl = document.getElementById('student-profile-info-created');
     const infoUnitEl = document.getElementById('student-profile-info-unit');
     const infoRoleEl = document.getElementById('student-profile-info-role');
+    const progressListEl = document.getElementById('student-profile-progress-list');
 
     const CATEGORY_LABELS = {
         treinamentos: 'Treinamentos',
@@ -184,7 +192,7 @@
         const approvedCount = rows.filter(r => r.approved).length;
         const avgScore = rows.reduce((sum, r) => sum + (r.score || 0), 0) / rows.length;
         approvedCountEl.textContent = String(approvedCount);
-        avgScoreEl.textContent = avgScore.toFixed(1);
+        avgScoreEl.textContent = formatScore(avgScore);
 
         courseGroups = groupRowsByCourse(rows);
         renderGrid();
@@ -370,7 +378,7 @@
                         <p class="student-course-category">${escapeHtml(categoryLabel)} &bull; ${formatDate(r.submittedAt)}</p>
                         <div class="student-course-stats">
                             ${starsHtml(r.rating)}
-                            <span class="student-course-score is-approved">${r.score}/10</span>
+                            <span class="student-course-score is-approved">${formatScore(r.score)}/10</span>
                         </div>
                         <div class="student-course-foot">
                             <span class="student-profile-item-score is-approved" style="padding:3px 9px;font-size:0.78em;">Aprovado</span>
@@ -400,7 +408,7 @@
                             return `
                             <div class="hfilter-chip-item user-reproved-item" data-reproved-index="${i}">
                                 <strong>${escapeHtml(courseNameOf(r))}</strong>
-                                <small>${escapeHtml(r.subject || '')} · ${formatDate(r.submittedAt)} · ${r.score}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                                <small>${escapeHtml(r.subject || '')} · ${formatDate(r.submittedAt)} · ${formatScore(r.score)}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
                             </div>`;
                         }).join('')}
                     </div>
@@ -511,7 +519,7 @@
                 ${attempts.length > 1 ? (() => {
                     const approvedAttempts = attempts.filter(a => a.approved);
                     const reprovedAttempts = attempts.filter(a => !a.approved);
-                    const pillLabel = a => `${formatDate(a.submittedAt)} &bull; ${a.score}/10`;
+                    const pillLabel = a => `${formatDate(a.submittedAt)} &bull; ${formatScore(a.score)}/10`;
                     const attemptGroupHtml = (list, kind) => {
                         if (list.length === 0) return '';
                         const isReproved = kind === 'reproved';
@@ -535,7 +543,7 @@
                 })() : ''}
 
                 <div class="student-detail-stats">
-                    <div class="student-detail-stat"><span class="label">Nota</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${row.score}/10</span></div>
+                    <div class="student-detail-stat"><span class="label">Nota</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${formatScore(row.score)}/10</span></div>
                     <div class="student-detail-stat"><span class="label">Situação</span><span class="value ${row.approved ? 'is-approved' : 'is-reproved'}">${row.approved ? 'Aprovado' : 'Reprovado'}</span></div>
                     <div class="student-detail-stat"><span class="label">Tentativa</span><span class="value">${row.attempt || 1}</span></div>
                     <div class="student-detail-stat"><span class="label">Data</span><span class="value">${formatDateTime(row.submittedAt)}</span></div>
@@ -599,12 +607,60 @@
         }
     }
 
+    // Progresso (% de módulos assistidos) dos cursos em andamento — mesmo
+    // dado e mesmo layout mostrados em Configurações > Usuários, do lado do
+    // admin (js/admin-users.js). Cursos com 0% de progresso ou já 100%
+    // concluídos e sem tentativa em aberto não entram aqui: essa lista é só
+    // "em andamento".
+    function renderProgress(progressRows, courseIndex) {
+        if (!progressListEl) return;
+        const courseByIds = new Map();
+        courseIndex.forEach(course => courseByIds.set(`${course.slug}|${course.subjectId}|${course.themeId}`, course));
+
+        const withCourse = progressRows
+            .map(p => ({ ...p, course: courseByIds.get(`${p.slug}|${p.subjectId}|${p.themeId}`) }))
+            .filter(p => p.course && p.total > 0)
+            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        if (withCourse.length === 0) {
+            progressListEl.innerHTML = '<p class="form-hint">Nenhum curso em andamento no momento.</p>';
+            return;
+        }
+
+        progressListEl.innerHTML = withCourse.map(p => {
+            const isComplete = p.pct >= 100;
+            return `
+                <div class="student-progress-item ${isComplete ? 'is-complete' : ''}">
+                    <div class="student-progress-item-head">
+                        <span class="student-progress-item-name" title="${escapeHtml(p.course.theme)}">${escapeHtml(p.course.theme)}</span>
+                        <span class="student-progress-item-pct">${p.pct}%</span>
+                    </div>
+                    <div class="student-progress-bar"><span style="width:${p.pct}%"></span></div>
+                </div>`;
+        }).join('');
+    }
+
+    async function loadProgress(session) {
+        if (!progressListEl) return;
+        progressListEl.innerHTML = '<p class="form-hint">Carregando progressão...</p>';
+        try {
+            const [progressRows, courseIndex] = await Promise.all([
+                U.StudentAuth.getCourseProgressForUser(session.userId),
+                U.getCourseIndex()
+            ]);
+            renderProgress(progressRows, courseIndex);
+        } catch (error) {
+            progressListEl.innerHTML = '<p class="form-hint">Não foi possível carregar a progressão agora.</p>';
+        }
+    }
+
     async function loadProfile() {
         const session = U.StudentAuth.getSession();
         if (!session) { closeModal(); return; }
 
         nameEl.textContent = session.fullName;
         loadUserInfo(session);
+        loadProgress(session);
         renderFilterBar(false);
         listEl.classList.remove('is-detail');
         listEl.innerHTML = '<p class="form-hint">Carregando histórico...</p>';

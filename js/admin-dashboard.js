@@ -7,6 +7,21 @@
     const showWarning = U.showWarning, showConfirm = U.showConfirm;
     const normalizeName = U.normalizeName;
 
+    // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
+    function formatScore(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return score;
+        return n.toFixed(1).replace('.', ',');
+    }
+
+    // Balão colorido da nota (mesmo padrão visual do Histórico).
+    function scoreBadgeHtml(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return '—';
+        const cls = n >= 8 ? 'is-high' : n >= 6 ? 'is-mid' : 'is-low';
+        return `<span class="hist-score ${cls}"><b>${formatScore(n)}</b><small>/10</small></span>`;
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
     const CHART_COLORS = {
         accent: '#4f8ef7', success: '#10b981', danger: '#ef4444', warning: '#f59e0b',
@@ -28,6 +43,7 @@
     let historyRows = [];
     let allTrainingData = {}; // allTrainingData[slug] = trainingData
     let allQuizData = {};     // allQuizData[slug] = quizData (contagem de questões nos cards)
+    let allProgress = {};     // allProgress[userId][slug][subjectId][themeId] = { total, done, pct, updatedAt }
     const chartInstances = {};
 
     function destroyChart(key) {
@@ -44,15 +60,17 @@
     // ─── Carga inicial (uma vez por sessão do painel) ───
     async function loadBaseData() {
         const slugs = Object.keys(CATEGORY_LABELS);
-        const [usersSnap, colabsSnap, rows, ...snaps] = await Promise.all([
+        const [usersSnap, colabsSnap, progressSnap, rows, ...snaps] = await Promise.all([
             get(ref(db, `/${dbRoot}/users`)),
             get(ref(db, `/${dbRoot}/colaboradores`)),
+            get(ref(db, `/${dbRoot}/progress/byUser`)),
             U.getHistoryRows(),
             ...slugs.map(slug => get(ref(db, `/${dbRoot}/${slug}/trainingData`))),
             ...slugs.map(slug => get(ref(db, `/${dbRoot}/${slug}/quizData`)))
         ]);
         allUsers = usersSnap.exists() ? usersSnap.val() : {};
         allColaboradores = colabsSnap.exists() ? colabsSnap.val() : {};
+        allProgress = progressSnap.exists() ? progressSnap.val() : {};
         historyRows = rows;
         allTrainingData = {};
         allQuizData = {};
@@ -63,60 +81,244 @@
     }
 
     // ─── Modo: por colaborador ───
+    // Grade de cards (um por colaborador de /colaboradores, a mesma lista
+    // que alimenta Usuários), com busca + filtros de unidade/função no
+    // mesmo padrão dos chips usados em Usuários/Histórico. Clicar num card
+    // abre um modal com histórico + gráficos, espelhando o modal "por curso".
     const userSearchInput = document.getElementById('cfg-dash-user-search');
-    const userPopover = document.getElementById('cfg-dash-user-popover');
-    let selectedUserId = null;
+    const userCardsBox = document.getElementById('cfg-dash-user-cards');
+    const userFilterRow = document.getElementById('cfg-dash-user-filter-row');
+    const userFilterClear = document.getElementById('cfg-dash-user-filter-clear');
+    let selectedUserId = null; // colaboradorId do card/modal aberto
+    const userListFilters = { unit: '', role: '' };
+    let userSearchTerm = '';
 
-    function renderUserPopover(term) {
-        const query = normalizeName(term);
-        const matches = Object.keys(allUsers)
-            .map(userId => ({ userId, ...allUsers[userId] }))
-            .filter(u => u.fullName && (!query || normalizeName(u.fullName).includes(query)))
-            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'))
-            .slice(0, 30);
-
-        userPopover.innerHTML = '';
-        if (matches.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'student-name-popover-empty';
-            empty.textContent = 'Nenhum colaborador encontrado.';
-            userPopover.appendChild(empty);
-        } else {
-            matches.forEach(u => {
-                const item = document.createElement('div');
-                item.className = 'student-name-popover-item';
-                item.textContent = u.fullName;
-                item.onclick = () => {
-                    userSearchInput.value = u.fullName;
-                    selectedUserId = u.userId;
-                    userPopover.classList.remove('active');
-                    renderUserDashboard(u.userId);
-                };
-                userPopover.appendChild(item);
-            });
-        }
-        userPopover.classList.add('active');
-    }
-
-    userSearchInput?.addEventListener('input', () => { selectedUserId = null; renderUserPopover(userSearchInput.value); });
-    userSearchInput?.addEventListener('focus', () => renderUserPopover(userSearchInput.value));
-    document.addEventListener('click', (event) => {
-        if (userPopover && !userPopover.contains(event.target) && event.target !== userSearchInput) {
-            userPopover.classList.remove('active');
-        }
-    });
-
-    function flattenUserResults(userId) {
+    // Linhas de histórico de um colaborador — casadas pela conta
+    // (accountUserId) ou, na falta dela, pelo nome normalizado (mesmo
+    // critério de personKeysOfColaborador/personKeysOfRow usado no público
+    // dos cursos), para incluir também registros importados sem conta.
+    function flattenColaboradorResults(colab) {
+        const keys = new Set(personKeysOfColaborador(colab));
         return historyRows
-            .filter(r => r.userId === userId)
+            .filter(r => personKeysOfRow(r).some(key => keys.has(key)))
             .sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
     }
 
-    function renderUserDashboard(userId) {
-        document.getElementById('cfg-dash-empty').style.display = 'none';
-        document.getElementById('cfg-dash-user-panel').style.display = 'flex';
+    function userCardStats(colab) {
+        const rows = flattenColaboradorResults(colab);
+        const scores = rows.map(r => Number(r.score) || 0);
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+        const onTime = rows.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
+        const late = rows.length - onTime;
+        return { rows, avg, attempts: rows.length, late };
+    }
 
-        const rows = flattenUserResults(userId);
+    function userFilterOptions(field) {
+        const values = new Set();
+        Object.values(allColaboradores).forEach(c => { if (c?.[field]) values.add(String(c[field]).trim()); });
+        return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    function closeUserFilterPopovers() {
+        userFilterRow?.querySelectorAll('.hfilter-chip.is-open').forEach(chip => chip.classList.remove('is-open'));
+    }
+
+    function refreshUserFilterChips() {
+        ['unit', 'role'].forEach(field => {
+            const chip = userFilterRow?.querySelector(`.hfilter-chip[data-field="${field}"]`);
+            const label = chip?.querySelector('.hfilter-chip-label');
+            if (!label) return;
+            label.textContent = userListFilters[field] || label.dataset.default;
+            chip.classList.toggle('is-active', !!userListFilters[field]);
+        });
+        const searchChip = userFilterRow?.querySelector('.hfilter-search-chip');
+        searchChip?.classList.toggle('is-active', !!userSearchTerm);
+        if (userFilterClear) userFilterClear.style.display = (userListFilters.unit || userListFilters.role) ? 'inline-flex' : 'none';
+    }
+
+    function renderUserFilterList(field, searchTerm = '') {
+        const listEl = document.getElementById(`cfg-dash-user-filter-${field}-list`);
+        if (!listEl) return;
+        const term = normalizeName(searchTerm);
+        const options = userFilterOptions(field).filter(v => !term || normalizeName(v).includes(term));
+        const allLabel = field === 'unit' ? 'Todas' : 'Todas as funções';
+
+        listEl.innerHTML = options.length === 0 && term
+            ? '<div class="hfilter-chip-empty">Nada encontrado.</div>'
+            : [`<div class="hfilter-chip-item ${!userListFilters[field] ? 'is-selected' : ''}" data-value="">${allLabel}</div>`]
+                .concat(options.map(v => `<div class="hfilter-chip-item ${userListFilters[field] === v ? 'is-selected' : ''}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`))
+                .join('');
+
+        listEl.querySelectorAll('.hfilter-chip-item[data-value]').forEach(item => {
+            item.addEventListener('click', () => {
+                userListFilters[field] = item.dataset.value;
+                closeUserFilterPopovers();
+                refreshUserFilterChips();
+                renderUserCards();
+            });
+        });
+    }
+
+    userFilterRow?.querySelectorAll('.hfilter-chip').forEach(chip => {
+        const field = chip.dataset.field;
+        const isSearchChip = field === 'search';
+        const btn = chip.querySelector('.hfilter-chip-btn');
+        const search = chip.querySelector('.hfilter-chip-search');
+
+        btn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = chip.classList.contains('is-open');
+            closeUserFilterPopovers();
+            if (isOpen) return;
+            chip.classList.add('is-open');
+            if (isSearchChip) { search?.focus(); return; }
+            if (search) search.value = '';
+            renderUserFilterList(field, '');
+            search?.focus();
+        });
+        chip.addEventListener('click', (event) => event.stopPropagation());
+        if (!isSearchChip) search?.addEventListener('input', () => renderUserFilterList(field, search.value));
+    });
+    document.addEventListener('click', closeUserFilterPopovers);
+
+    userFilterClear?.addEventListener('click', () => {
+        userListFilters.unit = '';
+        userListFilters.role = '';
+        refreshUserFilterChips();
+        renderUserCards();
+    });
+
+    userSearchInput?.addEventListener('input', () => {
+        userSearchTerm = userSearchInput.value;
+        refreshUserFilterChips();
+        renderUserCards();
+    });
+
+    function buildUserCard(colabId, colab) {
+        const stats = userCardStats(colab);
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'dash-user-card';
+        if (colabId === selectedUserId) card.classList.add('is-selected');
+
+        card.innerHTML = `
+            ${avatarHtml(colab.fullName)}
+            <div class="dash-user-card-body">
+                <h3>${escapeHtml(colab.fullName)}</h3>
+                <div class="dash-user-card-tags">
+                    ${colab.role ? `<span class="dash-user-card-tag"><i class="fas fa-briefcase"></i> ${escapeHtml(colab.role)}</span>` : ''}
+                    ${colab.unit ? `<span class="dash-user-card-tag"><i class="fas fa-building"></i> ${escapeHtml(colab.unit)}</span>` : ''}
+                </div>
+                <div class="dash-user-card-stats">
+                    <span><i class="fas fa-clipboard-list"></i> ${stats.attempts} ${stats.attempts === 1 ? 'curso' : 'cursos'}</span>
+                    <span><i class="fas fa-star"></i> ${stats.avg === null ? '—' : 'Média ' + stats.avg.toFixed(1).replace('.', ',')}</span>
+                    ${stats.late > 0 ? `<span class="is-warn"><i class="fas fa-triangle-exclamation"></i> ${stats.late} ${stats.late === 1 ? 'atraso' : 'atrasos'}</span>` : ''}
+                </div>
+            </div>`;
+        card.onclick = () => {
+            selectedUserId = colabId;
+            userCardsBox.querySelectorAll('.dash-user-card').forEach(c => c.classList.remove('is-selected'));
+            card.classList.add('is-selected');
+            openUserModal(colabId, colab);
+        };
+        return card;
+    }
+
+    function renderUserCards() {
+        if (!userCardsBox) return;
+        const inUserMode = document.getElementById('cfg-dash-user-picker')?.style.display !== 'none';
+        const empty = document.getElementById('cfg-dash-empty');
+        if (!inUserMode) { userCardsBox.style.display = 'none'; return; }
+
+        const term = normalizeName(userSearchTerm);
+        const entries = Object.keys(allColaboradores)
+            .map(id => ({ id, colab: allColaboradores[id] }))
+            .filter(({ colab }) => colab?.fullName)
+            .filter(({ colab }) => !term || normalizeName(colab.fullName).includes(term))
+            .filter(({ colab }) => !userListFilters.unit || (colab.unit || '') === userListFilters.unit)
+            .filter(({ colab }) => !userListFilters.role || (colab.role || '') === userListFilters.role)
+            .sort((a, b) => a.colab.fullName.localeCompare(b.colab.fullName, 'pt-BR'));
+
+        userCardsBox.style.display = entries.length ? 'grid' : 'block';
+        if (empty) empty.style.display = 'none';
+        if (entries.length === 0) {
+            userCardsBox.innerHTML = '<p class="dashboard-table-empty">Nenhum colaborador encontrado.</p>';
+            return;
+        }
+        userCardsBox.innerHTML = '';
+        entries.forEach(({ id, colab }) => userCardsBox.appendChild(buildUserCard(id, colab)));
+    }
+
+    // ─── Modal do colaborador ───
+    const userModal = document.getElementById('cfg-dash-user-modal');
+    const userModalTitle = document.getElementById('cfg-dash-user-modal-title');
+    const userModalClose = document.getElementById('cfg-dash-user-modal-close');
+    const userHeroThumb = document.getElementById('cfg-dash-user-hero-thumb');
+    const userHeroTags = document.getElementById('cfg-dash-user-hero-tags');
+    const userHeroStats = document.getElementById('cfg-dash-user-hero-stats');
+
+    function closeUserModal() { if (userModal) userModal.style.display = 'none'; }
+
+    function openUserModal(colabId, colab) {
+        if (!userModal) return;
+        userModalTitle.textContent = colab.fullName || 'Colaborador';
+        if (userHeroThumb) userHeroThumb.textContent = themeInitials(colab.fullName);
+        if (userHeroTags) {
+            userHeroTags.innerHTML = `
+                ${colab.role ? `<span class="dash-course-subject-tag"><i class="fas fa-briefcase"></i> ${escapeHtml(colab.role)}</span>` : ''}
+                ${colab.unit ? `<span class="dash-course-subject-tag"><i class="fas fa-building"></i> ${escapeHtml(colab.unit)}</span>` : ''}`;
+        }
+
+        userModal.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === 0));
+        userModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach((tab, i) => tab.classList.toggle('active', i === 0));
+        userModal.style.display = 'flex';
+        renderUserDashboard(colab, userHeroStats);
+    }
+
+    userModal?.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            userModal.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const target = btn.dataset.dashUserTab;
+            userModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach(tab => {
+                tab.classList.toggle('active', tab.id === `cfg-dash-user-tab-${target}`);
+            });
+        });
+    });
+    userModalClose?.addEventListener('click', closeUserModal);
+    userModal?.addEventListener('click', (event) => { if (event.target === userModal) closeUserModal(); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && userModal?.style.display === 'flex') closeUserModal();
+    });
+
+    function renderUserHistoryTable(rows) {
+        const container = document.getElementById('cfg-dash-user-history');
+        const countEl = document.getElementById('cfg-dash-user-tabcount-history');
+        if (countEl) countEl.textContent = String(rows.length);
+        if (!container) return;
+        if (rows.length === 0) {
+            container.innerHTML = emptyStateHtml('fa-clipboard-list', 'Nenhum curso realizado ainda.');
+            return;
+        }
+        const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        container.innerHTML = `<table class="is-sticky">
+            <thead><tr><th>Data</th><th>Curso</th><th>Nota</th><th>Prazo</th><th>Situação</th></tr></thead>
+            <tbody>${sorted.map((r, i) => {
+                const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
+                const situationOk = !!r.approved;
+                return `<tr style="--row-i:${i}">
+                    <td>${dateLabel}</td>
+                    <td>${escapeHtml(r.theme || r.subject || '—')}</td>
+                    <td>${scoreBadgeHtml(r.score)}</td>
+                    <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
+                    <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+    }
+
+    function renderUserDashboard(colab, heroStatsEl) {
+        const rows = flattenColaboradorResults(colab);
         const labels = rows.map(r => new Date(r.submittedAt || 0).toLocaleDateString('pt-BR'));
         const scores = rows.map(r => r.score);
         const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
@@ -148,6 +350,16 @@
             data: { labels: ['Aprovação', 'Reprovação'], datasets: [{ data: [approved, reproved], backgroundColor: [CHART_COLORS.success, CHART_COLORS.danger] }] },
             options: { responsive: true, maintainAspectRatio: false }
         });
+
+        if (heroStatsEl) {
+            const avgLabel = scores.length ? avg.toFixed(1).replace('.', ',') : '—';
+            heroStatsEl.innerHTML = `
+                <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'curso realizado' : 'cursos realizados'}</span>
+                <span class="hero-stat"><i class="fas fa-star"></i> Média ${avgLabel}</span>
+                ${late > 0 ? `<span class="hero-stat is-warn"><i class="fas fa-triangle-exclamation"></i> ${late} ${late === 1 ? 'atraso' : 'atrasos'}</span>` : ''}
+            `;
+        }
+        renderUserHistoryTable(rows);
     }
 
     // ─── Modo: por curso ───
@@ -160,7 +372,8 @@
     const categoryLabel = document.getElementById('cfg-dash-category-label');
     const courseCardsBox = document.getElementById('cfg-dash-course-cards');
 
-    let selectedSubjectId = null;
+    const ALL_SUBJECTS_ID = '__all__';
+    let selectedSubjectId = ALL_SUBJECTS_ID;
     let selectedCourseKey = null;
 
     function currentSlug() {
@@ -204,6 +417,19 @@
             empty.textContent = 'Nenhum tema cadastrado nesta categoria.';
             subjectPopover.appendChild(empty);
         } else {
+            const totalThemes = subjectIds.reduce((sum, id) => sum + Object.keys(currentTrainingData()[id]?.themes || {}).length, 0);
+            const allItem = document.createElement('button');
+            allItem.type = 'button';
+            allItem.className = 'dash-theme-popover-item';
+            if (selectedSubjectId === ALL_SUBJECTS_ID) allItem.classList.add('is-selected');
+            allItem.innerHTML = `<span class="dash-theme-popover-name">Todos os temas</span>
+                <span class="dash-theme-popover-count">${totalThemes} ${totalThemes === 1 ? 'curso' : 'cursos'}</span>`;
+            allItem.onclick = () => {
+                selectSubject(ALL_SUBJECTS_ID);
+                closeSubjectPopover();
+            };
+            subjectPopover.appendChild(allItem);
+
             subjectIds.forEach(subjectId => {
                 const subject = currentTrainingData()[subjectId] || {};
                 const count = Object.keys(subject.themes || {}).length;
@@ -238,8 +464,12 @@
     function selectSubject(subjectId) {
         selectedSubjectId = subjectId;
         selectedCourseKey = null;
-        const subject = currentTrainingData()[subjectId] || {};
-        subjectLabel.textContent = subject.name || subjectId;
+        if (subjectId === ALL_SUBJECTS_ID) {
+            subjectLabel.textContent = 'Todos os temas';
+        } else {
+            const subject = currentTrainingData()[subjectId] || {};
+            subjectLabel.textContent = subject.name || subjectId;
+        }
         closeCourseModal();
         renderCourseCards();
     }
@@ -326,7 +556,7 @@
         return String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
     }
 
-    function buildCourseCard(subjectId, theme) {
+    function buildCourseCard(subjectId, theme, subjectName) {
         const slug = currentSlug();
         const courseKey = `${subjectId}_${theme.id}`;
         const stats = courseStats(subjectId, theme);
@@ -357,6 +587,7 @@
         const body = document.createElement('div');
         body.className = 'dash-course-body';
         body.innerHTML = `
+            ${subjectName ? `<span class="dash-course-subject-tag"><i class="fas fa-layer-group"></i> ${escapeHtml(subjectName)}</span>` : ''}
             <h3>${escapeHtml(theme.name || theme.id)}</h3>
             <p class="dash-course-desc${theme.description ? '' : ' is-empty'}">${escapeHtml(theme.description || 'Sem descrição cadastrada para este curso.')}</p>
             <div class="dash-course-meta">
@@ -376,7 +607,7 @@
             selectedCourseKey = courseKey;
             courseCardsBox.querySelectorAll('.dash-course-card').forEach(c => c.classList.remove('is-selected'));
             card.classList.add('is-selected');
-            openCourseModal(slug, courseKey, theme.name || theme.id);
+            openCourseModal(slug, courseKey, theme.name || theme.id, { theme, thumb: imageSrc || null });
         };
         return card;
     }
@@ -387,11 +618,29 @@
         const inCourseMode = document.getElementById('cfg-dash-course-picker')?.style.display !== 'none';
         if (!selectedSubjectId || !inCourseMode) { courseCardsBox.style.display = 'none'; return; }
 
+        const empty = document.getElementById('cfg-dash-empty');
+
+        if (selectedSubjectId === ALL_SUBJECTS_ID) {
+            const subjectIds = orderedSubjectIds();
+            const cards = [];
+            subjectIds.forEach(subjectId => {
+                const subject = currentTrainingData()[subjectId] || {};
+                orderedThemes(subjectId).forEach(theme => cards.push({ subjectId, theme, subjectName: subject.name || subjectId }));
+            });
+            courseCardsBox.style.display = cards.length ? 'grid' : 'block';
+            if (empty) empty.style.display = 'none';
+            if (cards.length === 0) {
+                courseCardsBox.innerHTML = '<p class="dashboard-table-empty">Nenhum tema cadastrado nesta categoria.</p>';
+                return;
+            }
+            cards.forEach(({ subjectId, theme, subjectName }) => courseCardsBox.appendChild(buildCourseCard(subjectId, theme, subjectName)));
+            return;
+        }
+
         const themes = orderedThemes(selectedSubjectId);
         courseCardsBox.style.display = themes.length ? 'grid' : 'block';
         // Com os cards na tela o estado vazio vira ruído: o próprio grid já diz
         // o que falta fazer (escolher um assunto).
-        const empty = document.getElementById('cfg-dash-empty');
         if (empty) empty.style.display = 'none';
         if (themes.length === 0) {
             courseCardsBox.innerHTML = '<p class="dashboard-table-empty">Nenhum assunto cadastrado neste tema.</p>';
@@ -402,9 +651,9 @@
 
     // Troca de categoria nas Configurações: o dashboard acompanha.
     document.addEventListener('uniadmin:category-changed', () => {
-        selectedSubjectId = null;
+        selectedSubjectId = ALL_SUBJECTS_ID;
         selectedCourseKey = null;
-        if (subjectLabel) subjectLabel.textContent = 'Selecione um tema';
+        if (subjectLabel) subjectLabel.textContent = 'Todos os temas';
         closeSubjectPopover();
         updateCategoryChip();
         renderCourseCards();
@@ -431,19 +680,80 @@
         return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
+    // Estrelas douradas, crescentes da esquerda para a direita (as
+    // preenchidas vêm primeiro, as vazias completam até 5).
+    function starsHtml(rating) {
+        const n = Math.max(0, Math.min(5, Number(rating) || 0));
+        let html = '<span class="comment-stars" aria-label="' + n + ' de 5 estrelas">';
+        for (let i = 1; i <= 5; i++) {
+            html += `<i class="fas fa-star ${i <= n ? 'is-filled' : 'is-empty'}"></i>`;
+        }
+        html += '</span>';
+        return html;
+    }
+
+    const COMMENTS_PAGE_SIZE = 5;
+    let commentsPage = 1;
+    let commentsRowsCache = [];
+
+    function renderCommentsPagination(totalPages) {
+        const pager = document.getElementById('cfg-dash-course-comments-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        let html = `<button type="button" class="comments-page-btn" data-page="prev" ${commentsPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>`;
+        html += `<span class="comments-page-info">Página ${commentsPage} de ${totalPages}</span>`;
+        html += `<button type="button" class="comments-page-btn" data-page="next" ${commentsPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.innerHTML = html;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                commentsPage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintCommentsPage();
+            });
+        });
+    }
+
+    function paintCommentsPage() {
+        const container = document.getElementById('cfg-dash-course-comments');
+        const rows = commentsRowsCache;
+        const totalPages = Math.max(1, Math.ceil(rows.length / COMMENTS_PAGE_SIZE));
+        commentsPage = Math.min(Math.max(1, commentsPage), totalPages);
+        const start = (commentsPage - 1) * COMMENTS_PAGE_SIZE;
+        const pageRows = rows.slice(start, start + COMMENTS_PAGE_SIZE);
+
+        container.innerHTML = `<div class="comment-cards">${pageRows.map(r => {
+            const n = Number(r.rating) || 0;
+            const ratingClass = n >= 4 ? 'rating-high' : n === 3 ? 'rating-mid' : 'rating-low';
+            return `
+            <div class="comment-card ${ratingClass}">
+                <div class="comment-card-head">
+                    <span class="comment-card-name"><i class="fas fa-user-circle"></i> ${escapeHtml(r.fullName)}</span>
+                    ${starsHtml(r.rating)}
+                </div>
+                <p class="comment-card-text">${escapeHtml(r.comment)}</p>
+                <span class="comment-card-more" data-action="toggle-comment">Ver mais</span>
+            </div>`;
+        }).join('')}</div>`;
+        container.querySelectorAll('.comment-card-more').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const text = btn.previousElementSibling;
+                const expanded = text.classList.toggle('is-expanded');
+                btn.textContent = expanded ? 'Ver menos' : 'Ver mais';
+            });
+        });
+        renderCommentsPagination(totalPages);
+    }
+
     function renderCommentsTable(rows) {
         const container = document.getElementById('cfg-dash-course-comments');
-        const withComments = rows.filter(r => r.comment);
-        if (withComments.length === 0) {
+        const pager = document.getElementById('cfg-dash-course-comments-pagination');
+        commentsRowsCache = rows.filter(r => r.comment).sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
+        commentsPage = 1;
+        if (commentsRowsCache.length === 0) {
             container.innerHTML = '<p class="dashboard-table-empty">Nenhum comentário registrado para este curso.</p>';
+            if (pager) pager.innerHTML = '';
             return;
         }
-        container.innerHTML = `<table>
-            <thead><tr><th>Nome</th><th>Nota</th><th>Comentário</th></tr></thead>
-            <tbody>${withComments.map(r => `
-                <tr><td>${escapeHtml(r.fullName)}</td><td>${r.rating || '—'}/5 ★</td><td>${escapeHtml(r.comment)}</td></tr>
-            `).join('')}</tbody>
-        </table>`;
+        paintCommentsPage();
     }
 
     function renderReprovalsTable(rows, slug, subjectId, themeId) {
@@ -460,7 +770,7 @@
                 const statusLabel = U.Deadlines.STATUS_LABELS[r.deadlineStatus] || r.deadlineStatus || '—';
                 const canForgive = r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
                 return `<tr>
-                    <td>${escapeHtml(r.fullName)}</td><td>${r.score}/10</td><td>${dateLabel}</td><td>${escapeHtml(statusLabel)}</td>
+                    <td>${escapeHtml(r.fullName)}</td><td>${formatScore(r.score)}/10</td><td>${dateLabel}</td><td>${escapeHtml(statusLabel)}</td>
                     <td>${canForgive ? `<button class="dash-forgive-btn" data-user-id="${escapeHtml(r.userId)}" data-slug="${slug}" data-subject-id="${subjectId}" data-theme-id="${themeId}">Desconsiderar atraso</button>` : ''}</td>
                 </tr>`;
             }).join('')}</tbody>
@@ -470,6 +780,183 @@
             btn.addEventListener('click', () => handleForgiveDeadline(btn.dataset));
         });
     }
+
+    // ─── Aba Conclusões: quem já concluiu x quem falta ───
+
+    // Avatar com iniciais coloridas (mesmo critério de hash usado no card do
+    // curso — cor estável por nome, sem precisar de foto).
+    function avatarHtml(name) {
+        let hash = 0;
+        const str = name || '?';
+        for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) % 360;
+        return `<span class="row-avatar" style="--avatar-hue:${hash};">${escapeHtml(themeInitials(name))}</span>`;
+    }
+
+    function deadlineBadgeHtml(status) {
+        const label = U.Deadlines.STATUS_LABELS[status] || status || '—';
+        const toneMap = { on_time: 'is-good', livre: 'is-neutral', forgiven: 'is-neutral', not_started: 'is-neutral', late: 'is-mid', closed: 'is-bad' };
+        const tone = toneMap[status] || 'is-neutral';
+        const iconMap = { on_time: 'fa-check', late: 'fa-triangle-exclamation', closed: 'fa-ban', forgiven: 'fa-calendar-check' };
+        const icon = iconMap[status] || 'fa-circle-minus';
+        return `<span class="deadline-pill ${tone}"><i class="fas ${icon}"></i> ${escapeHtml(label)}</span>`;
+    }
+
+    // "Concluídos": uma linha por realização, ordenado da mais recente para a
+    // mais antiga, com busca por nome e paginação de 5 por página.
+    let completedRowsCache = [];
+    let completedSearchTerm = '';
+
+    function paintCompletedPage() {
+        const container = document.getElementById('cfg-dash-course-completed');
+        if (!container) return;
+        const filtered = completedSearchTerm
+            ? completedRowsCache.filter(r => normalizeName(r.fullName || '').includes(normalizeName(completedSearchTerm)))
+            : completedRowsCache;
+
+        if (completedRowsCache.length === 0) {
+            container.innerHTML = emptyStateHtml('fa-clipboard-check', 'Ninguém concluiu este curso ainda.');
+            return;
+        }
+        if (filtered.length === 0) {
+            container.innerHTML = emptyStateHtml('fa-search', 'Nenhum resultado para essa busca.');
+            return;
+        }
+
+        container.innerHTML = `<table class="is-sticky">
+            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Situação</th></tr></thead>
+            <tbody>${filtered.map((r, i) => {
+                const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
+                const situationOk = !!r.approved;
+                return `<tr style="--row-i:${i}">
+                    <td>${dateLabel}</td>
+                    <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
+                    <td>${escapeHtml(r.unit || '—')}</td>
+                    <td>${escapeHtml(r.role || '—')}</td>
+                    <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
+                    <td>${scoreBadgeHtml(r.score)}</td>
+                    <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+    }
+
+    function renderCompletedTable(rows) {
+        completedRowsCache = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        paintCompletedPage();
+    }
+
+    document.getElementById('cfg-dash-course-completed-search')?.addEventListener('input', (e) => {
+        completedSearchTerm = e.target.value;
+        paintCompletedPage();
+    });
+
+    // Progresso (%) de um colaborador neste curso, lido de progress/byUser.
+    function progressPctFor(colab, slug, subjectId, themeId) {
+        const userId = colab.accountUserId;
+        if (!userId) return 0;
+        const entry = allProgress[userId]?.[slug]?.[subjectId]?.[themeId];
+        return entry?.pct || 0;
+    }
+
+    function progressToneClass(pct) {
+        if (pct >= 75) return 'is-high';
+        if (pct >= 40) return 'is-mid';
+        return 'is-low';
+    }
+
+    function emptyStateHtml(icon, message) {
+        return `<div class="dashboard-empty-state"><i class="fas ${icon}"></i><p>${escapeHtml(message)}</p></div>`;
+    }
+
+    let missingRowsCache = [];
+    let missingSearchTerm = '';
+
+    function paintMissingTable() {
+        const container = document.getElementById('cfg-dash-course-missing');
+        if (!container) return;
+        const filtered = missingSearchTerm
+            ? missingRowsCache.filter(m => normalizeName(m.fullName || '').includes(normalizeName(missingSearchTerm)))
+            : missingRowsCache;
+
+        if (missingRowsCache.length === 0) {
+            container.innerHTML = emptyStateHtml('fa-trophy', 'Todos do público-alvo já concluíram este curso.');
+            return;
+        }
+        if (filtered.length === 0) {
+            container.innerHTML = emptyStateHtml('fa-search', 'Nenhum resultado para essa busca.');
+            return;
+        }
+
+        container.innerHTML = `<table class="is-sticky">
+            <thead><tr><th>Nome</th><th>Unidade</th><th>Progresso</th></tr></thead>
+            <tbody>${filtered.map((m, i) => `
+                <tr style="--row-i:${i}">
+                    <td><span class="row-name">${avatarHtml(m.fullName)} ${escapeHtml(m.fullName)}</span></td>
+                    <td>${escapeHtml(m.unit)}</td>
+                    <td>
+                        <div class="missing-progress" title="${m.pct}% assistido">
+                            <div class="missing-progress-bar"><span class="${progressToneClass(m.pct)}" style="width:${m.pct}%"></span></div>
+                            <span class="missing-progress-pct">${m.pct}%</span>
+                        </div>
+                    </td>
+                </tr>
+            `).join('')}</tbody>
+        </table>`;
+    }
+
+    // "Faltam realizar": público-alvo do curso que ainda não aparece nas
+    // realizações (rows), com progresso de módulos assistidos, do maior
+    // para o menor.
+    function renderMissingTable(rows, slug, subjectId, theme) {
+        const container = document.getElementById('cfg-dash-course-missing');
+        if (!container) return;
+
+        if (AUDIENCE_EXEMPT_SLUGS.includes(slug)) {
+            container.innerHTML = '<p class="dashboard-table-empty">Esta categoria não possui público-alvo definido.</p>';
+            missingRowsCache = [];
+            return;
+        }
+
+        const doneKeys = new Set();
+        rows.forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
+        const audience = courseAudience(theme);
+        missingRowsCache = audience
+            .filter(colab => !personKeysOfColaborador(colab).some(key => doneKeys.has(key)))
+            .map(colab => ({
+                fullName: colab.fullName,
+                unit: colab.unit || '—',
+                pct: progressPctFor(colab, slug, subjectId, theme.id)
+            }))
+            .sort((a, b) => b.pct - a.pct || a.fullName.localeCompare(b.fullName, 'pt-BR'));
+
+        paintMissingTable();
+    }
+
+    document.getElementById('cfg-dash-course-missing-search')?.addEventListener('input', (e) => {
+        missingSearchTerm = e.target.value;
+        paintMissingTable();
+    });
+
+    function handleCopyMissingList() {
+        if (missingRowsCache.length === 0) {
+            showWarning('Não há colaboradores pendentes para copiar.');
+            return;
+        }
+        const byUnit = new Map();
+        missingRowsCache.forEach(m => {
+            const unit = m.unit || 'Sem unidade';
+            if (!byUnit.has(unit)) byUnit.set(unit, []);
+            byUnit.get(unit).push(`${m.fullName} (${m.pct}% completo)`);
+        });
+        const unitNames = Array.from(byUnit.keys()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        const text = unitNames.map(unit => `${unit}\n${byUnit.get(unit).join('\n')}`).join('\n\n');
+
+        navigator.clipboard.writeText(text)
+            .then(() => showWarning('Lista copiada para a área de transferência.'))
+            .catch(() => showWarning('Não foi possível copiar a lista.'));
+    }
+
+    document.getElementById('cfg-dash-course-copy-missing')?.addEventListener('click', handleCopyMissingList);
 
     async function handleForgiveDeadline({ userId, slug, subjectId, themeId }) {
         const confirmed = await showConfirm({
@@ -528,6 +1015,34 @@
 
         renderCommentsTable(rows);
         renderReprovalsTable(rows, slug, subjectId, themeId);
+
+        const theme = allTrainingData[slug]?.[subjectId]?.themes?.[themeId];
+        renderCompletedTable(rows);
+        if (theme) renderMissingTable(rows, slug, subjectId, { id: themeId, ...theme });
+
+        renderCourseHero(rows);
+        updateTabCounts(rows);
+    }
+
+    // Resumo rápido no topo do modal: concluídos, pendentes e média — dá o
+    // panorama do curso sem precisar trocar de aba.
+    function renderCourseHero(rows) {
+        if (!courseHeroStats) return;
+        const scores = rows.map(r => Number(r.score) || 0);
+        const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1).replace('.', ',') : '—';
+        const pendentes = missingRowsCache.length;
+        courseHeroStats.innerHTML = `
+            <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'concluído' : 'concluídos'}</span>
+            <span class="hero-stat is-warn"><i class="fas fa-hourglass-half"></i> ${pendentes} ${pendentes === 1 ? 'pendente' : 'pendentes'}</span>
+            <span class="hero-stat"><i class="fas fa-star"></i> Média ${avg}</span>
+        `;
+    }
+
+    function updateTabCounts(rows) {
+        const conclusionsCount = document.getElementById('cfg-dash-course-tabcount-conclusions');
+        const infoCount = document.getElementById('cfg-dash-course-tabcount-info');
+        if (conclusionsCount) conclusionsCount.textContent = String(rows.length);
+        if (infoCount) infoCount.textContent = String(rows.filter(r => r.comment).length);
     }
 
     // ─── Modal do curso: Informações / Gráficos + Resetar curso ───
@@ -535,15 +1050,31 @@
     const courseModalTitle = document.getElementById('cfg-dash-course-modal-title');
     const courseModalClose = document.getElementById('cfg-dash-course-modal-close');
     const courseResetBtn = document.getElementById('cfg-dash-course-reset-btn');
+    const courseHeroThumb = document.getElementById('cfg-dash-course-hero-thumb');
+    const courseHeroStats = document.getElementById('cfg-dash-course-hero-stats');
     let openCourseSlug = null;
     let openCourseKey = null;
     let openCourseName = null;
 
-    function openCourseModal(slug, courseKey, themeName) {
+    function openCourseModal(slug, courseKey, themeName, extra) {
         openCourseSlug = slug;
         openCourseKey = courseKey;
         openCourseName = themeName;
         courseModalTitle.textContent = themeName || 'Curso';
+
+        if (courseHeroThumb) {
+            courseHeroThumb.innerHTML = '';
+            if (extra?.thumb) {
+                const img = document.createElement('img');
+                img.src = extra.thumb;
+                img.alt = '';
+                img.onerror = () => { courseHeroThumb.textContent = themeInitials(themeName); };
+                courseHeroThumb.appendChild(img);
+            } else {
+                courseHeroThumb.textContent = themeInitials(themeName);
+            }
+        }
+
         courseModal.querySelectorAll('.dash-course-modal-tabs .tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === 0));
         courseModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach((tab, i) => tab.classList.toggle('active', i === 0));
         courseModal.style.display = 'flex';
@@ -601,7 +1132,24 @@
                 .filter(r => r.imported && r.entryId)
                 .forEach(r => { updates[`/${dbRoot}/results/imported/${openCourseSlug}/${r.entryId}`] = null; });
 
+            // progress/byUser é uma árvore separada de results/* (grava % de
+            // módulos assistidos + nota, ver js/main.js:progressPathFor) —
+            // sem isso o card do colaborador continuava mostrando 100%/nota
+            // antiga mesmo depois do reset apagar a avaliação em results/*.
+            Object.keys(allProgress).forEach(userId => {
+                if (allProgress[userId]?.[openCourseSlug]?.[subjectId]?.[themeId] !== undefined) {
+                    updates[`/${dbRoot}/progress/byUser/${userId}/${openCourseSlug}/${subjectId}/${themeId}`] = null;
+                }
+            });
+
             await db.ref().update(updates);
+
+            Object.keys(allProgress).forEach(userId => {
+                if (allProgress[userId]?.[openCourseSlug]?.[subjectId]) {
+                    delete allProgress[userId][openCourseSlug][subjectId][themeId];
+                }
+            });
+
             showWarning('Curso resetado com sucesso.');
             historyRows = await U.refreshHistoryRows();
             renderCourseCards();
@@ -621,12 +1169,13 @@
         modeCourseBtn.classList.toggle('active', mode === 'course');
         document.getElementById('cfg-dash-user-picker').style.display = mode === 'user' ? 'flex' : 'none';
         document.getElementById('cfg-dash-course-picker').style.display = mode === 'course' ? 'flex' : 'none';
-        document.getElementById('cfg-dash-user-panel').style.display = 'none';
         document.getElementById('cfg-dash-empty').style.display = 'flex';
         closeSubjectPopover();
+        closeUserFilterPopovers();
         closeCourseModal();
-        if (mode === 'course') { updateCategoryChip(); renderCourseCards(); }
-        else if (courseCardsBox) { courseCardsBox.style.display = 'none'; }
+        closeUserModal();
+        if (mode === 'course') { updateCategoryChip(); renderCourseCards(); if (userCardsBox) userCardsBox.style.display = 'none'; }
+        else { renderUserCards(); if (courseCardsBox) courseCardsBox.style.display = 'none'; }
     }
     modeUserBtn?.addEventListener('click', () => setDashMode('user'));
     modeCourseBtn?.addEventListener('click', () => setDashMode('course'));
@@ -642,13 +1191,16 @@
             // de loadBaseData() — renderizar antes deixava a lista vazia no
             // primeiro carregamento (nada para escolher, dashboard em branco).
             updateCategoryChip();
-            if (selectedSubjectId && !currentTrainingData()[selectedSubjectId]) {
-                selectedSubjectId = null; selectedCourseKey = null;
-                subjectLabel.textContent = 'Selecione um tema';
+            if (selectedSubjectId && selectedSubjectId !== ALL_SUBJECTS_ID && !currentTrainingData()[selectedSubjectId]) {
+                selectedSubjectId = ALL_SUBJECTS_ID; selectedCourseKey = null;
+                subjectLabel.textContent = 'Todos os temas';
             }
             renderCourseCards();
             if (selectedCourseKey) renderCourseDashboard(currentSlug(), selectedCourseKey);
-            if (selectedUserId) renderUserDashboard(selectedUserId);
+            renderUserCards();
+            if (selectedUserId && allColaboradores[selectedUserId]) {
+                renderUserDashboard(allColaboradores[selectedUserId], userHeroStats);
+            }
         } catch (error) {
             showWarning('Erro ao carregar dados do dashboard: ' + error.message);
         }

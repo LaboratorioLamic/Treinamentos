@@ -454,6 +454,79 @@ body.admin-mode #cfg-root { display: block; }
     letter-spacing: 0.4px;
 }
 
+.student-profile-progress-block { margin-bottom: 18px; }
+
+.student-profile-block-title {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+}
+
+.student-profile-block-title i { margin-right: 6px; color: var(--accent); }
+
+.student-profile-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.student-progress-item {
+    padding: 10px 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: #fafbfc;
+}
+
+.student-progress-item-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.student-progress-item-name {
+    font-size: 0.86em;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.student-progress-item-pct {
+    font-size: 0.8em;
+    font-weight: 800;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.student-progress-item.is-complete .student-progress-item-pct { color: var(--success); }
+
+.student-progress-bar {
+    width: 100%;
+    height: 7px;
+    border-radius: 99px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.student-progress-bar span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+}
+
+.student-progress-item.is-complete .student-progress-bar span { background: var(--success); }
+
 .student-profile-list.is-detail { max-height: 430px; }
 
 .student-profile-list {
