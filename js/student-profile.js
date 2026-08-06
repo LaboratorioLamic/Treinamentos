@@ -651,6 +651,18 @@
         }).join('');
     }
 
+    // Cache bruto (todas as categorias) para trocar de categoria sem novo
+    // fetch — só refiltra e re-renderiza.
+    let progressRowsCache = [];
+    let courseIndexCache = [];
+    let historyRowsCache = [];
+    let courseImagesCacheAll = null;
+
+    function applyProgressForCategory() {
+        const rows = progressRowsCache.filter(p => p.slug === activeCategory);
+        renderProgress(rows, courseIndexCache);
+    }
+
     async function loadProgress(session) {
         if (!progressListEl) return;
         progressListEl.innerHTML = '<p class="form-hint">Carregando progressão...</p>';
@@ -659,10 +671,17 @@
                 U.StudentAuth.getCourseProgressForUser(session.userId),
                 U.getCourseIndex()
             ]);
-            renderProgress(progressRows, courseIndex);
+            progressRowsCache = progressRows;
+            courseIndexCache = courseIndex;
+            applyProgressForCategory();
         } catch (error) {
             progressListEl.innerHTML = '<p class="form-hint">Não foi possível carregar a progressão agora.</p>';
         }
+    }
+
+    function applyHistoryForCategory() {
+        const rows = historyRowsCache.filter(r => r.slug === activeCategory);
+        renderRows(rows, courseImagesCacheAll);
     }
 
     async function loadProfile() {
@@ -681,8 +700,9 @@
                 U.getHistoryRows(),
                 fetchCourseNames()
             ]);
-            const rows = rowsForSession(allHistoryRows, session);
-            renderRows(rows, courseImages);
+            historyRowsCache = rowsForSession(allHistoryRows, session);
+            courseImagesCacheAll = courseImages;
+            applyHistoryForCategory();
         } catch (error) {
             listEl.innerHTML = '<p class="form-hint">Não foi possível carregar seu histórico agora.</p>';
         }
@@ -731,11 +751,17 @@
         }
     });
 
-    // ─── Abas: Visão geral / Histórico ───
+    // ─── Abas: Treinamento / Educação Continuada (categoria) ───
+    //     e subabas: Visão geral / Histórico (dentro de cada categoria) ───
+    // Estágios fica fora dessas abas por decisão de produto.
     const tabOverviewBtn = document.getElementById('student-profile-tab-overview');
     const tabHistoryBtn = document.getElementById('student-profile-tab-history');
     const overviewPanel = document.getElementById('student-profile-overview-panel');
     const historyPanel = document.getElementById('student-profile-history-panel');
+    const categoryTabsEl = document.getElementById('student-profile-category-tabs');
+    const categoryBtns = categoryTabsEl ? [...categoryTabsEl.querySelectorAll('[data-category]')] : [];
+
+    let activeCategory = 'treinamentos';
 
     function setProfileTab(tab) {
         tabOverviewBtn?.classList.toggle('active', tab === 'overview');
@@ -746,9 +772,18 @@
     tabOverviewBtn?.addEventListener('click', () => setProfileTab('overview'));
     tabHistoryBtn?.addEventListener('click', () => setProfileTab('history'));
 
+    function setProfileCategory(category) {
+        activeCategory = category;
+        categoryBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.category === category));
+        applyProgressForCategory();
+        applyHistoryForCategory();
+    }
+    categoryBtns.forEach(btn => btn.addEventListener('click', () => setProfileCategory(btn.dataset.category)));
+
     function openModal() {
         modal.classList.add('active');
         resetPasswordPanel();
+        setProfileCategory('treinamentos');
         setProfileTab('overview');
         loadProfile();
     }

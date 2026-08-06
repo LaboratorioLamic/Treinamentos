@@ -415,6 +415,17 @@ body.admin-mode #cfg-root { display: block; }
     margin-bottom: 18px;
 }
 
+/* Subabas (Visão geral/Histórico) dentro de cada categoria: mesmo padrão,
+   um pouco menor para marcar hierarquia abaixo das abas de categoria. */
+.student-profile-subtabs {
+    margin-bottom: 14px;
+    padding: 3px;
+}
+.student-profile-subtabs .student-auth-tab {
+    padding: 7px 0;
+    font-size: 0.8em;
+}
+
 .student-profile-info {
     display: grid;
     grid-template-columns: 1fr 1fr;
