@@ -1258,6 +1258,13 @@
                     <div id="cfg-courses-grid" class="courses-grid"></div>
                 </div>
 
+                <!-- Container técnico: js/admin.js (populateThemes) precisa deste
+                     elemento para funcionar sem alterações, mas a UI nova não o
+                     exibe (o grid de cursos e o modal "Editar curso" já cobrem
+                     essa função). Fica fora de qualquer modal, sempre display:none,
+                     para nunca aparecer visualmente por engano dentro de um modal. -->
+                <div id="cfg-themes-container" class="themes-container" style="display:none !important;"></div>
+
                 <!-- Modais da aba "Cursos" (dentro de #cfg-root para herdar o CSS #cfg-root .form-group/.form-control/.image-picker/.roles-picker/etc.) -->
 
     <!-- Modal "Gerenciar Temas" -->
@@ -1428,11 +1435,6 @@
                     </div>
                 </div>
                 <div id="cfg-theme-loading" class="cfg-loading-spinner"></div>
-                <!-- Lista legada de Assuntos: js/admin.js (populateThemes) precisa
-                     deste container para funcionar sem alterações; a UI nova não
-                     o exibe (o grid de cursos e o modal "Editar curso" já cobrem
-                     essa função), mas ele precisa existir no DOM. -->
-                <div id="cfg-themes-container" class="themes-container" hidden></div>
             </div>
         </div>
     </div>
@@ -1452,7 +1454,10 @@
                 <span class="close" id="cfg-course-detail-close">&times;</span>
             </div>
             <div class="course-drawer-tabs">
-                <button type="button" class="tab-btn active" data-course-detail-tab="modules">
+                <button type="button" class="tab-btn active" data-course-detail-tab="info">
+                    <i class="fas fa-circle-info"></i> Informações
+                </button>
+                <button type="button" class="tab-btn" data-course-detail-tab="modules">
                     Módulos <span class="tab-count" id="cfg-course-detail-tabcount-modules">0</span>
                 </button>
                 <button type="button" class="tab-btn" data-course-detail-tab="quiz">
@@ -1460,7 +1465,10 @@
                 </button>
             </div>
             <div class="course-drawer-body">
-                <div class="tab-content active" id="cfg-course-detail-tab-modules">
+                <div class="tab-content active" id="cfg-course-detail-tab-info">
+                    <div id="cfg-course-detail-info" class="course-info-grid"></div>
+                </div>
+                <div class="tab-content" id="cfg-course-detail-tab-modules">
                     <div class="course-drawer-section-head">
                         <h3>Módulos do curso</h3>
                         <button type="button" class="btn btn-primary btn-sm" id="cfg-course-detail-add-module">

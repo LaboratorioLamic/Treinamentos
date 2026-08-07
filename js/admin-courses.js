@@ -77,7 +77,7 @@ function validKeys(collection) {
 }
 
 // ─── Estado local da UI (não é dado de negócio, não vai pro Firebase) ───
-let selectedSubjectFilter = new Set(); // vazio = todos os temas
+let selectedSubjectFilter = null; // null = todos os temas; senão, 1 subjectId
 let currentDetailSubjectId = null;
 let currentDetailThemeId = null;
 
@@ -92,13 +92,10 @@ const filterClearBtn = document.getElementById('cfg-courses-filter-clear');
 const filterSummaryEl = document.getElementById('cfg-courses-filter-summary');
 
 function refreshFilterSummary() {
-    const count = selectedSubjectFilter.size;
-    filterSummaryEl.textContent = count === 0
-        ? 'Todos os temas'
-        : count === 1
-            ? (C().getData().trainingData[[...selectedSubjectFilter][0]]?.name || '1 tema')
-            : `${count} temas selecionados`;
-    filterBtn.classList.toggle('is-on', count > 0);
+    filterSummaryEl.textContent = selectedSubjectFilter
+        ? (C().getData().trainingData[selectedSubjectFilter]?.name || 'Tema selecionado')
+        : 'Todos os temas';
+    filterBtn.classList.toggle('is-on', !!selectedSubjectFilter);
 }
 
 function renderFilterList() {
@@ -117,9 +114,9 @@ function renderFilterList() {
         return;
     }
     filterListEl.innerHTML = visible.map(id => {
-        const on = selectedSubjectFilter.has(id);
+        const on = selectedSubjectFilter === id;
         return `
-        <button type="button" class="filter-popover-option ${on ? 'is-selected' : ''}" data-subject-id="${id}" aria-pressed="${on}">
+        <button type="button" class="filter-popover-option ${on ? 'is-selected' : ''}" data-subject-id="${id}" role="radio" aria-checked="${on}">
             <span class="filter-popover-option-mark"><i class="fas fa-check"></i></span>
             <span class="filter-popover-option-label">${escapeHtml(data.trainingData[id].name)}</span>
         </button>`;
@@ -127,12 +124,11 @@ function renderFilterList() {
     filterListEl.querySelectorAll('.filter-popover-option[data-subject-id]').forEach(option => {
         option.addEventListener('click', () => {
             const id = option.dataset.subjectId;
-            const on = !selectedSubjectFilter.has(id);
-            if (on) selectedSubjectFilter.add(id); else selectedSubjectFilter.delete(id);
-            option.classList.toggle('is-selected', on);
-            option.setAttribute('aria-pressed', String(on));
-            refreshFilterSummary();
+            // Seleção única: clicar no já selecionado desmarca (volta a "todos").
+            selectedSubjectFilter = selectedSubjectFilter === id ? null : id;
+            renderFilterList();
             renderCoursesGrid();
+            closeFilterPopover();
         });
     });
     refreshFilterSummary();
@@ -185,7 +181,7 @@ filterBtn?.addEventListener('click', () => {
 });
 filterSearchInput?.addEventListener('input', renderFilterList);
 filterClearBtn?.addEventListener('click', () => {
-    selectedSubjectFilter.clear();
+    selectedSubjectFilter = null;
     renderFilterList();
     renderCoursesGrid();
 });
@@ -245,9 +241,8 @@ document.getElementById('cfg-courses-add-btn')?.addEventListener('click', () => 
         openSubjectManageModal();
         return;
     }
-    // Se só houver um tema selecionado no filtro, já pré-seleciona.
-    const preselect = selectedSubjectFilter.size === 1 ? [...selectedSubjectFilter][0] : '';
-    openThemeFormModal({ subjectId: preselect });
+    // Se houver um tema selecionado no filtro, já pré-seleciona.
+    openThemeFormModal({ subjectId: selectedSubjectFilter || '' });
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -259,14 +254,92 @@ const detailTitle = document.getElementById('cfg-course-detail-title');
 const detailTags = document.getElementById('cfg-course-detail-tags');
 
 function refreshDetailTabCounts() {
+    if (!currentDetailSubjectId || !currentDetailThemeId) return;
     const data = C().getData();
-    const modules = data.trainingData[currentDetailSubjectId]?.themes?.[currentDetailThemeId]?.modules || [];
+    const theme = data.trainingData[currentDetailSubjectId]?.themes?.[currentDetailThemeId];
+    if (!theme) return;
+    const modules = theme.modules || [];
     const quizKey = `${currentDetailSubjectId}_${currentDetailThemeId}`;
     const quizCount = data.quizData?.[quizKey]?.length || 0;
     const modCountEl = document.getElementById('cfg-course-detail-tabcount-modules');
     const quizCountEl = document.getElementById('cfg-course-detail-tabcount-quiz');
     if (modCountEl) modCountEl.textContent = String(modules.length);
     if (quizCountEl) quizCountEl.textContent = String(quizCount);
+    renderCourseInfo(currentDetailSubjectId, currentDetailThemeId, theme);
+}
+
+// Aba "Informações": mostra tudo que foi cadastrado no formulário de Assunto
+// (descrição, status, prazo, funções, certificado) em formato de leitura.
+function renderCourseInfo(subjectId, themeId, theme) {
+    const infoEl = document.getElementById('cfg-course-detail-info');
+    if (!infoEl) return;
+    const data = C().getData();
+    const subjectName = data.trainingData[subjectId]?.name || '—';
+
+    // Prazo
+    const deadlineStatus = window.UniAdmin?.Deadlines?.computeDeadlineStatus?.(theme.deadline) || 'livre';
+    const deadlineLabel = window.UniAdmin?.Deadlines?.STATUS_LABELS?.[deadlineStatus] || 'Sem prazo';
+    const fmtDate = window.UniAdmin?.Deadlines?.formatDeadlineDate;
+    const deadlineRows = theme.deadline?.mode === 'prazo' && fmtDate ? `
+        <div class="course-info-subrow"><span>Início</span><strong>${fmtDate(theme.deadline.startAt)}</strong></div>
+        <div class="course-info-subrow"><span>Prazo final</span><strong>${fmtDate(theme.deadline.endAt)}</strong></div>
+        <div class="course-info-subrow"><span>Encerramento</span><strong>${fmtDate(theme.deadline.closeAt)}</strong></div>`
+        : '';
+
+    // Funções com acesso
+    const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
+    const rolesHtml = roles.length
+        ? `<div class="course-info-pills">${roles.map(r => `<span class="course-info-pill">${escapeHtml(r)}</span>`).join('')}</div>`
+        : '<p class="course-info-muted">Visível para todas as funções.</p>';
+
+    // Certificado
+    const certTopics = theme.certificateEnabled ? (window.UniAdmin?.Certificate?.parseTopics?.(theme.certificateTopics) || []) : [];
+    const certHtml = theme.certificateEnabled ? `
+        <div class="course-info-subrow"><span>Título</span><strong>${escapeHtml(theme.certificateTitle || subjectName)}</strong></div>
+        <div class="course-info-subrow"><span>Carga horária</span><strong>${theme.certificateHours || 10}h</strong></div>
+        ${certTopics.length ? `<div class="course-info-pills">${certTopics.map(t => `<span class="course-info-pill">${escapeHtml(t)}</span>`).join('')}</div>` : ''}`
+        : '<p class="course-info-muted">Emissão de certificado desativada para este curso.</p>';
+
+    // Módulos e avaliação (resumo — o detalhe fica nas próprias abas)
+    const moduleCount = theme.modules?.length || 0;
+    const quizKey = `${subjectId}_${themeId}`;
+    const quizCount = data.quizData?.[quizKey]?.length || 0;
+    const quizEnabled = data.quizStatus?.[quizKey] !== false;
+
+    infoEl.innerHTML = `
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-align-left"></i> Descrição</div>
+            <p class="course-info-desc">${theme.description ? escapeHtml(theme.description) : '<span class="course-info-muted">Nenhuma descrição cadastrada.</span>'}</p>
+        </div>
+
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-toggle-on"></i> Status</div>
+            <div class="course-info-row">
+                <span class="course-info-status ${theme.active === false ? 'is-inactive' : 'is-active'}">
+                    <i class="fas ${theme.active === false ? 'fa-ban' : 'fa-check-circle'}"></i>
+                    ${theme.active === false ? 'Inativo' : 'Ativo'}
+                </span>
+                <span class="deadline-badge deadline-${deadlineStatus}">${deadlineLabel}</span>
+            </div>
+            ${deadlineRows}
+        </div>
+
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-bookmark"></i> Organização</div>
+            <div class="course-info-subrow"><span>Tema</span><strong>${escapeHtml(subjectName)}</strong></div>
+            <div class="course-info-subrow"><span>Módulos</span><strong>${moduleCount}</strong></div>
+            <div class="course-info-subrow"><span>Avaliação</span><strong>${quizCount ? `${quizCount} questão(ões) — ${quizEnabled ? 'habilitada' : 'desabilitada'}` : 'Sem questões cadastradas'}</strong></div>
+        </div>
+
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-user-tag"></i> Funções que veem este curso</div>
+            ${rolesHtml}
+        </div>
+
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-award"></i> Certificado</div>
+            ${certHtml}
+        </div>`;
 }
 
 function openCourseDetail(subjectId, themeId) {
@@ -285,13 +358,15 @@ function openCourseDetail(subjectId, themeId) {
         <span class="dash-course-subject-tag"><i class="fas fa-bookmark"></i> ${escapeHtml(subjectName)}</span>
         ${theme.active === false ? '<span class="user-status-badge">Inativo</span>' : ''}`;
 
+    renderCourseInfo(subjectId, themeId, theme);
+
     // Contexto para as funções legadas de populateModules()/populateQuizzes(),
     // que leem dos <select> ocultos cfg-module-subject/theme e cfg-quiz-subject/theme.
     C().setModuleContext(subjectId, themeId);
     C().setQuizContext(subjectId, themeId);
     refreshDetailTabCounts();
 
-    // Sempre abre na aba Módulos.
+    // Sempre abre na aba Informações.
     detailModal.querySelectorAll('.course-drawer-tabs .tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === 0));
     detailModal.querySelectorAll('.course-drawer-body .tab-content').forEach((tab, i) => tab.classList.toggle('active', i === 0));
 
@@ -400,7 +475,7 @@ function orderedThemeIds(data, subjectId) {
     return (order?.length ? order : validKeys(themes)).filter(id => themes[id]);
 }
 
-function buildCourseCard(subjectId, subjectName, themeId, theme, index, total) {
+function buildCourseCard(subjectId, subjectName, themeId, theme, index, total, canReorder) {
     const card = document.createElement('div');
     card.className = 'admin-course-card' + (theme.active === false ? ' is-inactive' : '');
     const media = theme.image
@@ -439,11 +514,16 @@ function buildCourseCard(subjectId, subjectName, themeId, theme, index, total) {
             </div>
         </div>
         <div class="admin-course-card-footer">
+            ${canReorder ? `
             <div class="order-buttons">
                 <button type="button" class="order-btn" data-direction="up" ${isFirst ? 'disabled' : ''} title="Mover para cima"><i class="fas fa-chevron-up"></i></button>
                 <button type="button" class="order-btn" data-direction="down" ${isLast ? 'disabled' : ''} title="Mover para baixo"><i class="fas fa-chevron-down"></i></button>
-            </div>
+            </div>` : '<div></div>'}
             <div class="card-actions">
+                <label class="toggle-switch" title="${theme.active === false ? 'Ativar curso' : 'Desativar curso'}">
+                    <input type="checkbox" class="admin-course-card-toggle" ${theme.active === false ? '' : 'checked'}>
+                    <span class="toggle-slider"></span>
+                </label>
                 <button type="button" class="btn btn-ghost btn-sm admin-course-card-edit" title="Editar"><i class="fas fa-pencil-alt"></i></button>
                 <button type="button" class="btn btn-danger btn-sm admin-course-card-delete" title="Excluir"><i class="fas fa-trash"></i></button>
             </div>
@@ -454,6 +534,10 @@ function buildCourseCard(subjectId, subjectName, themeId, theme, index, total) {
     });
     card.querySelector('.order-btn[data-direction="down"]')?.addEventListener('click', (e) => {
         e.stopPropagation(); C().moveTheme(subjectId, themeId, 'down');
+    });
+    card.querySelector('.admin-course-card-toggle')?.addEventListener('click', (e) => e.stopPropagation());
+    card.querySelector('.admin-course-card-toggle')?.addEventListener('change', (e) => {
+        C().toggleThemeActive(subjectId, themeId, e.target.checked);
     });
     card.querySelector('.admin-course-card-edit')?.addEventListener('click', (e) => {
         e.stopPropagation(); openThemeFormModal({ subjectId, themeId });
@@ -470,7 +554,10 @@ function renderCoursesGrid() {
     const data = C()?.getData?.();
     if (!data) return;
     gridEl.innerHTML = '';
-    const subjectIds = orderedSubjectIds(data).filter(id => selectedSubjectFilter.size === 0 || selectedSubjectFilter.has(id));
+    const subjectIds = orderedSubjectIds(data).filter(id => !selectedSubjectFilter || selectedSubjectFilter === id);
+    // Reordenar só faz sentido dentro de um único tema — com "todos os temas"
+    // a lista mistura vários temas e a posição relativa perde o sentido.
+    const canReorder = !!selectedSubjectFilter;
     let total = 0;
     const frag = document.createDocumentFragment();
     subjectIds.forEach(subjectId => {
@@ -479,7 +566,7 @@ function renderCoursesGrid() {
         themeIds.forEach((themeId, index) => {
             const theme = data.trainingData[subjectId].themes[themeId];
             if (!theme) return;
-            frag.appendChild(buildCourseCard(subjectId, subjectName, themeId, theme, index, themeIds.length));
+            frag.appendChild(buildCourseCard(subjectId, subjectName, themeId, theme, index, themeIds.length, canReorder));
             total++;
         });
     });
@@ -487,7 +574,7 @@ function renderCoursesGrid() {
     if (total === 0) {
         gridEl.innerHTML = `<div class="courses-empty">
             <i class="fas fa-graduation-cap"></i>
-            <p>${subjectIds.length === 0 && selectedSubjectFilter.size > 0 ? 'Nenhum curso para os temas selecionados.' : 'Nenhum curso cadastrado ainda. Clique em "Adicionar curso" para começar.'}</p>
+            <p>${subjectIds.length === 0 && selectedSubjectFilter ? 'Nenhum curso para o tema selecionado.' : 'Nenhum curso cadastrado ainda. Clique em "Adicionar curso" para começar.'}</p>
         </div>`;
     }
     refreshFilterSummary();

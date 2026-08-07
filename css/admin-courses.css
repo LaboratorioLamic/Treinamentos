@@ -111,8 +111,8 @@ body.cfg-mstack-open { overflow: hidden; }
 
 /* ─── Grid de cards de curso (Assunto) ─── */
 #cfg-root .courses-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 18px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
 }
 #cfg-root .courses-empty {
     grid-column: 1 / -1; text-align: center; padding: 60px 20px;
@@ -134,42 +134,41 @@ body.cfg-mstack-open { overflow: hidden; }
 #cfg-root .admin-course-card.is-inactive { opacity: 0.62; }
 
 #cfg-root .admin-course-card-media {
-    position: relative; width: 100%; aspect-ratio: 16/9;
+    position: relative; width: 100%; height: 128px;
     background: linear-gradient(135deg, #eef2ff, #f5f3ff);
     display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
-#cfg-root .admin-course-card-media img { width: 100%; height: 100%; object-fit: cover; }
+#cfg-root .admin-course-card-media img { width: 128px; height: 128px; object-fit: cover; margin: 0 auto; }
 #cfg-root .admin-course-card-media .image-initials {
-    font-size: 30px; font-weight: 800; color: var(--cfg-primary); letter-spacing: 1px;
+    font-size: 24px; font-weight: 800; color: var(--cfg-primary); letter-spacing: 1px;
 }
 #cfg-root .admin-course-card-subject-tag {
-    position: absolute; top: 10px; left: 10px;
+    position: absolute; top: 8px; left: 8px;
     background: rgba(9,15,30,0.62); backdrop-filter: blur(4px);
-    color: #fff; font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 999px;
+    color: #fff; font-size: 10.5px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
     display: flex; align-items: center; gap: 5px;
 }
 #cfg-root .admin-course-card-status {
-    position: absolute; top: 10px; right: 10px;
-    font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
+    position: absolute; top: 8px; right: 8px;
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
     background: rgba(220,38,38,0.92); color: #fff; letter-spacing: 0.3px;
 }
 
-#cfg-root .admin-course-card-body { padding: 14px 16px 10px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+#cfg-root .admin-course-card-body { padding: 10px 14px 8px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 #cfg-root .admin-course-card-body h3 {
-    font-size: 15px; font-weight: 700; color: var(--text); margin: 0;
+    font-size: 14px; font-weight: 700; color: var(--text); margin: 0;
     display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
 }
 #cfg-root .admin-course-card-desc {
-    font-size: 12.5px; color: var(--text-2); margin: 0; line-height: 1.5;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    min-height: 2.8em;
+    font-size: 12px; color: var(--text-2); margin: 0; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
 }
-#cfg-root .admin-course-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+#cfg-root .admin-course-card-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1px; }
 #cfg-root .admin-course-card-badges .deadline-badge,
-#cfg-root .admin-course-card-badges .roles-badge { font-size: 10.5px; padding: 3px 8px; }
+#cfg-root .admin-course-card-badges .roles-badge { font-size: 10px; padding: 2px 7px; }
 #cfg-root .admin-course-card-badges .modules-count,
 #cfg-root .admin-course-card-badges .quiz-status-badge {
-    font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
     display: inline-flex; align-items: center; gap: 4px;
     background: var(--cfg-border); color: var(--text-2);
 }
@@ -178,10 +177,12 @@ body.cfg-mstack-open { overflow: hidden; }
 
 #cfg-root .admin-course-card-footer {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    padding: 10px 12px; border-top: 1px solid var(--cfg-border);
+    padding: 8px 10px; border-top: 1px solid var(--cfg-border);
 }
 #cfg-root .admin-course-card-footer .order-buttons { display: flex; gap: 3px; }
-#cfg-root .admin-course-card-footer .card-actions { display: flex; gap: 6px; }
+#cfg-root .admin-course-card-footer .card-actions { display: flex; align-items: center; gap: 6px; }
+/* Toggle liga/desliga do curso, tamanho reduzido pra caber no footer do card */
+#cfg-root .admin-course-card-footer .toggle-switch { transform: scale(0.82); margin: 0 -2px; }
 
 /* ─── Modal centralizado grande: drawer de detalhe do curso ─── */
 /* z-index destes 5 modais é aplicado dinamicamente pelo ModalStack (JS),
@@ -231,6 +232,44 @@ body.cfg-mstack-open { overflow: hidden; }
 /* listas de módulo/questão dentro do drawer, reaproveitando .module-card/.quiz-card */
 .course-drawer-list { display: flex; flex-direction: column; gap: 10px; }
 .course-drawer-empty { text-align: center; padding: 30px 10px; color: var(--text-3); font-size: 13px; }
+#cfg-root .quiz-card-number { color: var(--cfg-primary); font-weight: 800; margin-right: 2px; }
+
+/* ─── Aba "Informações" do drawer de detalhe ─── */
+.course-info-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px; align-items: start;
+}
+.course-info-card {
+    background: #fafbfc; border: 1px solid var(--cfg-border); border-radius: var(--r-lg, 12px);
+    padding: 16px 18px;
+}
+.course-info-card-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px;
+}
+.course-info-card-head i { color: var(--cfg-primary); font-size: 12px; }
+.course-info-desc { font-size: 13.5px; color: var(--text); line-height: 1.6; margin: 0; }
+.course-info-muted { color: var(--text-3); font-size: 12.5px; margin: 0; font-style: italic; }
+.course-info-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.course-info-subrow {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 0; font-size: 13px; border-top: 1px dashed var(--cfg-border);
+}
+.course-info-subrow:first-of-type { border-top: none; padding-top: 0; }
+.course-info-subrow span { color: var(--text-3); }
+.course-info-subrow strong { color: var(--text); font-weight: 600; text-align: right; }
+.course-info-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px;
+}
+.course-info-status.is-active { background: #dcfce7; color: #15803d; }
+.course-info-status.is-inactive { background: #fee2e2; color: #b91c1c; }
+.course-info-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.course-info-pill {
+    font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    background: var(--cfg-primary-light, #eff6ff); color: var(--cfg-primary-h);
+}
 
 /* ─── Modais empilhados de Módulo/Avaliação (à frente do drawer) ─── */
 #cfg-module-form-modal .modal-content,

@@ -20,11 +20,14 @@ let currentModuleIndex = null;
 let currentQuizIndex = null;
 
 function initializeTabs() {
-    const allTabButtons = document.querySelectorAll('#cfg-root .tab-btn');
-    const allTabContents = document.querySelectorAll('#cfg-root .tab-content');
+    // Escopado à nav da sidebar/aos tab-content de topo — ver comentário em
+    // 'tabButtons'/'tabContents' mais abaixo sobre por que não usar
+    // '#cfg-root .tab-btn'/'#cfg-root .tab-content' sem escopo aqui.
+    const allTabButtons = document.querySelectorAll('#cfg-root .sidebar-nav .tab-btn');
+    const allTabContents = document.querySelectorAll('#cfg-root .content-area > .tab-content');
     allTabButtons.forEach(btn => btn.classList.remove('active'));
     allTabContents.forEach(content => content.classList.remove('active'));
-    const coursesBtn = document.querySelector('#cfg-root .tab-btn[data-tab="courses"]');
+    const coursesBtn = document.querySelector('#cfg-root .sidebar-nav .tab-btn[data-tab="courses"]');
     const coursesTab = document.getElementById('cfg-courses-tab');
     if (coursesBtn) coursesBtn.classList.add('active');
     if (coursesTab) coursesTab.classList.add('active');
@@ -359,8 +362,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             return false;
         }
 
-        const tabButtons = document.querySelectorAll('#cfg-root .tab-btn');
-        const tabContents = document.querySelectorAll('#cfg-root .tab-content');
+        // Escopado à nav da sidebar: '#cfg-root .tab-btn' sozinho pegaria também
+        // os botões de aba internos do drawer de curso (.course-drawer-tabs) e
+        // dos modais de dashboard, que reaproveitam a mesma classe .tab-btn.
+        const tabButtons = document.querySelectorAll('#cfg-root .sidebar-nav .tab-btn');
+        const tabContents = document.querySelectorAll('#cfg-root .content-area > .tab-content');
         // Colaboradores e Usuários são globais (não dependem de categoria) —
         // as demais abas gerenciam conteúdo de curso e continuam exigindo
         // uma categoria escolhida.
@@ -1517,7 +1523,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const isFirst = index === 0;
                 const isLast = index === quizzes.length - 1;
                 card.innerHTML = `
-                    <h3>${quiz.question}</h3>
+                    <h3><span class="quiz-card-number">${index + 1}.</span> ${quiz.question}</h3>
                     ${quiz.image ? `<img class="quiz-card-image" src="${quiz.image}" alt="Imagem da questão">` : ''}
                     <div class="card-footer">
                         <div class="order-buttons">
@@ -1695,7 +1701,7 @@ window.UniAdminCoursesData = {
     themeInitials,
     escapeHtml,
     moveSubject, moveTheme, moveModule, moveQuiz,
-    deleteSubject, deleteTheme,
+    deleteSubject, deleteTheme, toggleThemeActive,
 };
 
 })();
