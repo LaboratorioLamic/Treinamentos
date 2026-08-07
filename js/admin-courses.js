@@ -550,7 +550,7 @@ function buildCourseCard(subjectId, subjectName, themeId, theme, index, total, c
     card.querySelector('.order-btn[data-direction="down"]')?.addEventListener('click', (e) => {
         e.stopPropagation(); C().moveTheme(subjectId, themeId, 'down');
     });
-    card.querySelector('.admin-course-card-toggle')?.addEventListener('click', (e) => e.stopPropagation());
+    card.querySelector('.toggle-switch')?.addEventListener('click', (e) => e.stopPropagation());
     card.querySelector('.admin-course-card-toggle')?.addEventListener('change', (e) => {
         C().toggleThemeActive(subjectId, themeId, e.target.checked);
     });

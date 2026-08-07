@@ -42,6 +42,8 @@
     let allRows = [];
     let sortKey = 'submittedAt';
     let sortDir = 'desc';
+    const PAGE_SIZE = 20;
+    let currentPage = 1;
 
     function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -410,9 +412,16 @@
         const rows = applySort(applyFilters(rowsForCurrentCategory()));
 
         if (rows.length === 0) {
+            currentPage = 1;
             container.innerHTML = '<p class="dashboard-table-empty">Nenhum resultado encontrado.</p>';
             return;
         }
+
+        const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        const pageStart = (currentPage - 1) * PAGE_SIZE;
+        const pageRows = rows.slice(pageStart, pageStart + PAGE_SIZE);
 
         const colgroupHtml = `<colgroup>${COLUMNS.map(col => `<col class="${col.colClass}">`).join('')}</colgroup>`;
 
@@ -423,19 +432,23 @@
             return `<th data-key="${col.key}">${col.label} <i class="fas ${icon}"></i></th>`;
         }).join('');
 
-        const bodyHtml = rows.map((r, index) => `
-            <tr data-index="${index}">
-                ${COLUMNS.map(col => `<td>${col.render(r, index)}</td>`).join('')}
+        // Índice absoluto (dentro de `rows`) guardado em data-index — os
+        // handlers de clique usam esse valor para achar o registro correto
+        // mesmo a linha pertencendo a uma página diferente da primeira.
+        const bodyHtml = pageRows.map((r, i) => `
+            <tr data-index="${pageStart + i}">
+                ${COLUMNS.map(col => `<td>${col.render(r, pageStart + i)}</td>`).join('')}
             </tr>
         `).join('');
 
-        container.innerHTML = `<table class="history-table">${colgroupHtml}<thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+        container.innerHTML = `<table class="history-table">${colgroupHtml}<thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>${paginationHtml(rows.length, totalPages)}`;
 
         container.querySelectorAll('thead th[data-key]').forEach(th => {
             th.addEventListener('click', () => {
                 const key = th.dataset.key;
                 if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
                 else { sortKey = key; sortDir = 'asc'; }
+                currentPage = 1;
                 renderTable();
             });
         });
@@ -467,6 +480,39 @@
                 deleteRecord(rows[Number(btn.dataset.deleteIndex)]);
             });
         });
+
+        container.querySelectorAll('[data-page]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.page;
+                currentPage = target === 'prev' ? currentPage - 1 : target === 'next' ? currentPage + 1 : Number(target);
+                renderTable();
+            });
+        });
+    }
+
+    // Botões "anterior/1..N/próxima", com reticências quando há muitas
+    // páginas — mantém sempre visíveis a primeira, a última e uma janela em
+    // torno da página atual.
+    function paginationHtml(totalRows, totalPages) {
+        if (totalPages <= 1) return '';
+        const pages = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+        let lastRendered = 0;
+        let itemsHtml = '';
+        for (let p = 1; p <= totalPages; p++) {
+            if (!pages.has(p)) continue;
+            if (p - lastRendered > 1) itemsHtml += '<span class="history-pagination-ellipsis">…</span>';
+            itemsHtml += `<button type="button" class="history-pagination-btn ${p === currentPage ? 'is-active' : ''}" data-page="${p}">${p}</button>`;
+            lastRendered = p;
+        }
+        return `
+            <div class="history-pagination">
+                <span class="history-pagination-info">${totalRows} registro${totalRows === 1 ? '' : 's'}</span>
+                <div class="history-pagination-controls">
+                    <button type="button" class="history-pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+                    ${itemsHtml}
+                    <button type="button" class="history-pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>`;
     }
 
     function showSpinner(show) {
@@ -507,7 +553,7 @@
     // Configurações — quando o usuário troca de plataforma lá, o histórico
     // re-filtra e as opções de cada chip são recalculadas para essa categoria.
     document.addEventListener('uniadmin:category-changed', () => {
-        if (allRows.length > 0) { refreshAllChipLists(); renderTable(); }
+        if (allRows.length > 0) { currentPage = 1; refreshAllChipLists(); renderTable(); }
     });
 
     // ─── Linha de filtros: um chip por campo, cada um com seu popover de busca ───
@@ -588,6 +634,7 @@
     function onFilterChange(isCrossField) {
         if (isCrossField) refreshAllChipLists();
         else refreshChipLabels();
+        currentPage = 1;
         renderTable();
     }
 
