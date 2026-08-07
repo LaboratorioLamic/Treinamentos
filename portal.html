@@ -745,6 +745,39 @@
         </div>
     </div>
 
+    <!-- Modal de substituição/unificação de colaborador duplicado -->
+    <div class="modal" id="cfg-colab-merge-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-colab-merge-title">
+        <div class="modal-content confirm-content user-form-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-code-merge"></i></div>
+                <h2 id="cfg-colab-merge-title">Substituir colaborador</h2>
+                <p>Une este registro desvinculado a outro colaborador, transferindo todos os dados e apagando o duplicado.</p>
+            </div>
+
+            <div class="colab-merge-source" id="cfg-colab-merge-source">
+                <span class="colab-merge-source-name" id="cfg-colab-merge-source-name"></span>
+                <div class="colab-merge-source-meta" id="cfg-colab-merge-source-meta"></div>
+            </div>
+
+            <div class="confirm-field">
+                <label for="cfg-colab-merge-target">Unificar com</label>
+                <div class="user-combobox">
+                    <input type="text" id="cfg-colab-merge-target" placeholder="Buscar colaborador da mesma unidade e função" autocomplete="off" role="combobox" aria-expanded="false">
+                    <i class="fas fa-chevron-down user-combobox-caret"></i>
+                    <div class="user-combobox-popover" id="cfg-colab-merge-target-popover"></div>
+                </div>
+            </div>
+
+            <small class="form-hint">Só aparecem colaboradores da mesma unidade e função. O registro desvinculado é excluído após a unificação — ação não pode ser desfeita.</small>
+            <span class="confirm-error" id="cfg-colab-merge-error"></span>
+
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-colab-merge-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-colab-merge-ok">Substituir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de configuração do certificado do assunto -->
     <div class="modal cert-modal" id="cfg-cert-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-cert-modal-title">
         <div class="cert-modal-card">
@@ -1660,7 +1693,20 @@
                                     <i class="fas fa-search"></i>
                                     <input type="search" id="cfg-colab-filter" placeholder="Buscar colaborador...">
                                 </div>
-                                <div id="cfg-colab-container" class="themes-container"></div>
+                                <div class="colab-filters-row">
+                                    <div class="colab-status-filter" id="cfg-colab-link-filter" data-group="link">
+                                        <button type="button" class="colab-status-btn is-active" data-status="allLink">Todos</button>
+                                        <button type="button" class="colab-status-btn" data-status="unlinked">Desvinculado</button>
+                                        <button type="button" class="colab-status-btn" data-status="withAccount">Conta associada</button>
+                                        <button type="button" class="colab-status-btn" data-status="noAccount">Sem conta</button>
+                                    </div>
+                                    <div class="colab-status-filter colab-status-filter-right" id="cfg-colab-status-filter" data-group="status">
+                                        <button type="button" class="colab-status-btn is-active" data-status="active">Ativos</button>
+                                        <button type="button" class="colab-status-btn" data-status="inactive">Inativos</button>
+                                        <button type="button" class="colab-status-btn" data-status="all">Ambos</button>
+                                    </div>
+                                </div>
+                                <div id="cfg-colab-container" class="colab-grid"></div>
                             </div>
                         </div>
                     </div>

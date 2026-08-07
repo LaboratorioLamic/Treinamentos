@@ -99,6 +99,14 @@
             usersUpdated++;
         }
 
+        // inSheet marca se o nome apareceu nesta leitura da planilha — vira o
+        // balão "Sincronizado"/"Desvinculado" na aba Colaboradores. Todo mundo
+        // que já existia começa presumido fora da planilha; o loop abaixo
+        // liga de volta quem realmente veio nesta leitura.
+        Object.keys(existing).forEach(id => {
+            if (existing[id]?.inSheet !== false) updates[`${COLABS_PATH}/${id}/inSheet`] = false;
+        });
+
         seen.forEach((entry, key) => {
             const current = existingByKey.get(key);
             if (current) {
@@ -120,6 +128,7 @@
                     role: entry.role || null,
                     accountUserId: null,
                     active: true,
+                    inSheet: true,
                     importedAt: Date.now()
                 };
                 added++;
@@ -127,6 +136,7 @@
                 // Registros antigos (anteriores ao sourceKey) passam a ter a
                 // âncora, para que uma edição manual futura não seja desfeita.
                 if (!current.sourceKey) updates[`${COLABS_PATH}/${current.id}/sourceKey`] = key;
+                updates[`${COLABS_PATH}/${current.id}/inSheet`] = true;
                 const locked = current.editedFields || {};
                 let changed = false;
                 if (!locked.unit && (current.unit || null) !== (entry.unit || null)) {
