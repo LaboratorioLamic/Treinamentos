@@ -78,6 +78,7 @@ function validKeys(collection) {
 
 // ─── Estado local da UI (não é dado de negócio, não vai pro Firebase) ───
 let selectedSubjectFilter = null; // null = todos os temas; senão, 1 subjectId
+let selectedStatusFilter = 'active'; // 'active' | 'inactive' | 'all' — padrão: só ativos
 let currentDetailSubjectId = null;
 let currentDetailThemeId = null;
 
@@ -113,19 +114,23 @@ function renderFilterList() {
         positionFilterPopover();
         return;
     }
-    filterListEl.innerHTML = visible.map(id => {
+    const allOn = !selectedSubjectFilter;
+    const allOptionHtml = `
+        <button type="button" class="filter-popover-option ${allOn ? 'is-selected' : ''}" data-subject-id="" role="radio" aria-checked="${allOn}">
+            <span class="filter-popover-option-mark"><i class="fas fa-layer-group"></i></span>
+            <span class="filter-popover-option-label">Todos os temas</span>
+        </button>`;
+    filterListEl.innerHTML = allOptionHtml + visible.map(id => {
         const on = selectedSubjectFilter === id;
         return `
         <button type="button" class="filter-popover-option ${on ? 'is-selected' : ''}" data-subject-id="${id}" role="radio" aria-checked="${on}">
-            <span class="filter-popover-option-mark"><i class="fas fa-check"></i></span>
+            <span class="filter-popover-option-mark"><i class="fas fa-bookmark"></i></span>
             <span class="filter-popover-option-label">${escapeHtml(data.trainingData[id].name)}</span>
         </button>`;
     }).join('');
-    filterListEl.querySelectorAll('.filter-popover-option[data-subject-id]').forEach(option => {
+    filterListEl.querySelectorAll('.filter-popover-option').forEach(option => {
         option.addEventListener('click', () => {
-            const id = option.dataset.subjectId;
-            // Seleção única: clicar no já selecionado desmarca (volta a "todos").
-            selectedSubjectFilter = selectedSubjectFilter === id ? null : id;
+            selectedSubjectFilter = option.dataset.subjectId || null;
             renderFilterList();
             renderCoursesGrid();
             closeFilterPopover();
@@ -203,6 +208,16 @@ function openSubjectManageModal() {
 document.getElementById('cfg-courses-manage-themes-btn')?.addEventListener('click', openSubjectManageModal);
 document.getElementById('cfg-subject-manage-close')?.addEventListener('click', () => ModalStack.closeTop());
 subjectManageModal?.addEventListener('click', (event) => { if (event.target === subjectManageModal) ModalStack.closeTop(); });
+
+document.getElementById('cfg-courses-status-segment')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.status-segment-btn[data-status]');
+    if (!btn) return;
+    selectedStatusFilter = btn.dataset.status;
+    document.querySelectorAll('#cfg-courses-status-segment .status-segment-btn').forEach(b => {
+        b.classList.toggle('is-active', b === btn);
+    });
+    renderCoursesGrid();
+});
 
 // ══════════════════════════════════════════════════════════════════
 // Modal de formulário de Assunto (curso)
@@ -297,7 +312,7 @@ function renderCourseInfo(subjectId, themeId, theme) {
     const certHtml = theme.certificateEnabled ? `
         <div class="course-info-subrow"><span>Título</span><strong>${escapeHtml(theme.certificateTitle || subjectName)}</strong></div>
         <div class="course-info-subrow"><span>Carga horária</span><strong>${theme.certificateHours || 10}h</strong></div>
-        ${certTopics.length ? `<div class="course-info-pills">${certTopics.map(t => `<span class="course-info-pill">${escapeHtml(t)}</span>`).join('')}</div>` : ''}`
+        <div class="course-info-subrow"><span>Tópicos</span><strong>${certTopics.length ? `${certTopics.length} tópico(s)` : 'Nenhum tópico cadastrado'}</strong></div>`
         : '<p class="course-info-muted">Emissão de certificado desativada para este curso.</p>';
 
     // Módulos e avaliação (resumo — o detalhe fica nas próprias abas)
@@ -566,15 +581,24 @@ function renderCoursesGrid() {
         themeIds.forEach((themeId, index) => {
             const theme = data.trainingData[subjectId].themes[themeId];
             if (!theme) return;
+            const isActive = theme.active !== false;
+            if (selectedStatusFilter === 'active' && !isActive) return;
+            if (selectedStatusFilter === 'inactive' && isActive) return;
             frag.appendChild(buildCourseCard(subjectId, subjectName, themeId, theme, index, themeIds.length, canReorder));
             total++;
         });
     });
     gridEl.appendChild(frag);
     if (total === 0) {
+        const hasAnyCourse = subjectIds.some(id => orderedThemeIds(data, id).length > 0);
+        const msg = hasAnyCourse
+            ? (selectedStatusFilter === 'active' ? 'Nenhum curso ativo para os filtros selecionados.'
+                : selectedStatusFilter === 'inactive' ? 'Nenhum curso inativo para os filtros selecionados.'
+                : 'Nenhum curso para o tema selecionado.')
+            : 'Nenhum curso cadastrado ainda. Clique em "Adicionar curso" para começar.';
         gridEl.innerHTML = `<div class="courses-empty">
             <i class="fas fa-graduation-cap"></i>
-            <p>${subjectIds.length === 0 && selectedSubjectFilter ? 'Nenhum curso para o tema selecionado.' : 'Nenhum curso cadastrado ainda. Clique em "Adicionar curso" para começar.'}</p>
+            <p>${msg}</p>
         </div>`;
     }
     refreshFilterSummary();

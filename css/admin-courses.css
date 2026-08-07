@@ -77,12 +77,12 @@ body.cfg-mstack-open { overflow: hidden; }
 #cfg-root .filter-popover-option:hover { border-color: var(--cfg-border); }
 #cfg-root .filter-popover-option.is-selected { background: var(--cfg-primary-light, #eff6ff); border-color: var(--cfg-primary); color: var(--cfg-primary-h); font-weight: 600; }
 #cfg-root .filter-popover-option-mark {
-    width: 16px; height: 16px; flex-shrink: 0; border-radius: 5px;
-    border: 1.5px solid var(--cfg-border); display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: transparent;
+    width: 16px; height: 16px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--text-3);
 }
 #cfg-root .filter-popover-option.is-selected .filter-popover-option-mark {
-    background: var(--cfg-primary); border-color: var(--cfg-primary); color: #fff;
+    color: var(--cfg-primary);
 }
 #cfg-root .filter-popover-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 #cfg-root .filter-popover-empty,
@@ -98,6 +98,20 @@ body.cfg-mstack-open { overflow: hidden; }
 }
 #cfg-root .manage-themes-btn:hover { border-color: var(--cfg-primary); transform: translateY(-1px); }
 #cfg-root .manage-themes-btn i { color: var(--cfg-primary); }
+
+/* ─── Segmentado "Ativos / Inativos / Ambos" ─── */
+#cfg-root .status-segment {
+    display: flex; align-items: center; gap: 2px;
+    padding: 3px; border-radius: var(--r-lg, 12px);
+    border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+}
+#cfg-root .status-segment-btn {
+    padding: 7px 13px; border: none; border-radius: 9px; background: none;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-3);
+    cursor: pointer; transition: background 0.14s, color 0.14s;
+}
+#cfg-root .status-segment-btn:hover { color: var(--text); }
+#cfg-root .status-segment-btn.is-active { background: var(--cfg-primary); color: #fff; }
 
 #cfg-root .add-course-btn {
     display: flex; align-items: center; gap: 8px;
@@ -138,7 +152,7 @@ body.cfg-mstack-open { overflow: hidden; }
     background: linear-gradient(135deg, #eef2ff, #f5f3ff);
     display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
-#cfg-root .admin-course-card-media img { width: 128px; height: 128px; object-fit: cover; margin: 0 auto; }
+#cfg-root .admin-course-card-media img { width: 100%; height: 100%; object-fit: cover; }
 #cfg-root .admin-course-card-media .image-initials {
     font-size: 24px; font-weight: 800; color: var(--cfg-primary); letter-spacing: 1px;
 }
@@ -188,7 +202,7 @@ body.cfg-mstack-open { overflow: hidden; }
 /* z-index destes 5 modais é aplicado dinamicamente pelo ModalStack (JS),
    conforme a ordem de empilhamento — não fixar aqui para não confundir. */
 #cfg-course-detail-modal .course-drawer-content {
-    max-width: 1000px; width: 94vw; max-height: 90vh; display: flex; flex-direction: column;
+    max-width: 560px; width: 92vw; max-height: 88vh; display: flex; flex-direction: column;
 }
 #cfg-root .course-drawer-hero,
 .course-drawer-hero {
@@ -236,12 +250,12 @@ body.cfg-mstack-open { overflow: hidden; }
 
 /* ─── Aba "Informações" do drawer de detalhe ─── */
 .course-info-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 14px; align-items: start;
+    display: grid; grid-template-columns: 1fr;
+    gap: 12px; align-items: start;
 }
 .course-info-card {
     background: #fafbfc; border: 1px solid var(--cfg-border); border-radius: var(--r-lg, 12px);
-    padding: 16px 18px;
+    padding: 14px 16px;
 }
 .course-info-card-head {
     display: flex; align-items: center; gap: 8px;
@@ -288,4 +302,5 @@ body.cfg-mstack-open { overflow: hidden; }
     #cfg-root .courses-toolbar { flex-direction: column; align-items: stretch; }
     #cfg-root .filter-picker-btn { min-width: 0; }
     .course-drawer-hero { flex-wrap: wrap; }
+    .course-info-grid { grid-template-columns: 1fr; }
 }

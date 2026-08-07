@@ -455,7 +455,7 @@
            popover é movido para o fim de #cfg-root e posicionado em
            coordenadas de viewport (position:fixed) por js/admin.js. */
         #cfg-root .roles-popover {
-            position: fixed; z-index: 1200;
+            position: fixed; z-index: 3000;
             background: #fff; border: 1.5px solid var(--cfg-border); border-radius: 12px;
             box-shadow: 0 18px 44px -16px rgba(15,34,68,0.4);
             padding: 10px; display: flex; flex-direction: column; gap: 8px;
@@ -516,7 +516,7 @@
 
         /* O modal vive fora de #cfg-root, então não herda .form-control /
            .modal-body do painel — estilos próprios e completos aqui. */
-        .cert-modal { z-index: 2600; }
+        #cfg-cert-modal.cert-modal { z-index: 2600; }
         .cert-modal-card {
             width: 100%; max-width: 560px; max-height: 90vh;
             display: flex; flex-direction: column; overflow: hidden;
