@@ -14,6 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="css/admin-courses.css">
     <link rel="stylesheet" href="css/auth.css">
     <link rel="stylesheet" href="css/certificate.css">
 </head>
@@ -744,6 +745,39 @@
         </div>
     </div>
 
+    <!-- Modal de substituição/unificação de colaborador duplicado -->
+    <div class="modal" id="cfg-colab-merge-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-colab-merge-title">
+        <div class="modal-content confirm-content user-form-content">
+            <div class="confirm-head">
+                <div class="confirm-icon"><i class="fas fa-code-merge"></i></div>
+                <h2 id="cfg-colab-merge-title">Substituir colaborador</h2>
+                <p>Une este registro desvinculado a outro colaborador, transferindo todos os dados e apagando o duplicado.</p>
+            </div>
+
+            <div class="colab-merge-source" id="cfg-colab-merge-source">
+                <span class="colab-merge-source-name" id="cfg-colab-merge-source-name"></span>
+                <div class="colab-merge-source-meta" id="cfg-colab-merge-source-meta"></div>
+            </div>
+
+            <div class="confirm-field">
+                <label for="cfg-colab-merge-target">Unificar com</label>
+                <div class="user-combobox">
+                    <input type="text" id="cfg-colab-merge-target" placeholder="Buscar colaborador da mesma unidade e função" autocomplete="off" role="combobox" aria-expanded="false">
+                    <i class="fas fa-chevron-down user-combobox-caret"></i>
+                    <div class="user-combobox-popover" id="cfg-colab-merge-target-popover"></div>
+                </div>
+            </div>
+
+            <small class="form-hint">Só aparecem colaboradores da mesma unidade e função. O registro desvinculado é excluído após a unificação — ação não pode ser desfeita.</small>
+            <span class="confirm-error" id="cfg-colab-merge-error"></span>
+
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" id="cfg-colab-merge-cancel">Cancelar</button>
+                <button type="button" class="confirm-ok" id="cfg-colab-merge-ok">Substituir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de configuração do certificado do assunto -->
     <div class="modal cert-modal" id="cfg-cert-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-cert-modal-title">
         <div class="cert-modal-card">
@@ -1178,17 +1212,8 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Navegação</div>
                 <nav class="sidebar-nav">
-                    <button class="tab-btn active" data-tab="subjects">
-                        <span class="nav-icon"><i class="fas fa-bookmark"></i></span>Temas
-                    </button>
-                    <button class="tab-btn" data-tab="themes">
-                        <span class="nav-icon"><i class="fas fa-layer-group"></i></span>Assuntos
-                    </button>
-                    <button class="tab-btn" data-tab="modules">
-                        <span class="nav-icon"><i class="fas fa-play-circle"></i></span>Módulos
-                    </button>
-                    <button class="tab-btn" data-tab="quizzes">
-                        <span class="nav-icon"><i class="fas fa-clipboard-list"></i></span>Avaliações
+                    <button class="tab-btn active" data-tab="courses">
+                        <span class="nav-icon"><i class="fas fa-graduation-cap"></i></span>Cursos
                     </button>
                     <button class="tab-btn" data-tab="colaboradores">
                         <span class="nav-icon"><i class="fas fa-address-book"></i></span>Colaboradores
@@ -1233,368 +1258,405 @@
 
             <main class="content-area">
 
-                <!-- Temas Tab -->
-                <div class="tab-content active" id="cfg-subjects-tab">
-                    <div class="content-panels">
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon"><i class="fas fa-bookmark"></i></div>
-                                <h2>Gerenciar Temas</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-subject-name">Nome do Tema</label>
-                                    <input class="form-control" type="text" id="cfg-subject-name" placeholder="Digite o nome do tema">
+                <!-- Cursos Tab (unifica Temas/Assuntos/Módulos/Avaliações) -->
+                <div class="tab-content active" id="cfg-courses-tab">
+                    <div class="courses-toolbar">
+                        <div class="filter-popover-wrap">
+                            <button type="button" class="filter-picker-btn" id="cfg-courses-filter-btn"
+                                    aria-haspopup="true" aria-expanded="false">
+                                <span class="filter-picker-icon"><i class="fas fa-bookmark"></i></span>
+                                <span class="filter-picker-text">
+                                    <strong id="cfg-courses-filter-summary">Todos os temas</strong>
+                                    <small>Filtrar por tema</small>
+                                </span>
+                                <i class="fas fa-chevron-down filter-picker-arrow"></i>
+                            </button>
+                            <div class="filter-popover" id="cfg-courses-filter-popover" hidden>
+                                <div class="filter-popover-head">
+                                    <input type="text" class="filter-popover-search" id="cfg-courses-filter-search" placeholder="Buscar tema..." autocomplete="off">
+                                    <button type="button" class="filter-popover-clear" id="cfg-courses-filter-clear">Limpar</button>
                                 </div>
-                                <div class="form-actions">
-                                    <button class="btn btn-primary btn-full" id="cfg-subject-save">
-                                        <i class="fas fa-save"></i> Salvar Tema
-                                    </button>
-                                    <button class="btn btn-danger btn-icon" id="cfg-subject-delete" style="display:none;" title="Excluir">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                                <div id="cfg-subject-loading" class="cfg-loading-spinner"></div>
+                                <div class="filter-popover-list" id="cfg-courses-filter-list"></div>
+                                <p class="filter-popover-hint">Sem seleção, mostra cursos de todos os temas.</p>
                             </div>
                         </div>
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
-                                <h2>Temas Cadastrados</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div id="cfg-subjects-container" class="subjects-container"></div>
-                            </div>
+                        <button type="button" class="manage-themes-btn" id="cfg-courses-manage-themes-btn">
+                            <i class="fas fa-bookmark"></i> Gerenciar Temas
+                        </button>
+                        <div class="status-segment" id="cfg-courses-status-segment" role="group" aria-label="Filtrar por status">
+                            <button type="button" class="status-segment-btn is-active" data-status="active">Ativos</button>
+                            <button type="button" class="status-segment-btn" data-status="inactive">Inativos</button>
+                            <button type="button" class="status-segment-btn" data-status="all">Ambos</button>
                         </div>
+                        <div class="courses-toolbar-spacer"></div>
+                        <button type="button" class="add-course-btn" id="cfg-courses-add-btn">
+                            <i class="fas fa-plus"></i> Adicionar curso
+                        </button>
                     </div>
+                    <div id="cfg-courses-grid" class="courses-grid"></div>
                 </div>
 
-                <!-- Assuntos Tab -->
-                <div class="tab-content" id="cfg-themes-tab">
-                    <div class="content-panels">
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon"><i class="fas fa-layer-group"></i></div>
-                                <h2>Gerenciar Assuntos</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-theme-subject">Tema</label>
-                                    <select class="form-control" id="cfg-theme-subject">
-                                        <option value="">Selecione um tema</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-theme-name">Nome do Assunto</label>
-                                    <input class="form-control" type="text" id="cfg-theme-name" placeholder="Digite o nome do assunto">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-theme-description">
-                                        Descrição <span style="color:var(--text-3);font-weight:400;">(breve, aparece no card)</span>
-                                    </label>
-                                    <textarea class="form-control" id="cfg-theme-description" maxlength="220" placeholder="Resumo do curso em uma ou duas frases"></textarea>
-                                    <small class="form-hint"><span id="cfg-theme-desc-count">0</span>/220 caracteres</small>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Status</label>
-                                    <div class="deadline-mode-toggle">
-                                        <button type="button" class="deadline-mode-btn active" id="cfg-theme-status-active" data-status="active">
-                                            <i class="fas fa-check-circle"></i> Ativo
-                                        </button>
-                                        <button type="button" class="deadline-mode-btn" id="cfg-theme-status-inactive" data-status="inactive">
-                                            <i class="fas fa-ban"></i> Inativo
-                                        </button>
-                                    </div>
-                                    <small class="form-hint">Assuntos inativos ficam ocultos para os colaboradores no portal.</small>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Imagem do curso <span style="color:var(--text-3);font-weight:400;">(128×128, comprimida)</span></label>
-                                    <div class="image-picker">
-                                        <div class="image-preview" id="cfg-theme-image-preview">
-                                            <span class="image-initials" id="cfg-theme-image-initials">?</span>
-                                        </div>
-                                        <div class="image-picker-actions">
-                                            <label class="btn btn-ghost btn-sm" for="cfg-theme-image-file">
-                                                <i class="fas fa-image"></i> Escolher imagem
-                                            </label>
-                                            <input type="file" id="cfg-theme-image-file" accept="image/*" hidden>
-                                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-theme-image-clear">
-                                                <i class="fas fa-times"></i> Remover
-                                            </button>
-                                            <small class="form-hint" id="cfg-theme-image-info">Sem imagem — o card mostra as iniciais.</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Prazo</label>
-                                    <div class="deadline-mode-toggle">
-                                        <button type="button" class="deadline-mode-btn active" id="cfg-theme-deadline-livre" data-mode="livre">
-                                            <i class="fas fa-infinity"></i> Livre
-                                        </button>
-                                        <button type="button" class="deadline-mode-btn" id="cfg-theme-deadline-prazo" data-mode="prazo">
-                                            <i class="fas fa-calendar-days"></i> Prazo
-                                        </button>
-                                    </div>
-                                    <div id="cfg-theme-deadline-fields" class="deadline-fields" style="display:none;">
-                                        <div class="form-group">
-                                            <label class="form-label" for="cfg-theme-deadline-start">Início <span style="color:var(--text-3);font-weight:400;">(curso fica disponível a partir daqui)</span></label>
-                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-start">
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label" for="cfg-theme-deadline-end">Prazo final <span style="color:var(--text-3);font-weight:400;">(data esperada de término)</span></label>
-                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-end">
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label" for="cfg-theme-deadline-close">Encerramento <span style="color:var(--text-3);font-weight:400;">(bloqueia a avaliação após esta data)</span></label>
-                                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-close">
-                                        </div>
-                                        <small class="form-hint" id="cfg-theme-deadline-error" style="display:none;color:var(--danger);"></small>
-                                    </div>
-                                </div>
-                                <!-- Funções (cargos) que enxergam o curso. Vazio = todas.
-                                     A lista vem dos cargos das contas cadastradas. -->
-                                <div class="form-group">
-                                    <label class="form-label">Funções que veem este curso</label>
-                                    <div class="roles-picker" id="cfg-theme-roles-picker">
-                                        <button type="button" class="roles-picker-btn" id="cfg-theme-roles-btn"
-                                                aria-haspopup="true" aria-expanded="false">
-                                            <span class="roles-picker-icon"><i class="fas fa-user-tag"></i></span>
-                                            <span class="roles-picker-text">
-                                                <strong id="cfg-theme-roles-summary">Todas as funções</strong>
-                                                <small>Clique para selecionar</small>
-                                            </span>
-                                            <i class="fas fa-chevron-down roles-picker-arrow"></i>
-                                        </button>
-                                        <div class="roles-popover" id="cfg-theme-roles-popover" hidden>
-                                            <div class="roles-popover-head">
-                                                <input type="text" class="roles-popover-search" id="cfg-theme-roles-search" placeholder="Buscar função..." autocomplete="off">
-                                                <button type="button" class="roles-popover-clear" id="cfg-theme-roles-clear">Limpar</button>
-                                            </div>
-                                            <div class="roles-popover-list" id="cfg-theme-roles-list"></div>
-                                            <p class="roles-popover-hint">Sem seleção, o curso aparece para todos.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Certificado</label>
-                                    <button type="button" class="cert-config-btn" id="cfg-theme-cert-open">
-                                        <span class="cert-config-btn-icon"><i class="fas fa-award"></i></span>
-                                        <span class="cert-config-btn-text">
-                                            <strong>Configurar certificado</strong>
-                                            <small id="cfg-theme-cert-summary">Emissão desativada</small>
-                                        </span>
-                                        <i class="fas fa-chevron-right cert-config-btn-arrow"></i>
-                                    </button>
-                                </div>
-                                <div class="form-actions">
-                                    <button class="btn btn-primary btn-full" id="cfg-theme-save">
-                                        <i class="fas fa-save"></i> Salvar Assunto
-                                    </button>
-                                    <button class="btn btn-danger btn-icon" id="cfg-theme-delete" style="display:none;" title="Excluir">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                                <div id="cfg-theme-migrate-container" class="migrate-container">
-                                    <div class="migrate-header">
-                                        <i class="fas fa-exchange-alt"></i>
-                                        <h3>Migrar Assunto</h3>
-                                    </div>
-                                    <div class="migrate-content">
-                                        <div class="migrate-select-wrapper">
-                                            <label for="cfg-theme-new-subject">Novo tema de destino</label>
-                                            <select id="cfg-theme-new-subject">
-                                                <option value="">Selecione o novo tema</option>
-                                            </select>
-                                        </div>
-                                        <button id="cfg-theme-migrate" class="migrate-btn">
-                                            <i class="fas fa-arrow-right"></i> Migrar (com Módulos e Avaliações)
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="cfg-theme-loading" class="cfg-loading-spinner"></div>
-                            </div>
-                        </div>
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
-                                <h2>Assuntos Cadastrados</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div id="cfg-themes-container" class="themes-container"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Container técnico: js/admin.js (populateThemes) precisa deste
+                     elemento para funcionar sem alterações, mas a UI nova não o
+                     exibe (o grid de cursos e o modal "Editar curso" já cobrem
+                     essa função). Fica fora de qualquer modal, sempre display:none,
+                     para nunca aparecer visualmente por engano dentro de um modal. -->
+                <div id="cfg-themes-container" class="themes-container" style="display:none !important;"></div>
 
-                <!-- Módulos Tab -->
-                <div class="tab-content" id="cfg-modules-tab">
-                    <div class="content-panels">
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon"><i class="fas fa-play-circle"></i></div>
-                                <h2>Gerenciar Módulos</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-subject">Tema</label>
-                                    <select class="form-control" id="cfg-module-subject">
-                                        <option value="">Selecione um tema</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-theme">Assunto</label>
-                                    <select class="form-control" id="cfg-module-theme">
-                                        <option value="">Selecione um assunto</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-title">Título do Módulo</label>
-                                    <input class="form-control" type="text" id="cfg-module-title" placeholder="Título do módulo">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-caption">Subtítulo</label>
-                                    <textarea class="form-control" id="cfg-module-caption" placeholder="Descrição do módulo"></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-video">ID do Vídeo (YouTube)</label>
-                                    <input class="form-control" type="text" id="cfg-module-video" placeholder="Ex.: dQw4w9WgXcQ">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-pdf">Diretório do PDF</label>
-                                    <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Código após dropbox.com/scl/fi/…">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-module-attachments">
-                                        Anexos <span style="color:var(--text-3);font-weight:400;">(título;URL — um por linha)</span>
-                                    </label>
-                                    <textarea class="form-control" id="cfg-module-attachments" placeholder="Ex.: Guia;https://example.com/guia.pdf"></textarea>
-                                </div>
-                                <div class="form-actions">
-                                    <button class="btn btn-primary btn-full" id="cfg-module-save">
-                                        <i class="fas fa-save"></i> Salvar Módulo
-                                    </button>
-                                    <button class="btn btn-danger btn-icon" id="cfg-module-delete" style="display:none;" title="Excluir">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                                <div id="cfg-module-loading" class="cfg-loading-spinner"></div>
-                            </div>
-                        </div>
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
-                                <h2>Módulos Cadastrados</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div id="cfg-modules-container" class="modules-container"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Modais da aba "Cursos" (dentro de #cfg-root para herdar o CSS #cfg-root .form-group/.form-control/.image-picker/.roles-picker/etc.) -->
 
-                <!-- Avaliações Tab -->
-                <div class="tab-content" id="cfg-quizzes-tab">
-                    <div class="content-panels">
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon"><i class="fas fa-clipboard-list"></i></div>
-                                <h2>Gerenciar Avaliações</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-subject">Tema</label>
-                                    <select class="form-control" id="cfg-quiz-subject">
-                                        <option value="">Selecione um tema</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-theme">Assunto</label>
-                                    <select class="form-control" id="cfg-quiz-theme">
-                                        <option value="">Selecione um assunto</option>
-                                    </select>
-                                </div>
-                                <div id="cfg-quiz-toggle-wrapper" class="quiz-toggle-wrapper" style="display:none;">
-                                    <div class="quiz-toggle-container">
-                                        <label class="quiz-toggle-label">
-                                            <i class="fas fa-power-off"></i>
-                                            <span>Status da Avaliação</span>
-                                        </label>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="cfg-quiz-status-toggle" checked>
-                                            <span class="toggle-slider"></span>
-                                        </label>
-                                        <div class="toggle-status enabled" id="cfg-quiz-status-text">Habilitada</div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-question">Pergunta</label>
-                                    <input class="form-control" type="text" id="cfg-quiz-question" placeholder="Digite a pergunta">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Imagem da questão <span style="color:var(--text-3);font-weight:400;">(opcional, altura 256px, comprimida)</span></label>
-                                    <div class="image-picker">
-                                        <div class="image-preview quiz-image-preview" id="cfg-quiz-image-preview">
-                                            <span class="image-initials"><i class="fas fa-image"></i></span>
-                                        </div>
-                                        <div class="image-picker-actions">
-                                            <label class="btn btn-ghost btn-sm" for="cfg-quiz-image-file">
-                                                <i class="fas fa-image"></i> Escolher imagem
-                                            </label>
-                                            <input type="file" id="cfg-quiz-image-file" accept="image/*" hidden>
-                                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-quiz-image-clear">
-                                                <i class="fas fa-times"></i> Remover
-                                            </button>
-                                            <small class="form-hint" id="cfg-quiz-image-info">Sem imagem — a questão mostra apenas o texto.</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-option1">Opção 1</label>
-                                    <input class="form-control" type="text" id="cfg-quiz-option1" placeholder="Opção 1">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-option2">Opção 2</label>
-                                    <input class="form-control" type="text" id="cfg-quiz-option2" placeholder="Opção 2">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-option3">Opção 3</label>
-                                    <input class="form-control" type="text" id="cfg-quiz-option3" placeholder="Opção 3">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-option4">Opção 4</label>
-                                    <input class="form-control" type="text" id="cfg-quiz-option4" placeholder="Opção 4">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="cfg-quiz-correct">Resposta Correta</label>
-                                    <select class="form-control" id="cfg-quiz-correct">
-                                        <option value="0">Opção 1</option>
-                                        <option value="1">Opção 2</option>
-                                        <option value="2">Opção 3</option>
-                                        <option value="3">Opção 4</option>
-                                    </select>
-                                </div>
-                                <div class="form-actions">
-                                    <button class="btn btn-primary btn-full" id="cfg-quiz-save">
-                                        <i class="fas fa-save"></i> Salvar Questão
-                                    </button>
-                                    <button class="btn btn-danger btn-icon" id="cfg-quiz-delete" style="display:none;" title="Excluir">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                                <div id="cfg-quiz-loading" class="cfg-loading-spinner"></div>
-                            </div>
+    <!-- Modal "Gerenciar Temas" -->
+    <div class="modal" id="cfg-subject-manage-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-subject-manage-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cfg-subject-manage-title"><i class="fas fa-bookmark"></i> Gerenciar Temas</h2>
+                <span class="close" id="cfg-subject-manage-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="cfg-subject-name">Nome do Tema</label>
+                    <input class="form-control" type="text" id="cfg-subject-name" placeholder="Digite o nome do tema">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-full" id="cfg-subject-save">
+                        <i class="fas fa-save"></i> Salvar Tema
+                    </button>
+                    <button class="btn btn-danger btn-icon" id="cfg-subject-delete" style="display:none;" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div id="cfg-subject-loading" class="cfg-loading-spinner"></div>
+                <div id="cfg-subjects-container" class="subject-manage-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de formulário de Assunto (curso) -->
+    <div class="modal" id="cfg-theme-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-theme-form-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cfg-theme-form-title"><i class="fas fa-layer-group"></i> Gerenciar Curso</h2>
+                <span class="close" id="cfg-theme-form-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="cfg-theme-subject">Tema</label>
+                    <select class="form-control" id="cfg-theme-subject">
+                        <option value="">Selecione um tema</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-theme-name">Nome do Assunto</label>
+                    <input class="form-control" type="text" id="cfg-theme-name" placeholder="Digite o nome do assunto">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-theme-description">
+                        Descrição <span style="color:var(--text-3);font-weight:400;">(breve, aparece no card)</span>
+                    </label>
+                    <textarea class="form-control" id="cfg-theme-description" maxlength="220" placeholder="Resumo do curso em uma ou duas frases"></textarea>
+                    <small class="form-hint"><span id="cfg-theme-desc-count">0</span>/220 caracteres</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <div class="deadline-mode-toggle">
+                        <button type="button" class="deadline-mode-btn active" id="cfg-theme-status-active" data-status="active">
+                            <i class="fas fa-check-circle"></i> Ativo
+                        </button>
+                        <button type="button" class="deadline-mode-btn" id="cfg-theme-status-inactive" data-status="inactive">
+                            <i class="fas fa-ban"></i> Inativo
+                        </button>
+                    </div>
+                    <small class="form-hint">Assuntos inativos ficam ocultos para os colaboradores no portal.</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Imagem do curso <span style="color:var(--text-3);font-weight:400;">(128×128, comprimida)</span></label>
+                    <div class="image-picker">
+                        <div class="image-preview" id="cfg-theme-image-preview">
+                            <span class="image-initials" id="cfg-theme-image-initials">?</span>
                         </div>
-                        <div class="panel-card">
-                            <div class="panel-header">
-                                <div class="panel-icon green"><i class="fas fa-list"></i></div>
-                                <h2>Questões Cadastradas</h2>
-                            </div>
-                            <div class="panel-body">
-                                <div id="cfg-quizzes-container" class="quizzes-container"></div>
-                            </div>
+                        <div class="image-picker-actions">
+                            <label class="btn btn-ghost btn-sm" for="cfg-theme-image-file">
+                                <i class="fas fa-image"></i> Escolher imagem
+                            </label>
+                            <input type="file" id="cfg-theme-image-file" accept="image/*" hidden>
+                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-theme-image-clear">
+                                <i class="fas fa-times"></i> Remover
+                            </button>
+                            <small class="form-hint" id="cfg-theme-image-info">Sem imagem — o card mostra as iniciais.</small>
                         </div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Prazo</label>
+                    <div class="deadline-mode-toggle">
+                        <button type="button" class="deadline-mode-btn active" id="cfg-theme-deadline-livre" data-mode="livre">
+                            <i class="fas fa-infinity"></i> Livre
+                        </button>
+                        <button type="button" class="deadline-mode-btn" id="cfg-theme-deadline-prazo" data-mode="prazo">
+                            <i class="fas fa-calendar-days"></i> Prazo
+                        </button>
+                    </div>
+                    <div id="cfg-theme-deadline-fields" class="deadline-fields" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label" for="cfg-theme-deadline-start">Início <span style="color:var(--text-3);font-weight:400;">(curso fica disponível a partir daqui)</span></label>
+                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-start">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="cfg-theme-deadline-end">Prazo final <span style="color:var(--text-3);font-weight:400;">(data esperada de término)</span></label>
+                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-end">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="cfg-theme-deadline-close">Encerramento <span style="color:var(--text-3);font-weight:400;">(bloqueia a avaliação após esta data)</span></label>
+                            <input class="form-control" type="datetime-local" id="cfg-theme-deadline-close">
+                        </div>
+                        <small class="form-hint" id="cfg-theme-deadline-error" style="display:none;color:var(--danger);"></small>
+                    </div>
+                </div>
+                <!-- Funções (cargos) que enxergam o curso. Vazio = todas.
+                     A lista vem dos cargos das contas cadastradas. -->
+                <div class="form-group">
+                    <label class="form-label">Funções que veem este curso</label>
+                    <div class="roles-picker" id="cfg-theme-roles-picker">
+                        <button type="button" class="roles-picker-btn" id="cfg-theme-roles-btn"
+                                aria-haspopup="true" aria-expanded="false">
+                            <span class="roles-picker-icon"><i class="fas fa-user-tag"></i></span>
+                            <span class="roles-picker-text">
+                                <strong id="cfg-theme-roles-summary">Todas as funções</strong>
+                                <small>Clique para selecionar</small>
+                            </span>
+                            <i class="fas fa-chevron-down roles-picker-arrow"></i>
+                        </button>
+                        <div class="roles-popover" id="cfg-theme-roles-popover" hidden>
+                            <div class="roles-popover-head">
+                                <input type="text" class="roles-popover-search" id="cfg-theme-roles-search" placeholder="Buscar função..." autocomplete="off">
+                                <button type="button" class="roles-popover-clear" id="cfg-theme-roles-clear">Limpar</button>
+                            </div>
+                            <div class="roles-popover-list" id="cfg-theme-roles-list"></div>
+                            <p class="roles-popover-hint">Sem seleção, o curso aparece para todos.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Certificado</label>
+                    <button type="button" class="cert-config-btn" id="cfg-theme-cert-open">
+                        <span class="cert-config-btn-icon"><i class="fas fa-award"></i></span>
+                        <span class="cert-config-btn-text">
+                            <strong>Configurar certificado</strong>
+                            <small id="cfg-theme-cert-summary">Emissão desativada</small>
+                        </span>
+                        <i class="fas fa-chevron-right cert-config-btn-arrow"></i>
+                    </button>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-full" id="cfg-theme-save">
+                        <i class="fas fa-save"></i> Salvar Assunto
+                    </button>
+                    <button class="btn btn-danger btn-icon" id="cfg-theme-delete" style="display:none;" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div id="cfg-theme-migrate-container" class="migrate-container">
+                    <div class="migrate-header">
+                        <i class="fas fa-exchange-alt"></i>
+                        <h3>Migrar Assunto</h3>
+                    </div>
+                    <div class="migrate-content">
+                        <div class="migrate-select-wrapper">
+                            <label for="cfg-theme-new-subject">Novo tema de destino</label>
+                            <select id="cfg-theme-new-subject">
+                                <option value="">Selecione o novo tema</option>
+                            </select>
+                        </div>
+                        <button id="cfg-theme-migrate" class="migrate-btn">
+                            <i class="fas fa-arrow-right"></i> Migrar (com Módulos e Avaliações)
+                        </button>
+                    </div>
+                </div>
+                <div id="cfg-theme-loading" class="cfg-loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de detalhe do curso (Assunto): hero + abas internas Módulos/Avaliação -->
+    <div class="modal" id="cfg-course-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-course-detail-title">
+        <div class="modal-content course-drawer-content">
+            <div class="course-drawer-hero">
+                <div class="course-drawer-hero-thumb" id="cfg-course-detail-thumb">?</div>
+                <div class="course-drawer-hero-info">
+                    <h2 id="cfg-course-detail-title">Curso</h2>
+                    <div class="course-drawer-hero-tags" id="cfg-course-detail-tags"></div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" id="cfg-course-detail-edit">
+                    <i class="fas fa-pencil-alt"></i> Editar curso
+                </button>
+                <span class="close" id="cfg-course-detail-close">&times;</span>
+            </div>
+            <div class="course-drawer-tabs">
+                <button type="button" class="tab-btn active" data-course-detail-tab="info">
+                    <i class="fas fa-circle-info"></i> Informações
+                </button>
+                <button type="button" class="tab-btn" data-course-detail-tab="modules">
+                    Módulos <span class="tab-count" id="cfg-course-detail-tabcount-modules">0</span>
+                </button>
+                <button type="button" class="tab-btn" data-course-detail-tab="quiz">
+                    Avaliação <span class="tab-count" id="cfg-course-detail-tabcount-quiz">0</span>
+                </button>
+            </div>
+            <div class="course-drawer-body">
+                <div class="tab-content active" id="cfg-course-detail-tab-info">
+                    <div id="cfg-course-detail-info" class="course-info-grid"></div>
+                </div>
+                <div class="tab-content" id="cfg-course-detail-tab-modules">
+                    <div class="course-drawer-section-head">
+                        <h3>Módulos do curso</h3>
+                        <button type="button" class="btn btn-primary btn-sm" id="cfg-course-detail-add-module">
+                            <i class="fas fa-plus"></i> Adicionar módulo
+                        </button>
+                    </div>
+                    <div id="cfg-modules-container" class="course-drawer-list modules-container"></div>
+                </div>
+                <div class="tab-content" id="cfg-course-detail-tab-quiz">
+                    <div id="cfg-quiz-toggle-wrapper" class="quiz-toggle-wrapper" style="display:none;">
+                        <div class="quiz-toggle-container">
+                            <label class="quiz-toggle-label">
+                                <i class="fas fa-power-off"></i>
+                                <span>Status da Avaliação</span>
+                            </label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="cfg-quiz-status-toggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <div class="toggle-status enabled" id="cfg-quiz-status-text">Habilitada</div>
+                        </div>
+                    </div>
+                    <div class="course-drawer-section-head">
+                        <h3>Questões da avaliação</h3>
+                        <button type="button" class="btn btn-primary btn-sm" id="cfg-course-detail-add-quiz">
+                            <i class="fas fa-plus"></i> Adicionar questão
+                        </button>
+                    </div>
+                    <div id="cfg-quizzes-container" class="course-drawer-list quizzes-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de formulário de Módulo (empilhado sobre o detalhe do curso) -->
+    <div class="modal" id="cfg-module-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-module-form-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cfg-module-form-title"><i class="fas fa-play-circle"></i> Gerenciar Módulo</h2>
+                <span class="close" id="cfg-module-form-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <select class="form-control" id="cfg-module-subject" hidden></select>
+                <select class="form-control" id="cfg-module-theme" hidden></select>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-module-title">Título do Módulo</label>
+                    <input class="form-control" type="text" id="cfg-module-title" placeholder="Título do módulo">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-module-caption">Subtítulo</label>
+                    <textarea class="form-control" id="cfg-module-caption" placeholder="Descrição do módulo"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-module-video">ID do Vídeo (YouTube)</label>
+                    <input class="form-control" type="text" id="cfg-module-video" placeholder="Ex.: dQw4w9WgXcQ">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-module-pdf">Diretório do PDF</label>
+                    <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Código após dropbox.com/scl/fi/…">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-module-attachments">
+                        Anexos <span style="color:var(--text-3);font-weight:400;">(título;URL — um por linha)</span>
+                    </label>
+                    <textarea class="form-control" id="cfg-module-attachments" placeholder="Ex.: Guia;https://example.com/guia.pdf"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-full" id="cfg-module-save">
+                        <i class="fas fa-save"></i> Salvar Módulo
+                    </button>
+                    <button class="btn btn-danger btn-icon" id="cfg-module-delete" style="display:none;" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div id="cfg-module-loading" class="cfg-loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de formulário de Avaliação (empilhado sobre o detalhe do curso) -->
+    <div class="modal" id="cfg-quiz-form-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-quiz-form-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cfg-quiz-form-title"><i class="fas fa-clipboard-list"></i> Gerenciar Questão</h2>
+                <span class="close" id="cfg-quiz-form-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <select class="form-control" id="cfg-quiz-subject" hidden></select>
+                <select class="form-control" id="cfg-quiz-theme" hidden></select>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-question">Pergunta</label>
+                    <input class="form-control" type="text" id="cfg-quiz-question" placeholder="Digite a pergunta">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Imagem da questão <span style="color:var(--text-3);font-weight:400;">(opcional, altura 256px, comprimida)</span></label>
+                    <div class="image-picker">
+                        <div class="image-preview quiz-image-preview" id="cfg-quiz-image-preview">
+                            <span class="image-initials"><i class="fas fa-image"></i></span>
+                        </div>
+                        <div class="image-picker-actions">
+                            <label class="btn btn-ghost btn-sm" for="cfg-quiz-image-file">
+                                <i class="fas fa-image"></i> Escolher imagem
+                            </label>
+                            <input type="file" id="cfg-quiz-image-file" accept="image/*" hidden>
+                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-quiz-image-clear">
+                                <i class="fas fa-times"></i> Remover
+                            </button>
+                            <small class="form-hint" id="cfg-quiz-image-info">Sem imagem — a questão mostra apenas o texto.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-option1">Opção 1</label>
+                    <input class="form-control" type="text" id="cfg-quiz-option1" placeholder="Opção 1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-option2">Opção 2</label>
+                    <input class="form-control" type="text" id="cfg-quiz-option2" placeholder="Opção 2">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-option3">Opção 3</label>
+                    <input class="form-control" type="text" id="cfg-quiz-option3" placeholder="Opção 3">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-option4">Opção 4</label>
+                    <input class="form-control" type="text" id="cfg-quiz-option4" placeholder="Opção 4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-quiz-correct">Resposta Correta</label>
+                    <select class="form-control" id="cfg-quiz-correct">
+                        <option value="0">Opção 1</option>
+                        <option value="1">Opção 2</option>
+                        <option value="2">Opção 3</option>
+                        <option value="3">Opção 4</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-full" id="cfg-quiz-save">
+                        <i class="fas fa-save"></i> Salvar Questão
+                    </button>
+                    <button class="btn btn-danger btn-icon" id="cfg-quiz-delete" style="display:none;" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div id="cfg-quiz-loading" class="cfg-loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+
 
                 <!-- Colaboradores Tab -->
                 <div class="tab-content" id="cfg-colaboradores-tab">
@@ -1631,7 +1693,20 @@
                                     <i class="fas fa-search"></i>
                                     <input type="search" id="cfg-colab-filter" placeholder="Buscar colaborador...">
                                 </div>
-                                <div id="cfg-colab-container" class="themes-container"></div>
+                                <div class="colab-filters-row">
+                                    <div class="colab-status-filter" id="cfg-colab-link-filter" data-group="link">
+                                        <button type="button" class="colab-status-btn is-active" data-status="allLink">Todos</button>
+                                        <button type="button" class="colab-status-btn" data-status="unlinked">Desvinculado</button>
+                                        <button type="button" class="colab-status-btn" data-status="withAccount">Conta associada</button>
+                                        <button type="button" class="colab-status-btn" data-status="noAccount">Sem conta</button>
+                                    </div>
+                                    <div class="colab-status-filter colab-status-filter-right" id="cfg-colab-status-filter" data-group="status">
+                                        <button type="button" class="colab-status-btn is-active" data-status="active">Ativos</button>
+                                        <button type="button" class="colab-status-btn" data-status="inactive">Inativos</button>
+                                        <button type="button" class="colab-status-btn" data-status="all">Ambos</button>
+                                    </div>
+                                </div>
+                                <div id="cfg-colab-container" class="colab-grid"></div>
                             </div>
                         </div>
                     </div>
@@ -1922,6 +1997,7 @@
     <script src="js/auth.js"></script>
     <script src="js/student-auth.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/admin-courses.js"></script>
     <script src="js/admin-colaboradores.js"></script>
     <script src="js/admin-users.js"></script>
     <script src="js/admin-excel.js"></script>

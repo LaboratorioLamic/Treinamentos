@@ -20,14 +20,17 @@ let currentModuleIndex = null;
 let currentQuizIndex = null;
 
 function initializeTabs() {
-    const allTabButtons = document.querySelectorAll('#cfg-root .tab-btn');
-    const allTabContents = document.querySelectorAll('#cfg-root .tab-content');
+    // Escopado à nav da sidebar/aos tab-content de topo — ver comentário em
+    // 'tabButtons'/'tabContents' mais abaixo sobre por que não usar
+    // '#cfg-root .tab-btn'/'#cfg-root .tab-content' sem escopo aqui.
+    const allTabButtons = document.querySelectorAll('#cfg-root .sidebar-nav .tab-btn');
+    const allTabContents = document.querySelectorAll('#cfg-root .content-area > .tab-content');
     allTabButtons.forEach(btn => btn.classList.remove('active'));
     allTabContents.forEach(content => content.classList.remove('active'));
-    const subjectsBtn = document.querySelector('#cfg-root .tab-btn[data-tab="subjects"]');
-    const subjectsTab = document.getElementById('cfg-subjects-tab');
-    if (subjectsBtn) subjectsBtn.classList.add('active');
-    if (subjectsTab) subjectsTab.classList.add('active');
+    const coursesBtn = document.querySelector('#cfg-root .sidebar-nav .tab-btn[data-tab="courses"]');
+    const coursesTab = document.getElementById('cfg-courses-tab');
+    if (coursesBtn) coursesBtn.classList.add('active');
+    if (coursesTab) coursesTab.classList.add('active');
 }
 
 function escapeHtml(value) {
@@ -273,12 +276,13 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 data = snapshot.exists() ? snapshot.val() : { trainingData: {}, quizData: {} };
                 initializeOrderFields();
                 populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
+                window.UniAdminCourses?.refresh?.();
                 tabButtons.forEach(b => b.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
-                const subjectsBtn = document.querySelector('#cfg-root .tab-btn[data-tab="subjects"]');
-                const subjectsTab = document.getElementById('cfg-subjects-tab');
-                if (subjectsBtn) subjectsBtn.classList.add('active');
-                if (subjectsTab) subjectsTab.classList.add('active');
+                const coursesBtn = document.querySelector('#cfg-root .tab-btn[data-tab="courses"]');
+                const coursesTab = document.getElementById('cfg-courses-tab');
+                if (coursesBtn) coursesBtn.classList.add('active');
+                if (coursesTab) coursesTab.classList.add('active');
             } catch (error) {
                 console.error('Erro ao carregar dados:', error.message);
                 showWarning('Não foi possível carregar os dados. Tente novamente.');
@@ -290,6 +294,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!currentDbPath) { console.error('currentDbPath não definido'); showWarning('Nenhuma categoria selecionada.'); return false; }
             try {
                 await set(ref(db, currentDbPath), data);
+                // Ponte para a camada de apresentação da aba "Cursos" (js/admin-courses.js):
+                // qualquer save bem-sucedido (Tema/Assunto/Módulo/Avaliação) atualiza o grid.
+                window.UniAdminCourses?.refresh?.();
                 return true;
             } catch (error) {
                 console.error('Erro ao salvar dados:', error.message);
@@ -355,8 +362,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             return false;
         }
 
-        const tabButtons = document.querySelectorAll('#cfg-root .tab-btn');
-        const tabContents = document.querySelectorAll('#cfg-root .tab-content');
+        // Escopado à nav da sidebar: '#cfg-root .tab-btn' sozinho pegaria também
+        // os botões de aba internos do drawer de curso (.course-drawer-tabs) e
+        // dos modais de dashboard, que reaproveitam a mesma classe .tab-btn.
+        const tabButtons = document.querySelectorAll('#cfg-root .sidebar-nav .tab-btn');
+        const tabContents = document.querySelectorAll('#cfg-root .content-area > .tab-content');
         // Colaboradores e Usuários são globais (não dependem de categoria) —
         // as demais abas gerenciam conteúdo de curso e continuam exigindo
         // uma categoria escolhida.
@@ -371,10 +381,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 btn.classList.add('active');
                 const targetTab = document.getElementById(`cfg-${btn.dataset.tab}-tab`);
                 if (targetTab) targetTab.classList.add('active');
-                if (btn.dataset.tab === 'subjects') populateSubjects();
-                if (btn.dataset.tab === 'themes') populateThemes();
-                if (btn.dataset.tab === 'modules') populateModules();
-                if (btn.dataset.tab === 'quizzes') populateQuizzes();
+                if (btn.dataset.tab === 'courses') window.UniAdminCourses?.refresh?.();
                 if (btn.dataset.tab === 'colaboradores') window.UniAdmin.populateColaboradores?.();
                 if (btn.dataset.tab === 'users') window.UniAdmin.populateUsers?.();
                 if (btn.dataset.tab === 'dashboard') window.UniAdmin.initDashboard?.();
@@ -1516,7 +1523,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const isFirst = index === 0;
                 const isLast = index === quizzes.length - 1;
                 card.innerHTML = `
-                    <h3>${quiz.question}</h3>
+                    <h3><span class="quiz-card-number">${index + 1}.</span> ${quiz.question}</h3>
                     ${quiz.image ? `<img class="quiz-card-image" src="${quiz.image}" alt="Imagem da questão">` : ''}
                     <div class="card-footer">
                         <div class="order-buttons">
@@ -1659,5 +1666,42 @@ document.getElementById('cfg-back-to-portal')?.addEventListener('click', closeAd
 // Ponte usada por js/portal-auth.js para abrir o painel apos validar a senha.
 window.__openAdmin = openAdminPanel;
 window.__closeAdmin = closeAdminPanel;
+
+// ─── Ponte de dados/lógica usada pela camada de apresentação da aba
+// "Cursos" (js/admin-courses.js). Expõe leitura do estado e as mesmas
+// funções de CRUD/ordenação já usadas pelo painel legado — a camada nova
+// não duplica lógica, só monta a UI em cima disto.
+window.UniAdminCoursesData = {
+    getData: () => data,
+    getCurrentCategory: () => currentCategory,
+    // Contexto (Tema/Assunto) selecionado nos formulários de Módulo/Avaliação.
+    // A camada de apresentação seta os <select> ocultos e dispara 'change'
+    // antes de abrir os modais de Módulo/Avaliação; ela não chama estas
+    // funções de posicionamento diretamente.
+    setModuleContext(subjectId, themeId) {
+        moduleSubjectSelect.value = subjectId || '';
+        moduleSubjectSelect.dispatchEvent(new Event('change'));
+        moduleThemeSelect.value = themeId || '';
+        moduleThemeSelect.dispatchEvent(new Event('change'));
+    },
+    setQuizContext(subjectId, themeId) {
+        quizSubjectSelect.value = subjectId || '';
+        quizSubjectSelect.dispatchEvent(new Event('change'));
+        quizThemeSelect.value = themeId || '';
+        quizThemeSelect.dispatchEvent(new Event('change'));
+    },
+    resetModuleForm() {
+        currentModuleIndex = null;
+        moduleTitleInput.value = ''; moduleCaptionInput.value = ''; moduleVideoInput.value = '';
+        modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
+        moduleDeleteBtn.style.display = 'none';
+    },
+    resetQuizForm,
+    resetThemeForm,
+    themeInitials,
+    escapeHtml,
+    moveSubject, moveTheme, moveModule, moveQuiz,
+    deleteSubject, deleteTheme, toggleThemeActive,
+};
 
 })();

@@ -30,6 +30,10 @@
     }
 
     let colaboradoresCache = {};
+    // Dois grupos de filtro independentes e combináveis: status (ativos/
+    // inativos/ambos) e vínculo (todos/desvinculado/conta associada/sem conta).
+    let statusFilter = 'active';
+    let linkFilter = 'allLink';
 
     function renderList(filterTerm = '') {
         const container = document.getElementById('cfg-colab-container');
@@ -39,10 +43,22 @@
             .map(id => ({ id, ...colaboradoresCache[id] }))
             .filter(c => c && c.fullName)
             .filter(c => !term || normalizeName(c.fullName).includes(term))
+            .filter(c => {
+                const isActive = c.active !== false;
+                if (statusFilter === 'active') return isActive;
+                if (statusFilter === 'inactive') return !isActive;
+                return true;
+            })
+            .filter(c => {
+                if (linkFilter === 'unlinked') return c.inSheet === false;
+                if (linkFilter === 'withAccount') return !!c.accountUserId;
+                if (linkFilter === 'noAccount') return !c.accountUserId;
+                return true;
+            })
             .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'));
 
         if (entries.length === 0) {
-            container.innerHTML = '<p class="form-hint">Nenhum colaborador sincronizado ainda.</p>';
+            container.innerHTML = '<p class="form-hint">Nenhum colaborador encontrado.</p>';
             return;
         }
 
@@ -52,8 +68,14 @@
             if (c.role) metaParts.push(`<i class="fas fa-id-badge"></i> ${escapeHtml(c.role)}`);
             const metaLine = metaParts.length ? `<p class="card-desc">${metaParts.join(' &nbsp;&bull;&nbsp; ')}</p>` : '';
             const edited = c.editedFields && Object.keys(c.editedFields).length > 0;
+            const isActive = c.active !== false;
+            // Balão de sincronização: mostra se o nome completo ainda consta
+            // na última leitura da planilha (inSheet, gravado pelo sync).
+            const syncBadge = c.inSheet === false
+                ? '<span class="colab-badge is-unlinked"><i class="fas fa-link-slash"></i> Desvinculado</span>'
+                : '<span class="colab-badge is-linked"><i class="fas fa-check"></i> Sincronizado</span>';
             return `
-            <div class="theme-card" data-colab-id="${escapeHtml(c.id)}">
+            <div class="theme-card${isActive ? '' : ' is-inactive'}" data-colab-id="${escapeHtml(c.id)}">
                 <div class="theme-card-head">
                     <span class="theme-card-thumb is-initials">${escapeHtml(colabInitials(c.fullName))}</span>
                     <div class="theme-card-title">
@@ -65,6 +87,7 @@
                                 : '<i class="fas fa-circle" style="color:var(--text-3);"></i> Sem conta associada'}
                             ${edited ? ' &nbsp;&bull;&nbsp; <i class="fas fa-pen"></i> Corrigido manualmente' : ''}
                         </p>
+                        <p class="card-desc">${syncBadge} ${isActive ? '' : '<span class="colab-badge is-unlinked"><i class="fas fa-pause"></i> Inativo</span>'}</p>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -72,6 +95,13 @@
                         <button class="btn btn-ghost btn-sm colab-edit" data-colab-id="${escapeHtml(c.id)}" title="Corrigir dados">
                             <i class="fas fa-pencil-alt"></i><span class="btn-label"> Editar</span>
                         </button>
+                        <button class="btn btn-ghost btn-sm colab-toggle-active" data-colab-id="${escapeHtml(c.id)}" title="${isActive ? 'Inativar' : 'Ativar'}">
+                            <i class="fas ${isActive ? 'fa-toggle-off' : 'fa-toggle-on'}"></i><span class="btn-label"> ${isActive ? 'Inativar' : 'Ativar'}</span>
+                        </button>
+                        ${c.inSheet === false ? `
+                        <button class="btn btn-ghost btn-sm colab-merge" data-colab-id="${escapeHtml(c.id)}" title="Unificar com outro colaborador (mesma unidade e função)">
+                            <i class="fas fa-code-merge"></i><span class="btn-label"> Substituir</span>
+                        </button>` : ''}
                         <button class="btn btn-danger btn-sm colab-delete" data-colab-id="${escapeHtml(c.id)}" title="Excluir da lista">
                             <i class="fas fa-trash"></i><span class="btn-label"> Excluir</span>
                         </button>
@@ -86,11 +116,51 @@
         container.querySelectorAll('.colab-delete').forEach(btn => {
             btn.addEventListener('click', () => handleDeleteColab(btn.dataset.colabId));
         });
+        container.querySelectorAll('.colab-toggle-active').forEach(btn => {
+            btn.addEventListener('click', () => handleToggleActive(btn.dataset.colabId));
+        });
+        container.querySelectorAll('.colab-merge').forEach(btn => {
+            btn.addEventListener('click', () => openMergeModal(btn.dataset.colabId));
+        });
     }
 
     function currentFilterTerm() {
         return document.getElementById('cfg-colab-filter')?.value || '';
     }
+
+    async function handleToggleActive(colabId) {
+        const colab = colaboradoresCache[colabId];
+        if (!colab) return;
+        const nextActive = colab.active === false;
+        try {
+            await db.ref().update({ [`${COLABS_PATH}/${colabId}/active`]: nextActive });
+            colaboradoresCache[colabId] = { ...colab, active: nextActive };
+            renderList(currentFilterTerm());
+            showWarning(nextActive ? 'Colaborador ativado.' : 'Colaborador inativado.');
+        } catch (error) {
+            showWarning('Erro ao atualizar status: ' + error.message);
+        }
+    }
+
+    document.getElementById('cfg-colab-status-filter')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.colab-status-btn');
+        if (!btn) return;
+        statusFilter = btn.dataset.status;
+        document.querySelectorAll('#cfg-colab-status-filter .colab-status-btn').forEach(b => {
+            b.classList.toggle('is-active', b === btn);
+        });
+        renderList(currentFilterTerm());
+    });
+
+    document.getElementById('cfg-colab-link-filter')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.colab-status-btn');
+        if (!btn) return;
+        linkFilter = btn.dataset.status;
+        document.querySelectorAll('#cfg-colab-link-filter .colab-status-btn').forEach(b => {
+            b.classList.toggle('is-active', b === btn);
+        });
+        renderList(currentFilterTerm());
+    });
 
     // ─── Edição manual (corrige o que veio errado da planilha) ───
     // O que é alterado aqui fica marcado em editedFields e passa a ser
@@ -243,15 +313,19 @@
     // continua exibindo o dado errado e o nome corrigido deixa de casar com
     // as avaliações antigas.
     async function resultUpdatesForRename(oldNameKey, { fullName, unit, role }) {
+        // Aceita uma chave só ou uma lista de chaves antigas — o merge passa
+        // tanto o nome atual quanto o de origem (sourceKey) do colaborador,
+        // para pegar histórico gravado sob qualquer nome que ele já teve.
+        const oldKeys = new Set((Array.isArray(oldNameKey) ? oldNameKey : [oldNameKey]).filter(Boolean));
         const snapshot = await get(ref(db, RESULTS_PATH));
-        if (!snapshot.exists()) return { updates: {}, count: 0 };
+        if (!snapshot.exists() || oldKeys.size === 0) return { updates: {}, count: 0 };
         const results = snapshot.val() || {};
         const updates = {};
         let count = 0;
 
         Object.entries(results.imported || {}).forEach(([slug, entries]) => {
             Object.entries(entries || {}).forEach(([entryId, r]) => {
-                if (normalizeName(r?.name || '') !== oldNameKey) return;
+                if (!oldKeys.has(normalizeName(r?.name || ''))) return;
                 const base = `${RESULTS_PATH}/imported/${slug}/${entryId}`;
                 updates[`${base}/name`] = fullName;
                 updates[`${base}/unit`] = unit || '';
@@ -265,7 +339,7 @@
             Object.entries(subjects || {}).forEach(([subjectId, themes]) => {
                 Object.entries(themes || {}).forEach(([themeId, entries]) => {
                     Object.entries(entries || {}).forEach(([entryId, r]) => {
-                        if (normalizeName(r?.name || '') !== oldNameKey) return;
+                        if (!oldKeys.has(normalizeName(r?.name || ''))) return;
                         updates[`${RESULTS_PATH}/estagiosLivre/${slug}/${subjectId}/${themeId}/${entryId}/name`] = fullName;
                         count++;
                     });
@@ -385,6 +459,167 @@
             showWarning('Erro ao excluir colaborador: ' + error.message);
         }
     }
+
+    // ─── Substituir (unificar duplicado desvinculado com outro colaborador) ───
+    // Resolve duplicidade: um registro que saiu da planilha (inSheet: false)
+    // costuma ser o "antigo" de alguém que voltou com outra linha na
+    // planilha. "Substituir" funde esse registro no colaborador de destino —
+    // mesma unidade e função — levando conta vinculada (se o destino ainda
+    // não tiver uma) e histórico avulso, e apaga o duplicado.
+    const mergeModal = document.getElementById('cfg-colab-merge-modal');
+    const mergeSourceName = document.getElementById('cfg-colab-merge-source-name');
+    const mergeSourceMeta = document.getElementById('cfg-colab-merge-source-meta');
+    const mergeTargetInput = document.getElementById('cfg-colab-merge-target');
+    const mergeTargetPopover = document.getElementById('cfg-colab-merge-target-popover');
+    const mergeError = document.getElementById('cfg-colab-merge-error');
+    const mergeOk = document.getElementById('cfg-colab-merge-ok');
+    const mergeCancel = document.getElementById('cfg-colab-merge-cancel');
+
+    let mergingColabId = null;
+    let mergeTargetId = null;
+
+    function mergeCandidates(sourceColab) {
+        return Object.keys(colaboradoresCache)
+            .filter(id => id !== sourceColab.id)
+            .map(id => ({ id, ...colaboradoresCache[id] }))
+            .filter(c => c.fullName
+                && (c.unit || null) === (sourceColab.unit || null)
+                && (c.role || null) === (sourceColab.role || null))
+            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'));
+    }
+
+    function mergeError_(message) {
+        if (!mergeError) return;
+        mergeError.textContent = message || '';
+        mergeError.classList.toggle('active', !!message);
+    }
+
+    function closeMergeModal() {
+        if (mergeModal) mergeModal.style.display = 'none';
+        mergingColabId = null;
+        mergeTargetId = null;
+    }
+
+    function openMergeModal(colabId) {
+        const colab = colaboradoresCache[colabId];
+        if (!colab || !mergeModal) return;
+        mergingColabId = colabId;
+        mergeTargetId = null;
+        mergeError_('');
+        mergeTargetInput.value = '';
+        if (mergeSourceName) mergeSourceName.textContent = colab.fullName;
+        if (mergeSourceMeta) {
+            mergeSourceMeta.innerHTML = `
+                <span><i class="fas fa-building"></i> ${escapeHtml(colab.unit || 'Sem unidade')}</span>
+                <span><i class="fas fa-id-badge"></i> ${escapeHtml(colab.role || 'Sem função')}</span>`;
+        }
+        mergeModal.style.display = 'flex';
+        setTimeout(() => mergeTargetInput.focus(), 60);
+    }
+
+    setupCombobox({
+        input: mergeTargetInput,
+        popover: mergeTargetPopover,
+        emptyText: 'Nenhum colaborador com mesma unidade e função.',
+        getItems: () => {
+            const colab = colaboradoresCache[mergingColabId];
+            if (!colab) return [];
+            return mergeCandidates({ id: mergingColabId, ...colab }).map(c => c.fullName);
+        }
+    });
+    // A combobox genérica só resolve o valor digitado — aqui também precisa
+    // do id do colaborador escolhido, então intercepta a escolha via input.
+    mergeTargetInput?.addEventListener('input', () => {
+        const colab = colaboradoresCache[mergingColabId];
+        if (!colab) return;
+        const match = mergeCandidates({ id: mergingColabId, ...colab })
+            .find(c => c.fullName === mergeTargetInput.value);
+        mergeTargetId = match ? match.id : null;
+    });
+
+    // Reatribui histórico avulso (mesma lógica de resultUpdatesForRename) do
+    // nome de origem para o nome/unidade/função de destino. Passa tanto o
+    // nome atual quanto o de origem (sourceKey) do colaborador que está
+    // sendo substituído, para não deixar escapar histórico gravado sob um
+    // nome anterior a uma correção manual.
+    async function resultUpdatesForMerge(oldNameKeys, target) {
+        return resultUpdatesForRename(oldNameKeys, {
+            fullName: target.fullName, unit: target.unit, role: target.role
+        });
+    }
+
+    async function submitMerge() {
+        const sourceId = mergingColabId;
+        const source = colaboradoresCache[sourceId];
+        if (!source) return;
+
+        if (!mergeTargetId || !colaboradoresCache[mergeTargetId]) {
+            mergeError_('Escolha um colaborador da lista para unificar.');
+            return;
+        }
+        const target = { id: mergeTargetId, ...colaboradoresCache[mergeTargetId] };
+        if ((target.unit || null) !== (source.unit || null) || (target.role || null) !== (source.role || null)) {
+            mergeError_('O destino precisa ter a mesma unidade e função.');
+            return;
+        }
+
+        mergeOk.disabled = true;
+        try {
+            const updates = {};
+            const targetNameKey = target.fullNameKey || normalizeName(target.fullName || '');
+            // Conta vinculada: só migra se o destino ainda não tiver uma —
+            // nunca sobrescreve uma conta já associada ao destino. A conta
+            // migrada passa a exibir o nome do destino (é o mesmo dado que
+            // results/byUser resolve ao vivo por userId — sem isso o
+            // histórico continuaria mostrando o nome antigo do duplicado).
+            if (source.accountUserId && !target.accountUserId) {
+                updates[`${USERS_PATH}/${source.accountUserId}/colaboradorId`] = target.id;
+                updates[`${USERS_PATH}/${source.accountUserId}/fullName`] = target.fullName;
+                updates[`${USERS_PATH}/${source.accountUserId}/fullNameKey`] = targetNameKey;
+                updates[`${USERS_PATH}/${source.accountUserId}/unit`] = target.unit || null;
+                updates[`${USERS_PATH}/${source.accountUserId}/role`] = target.role || null;
+                updates[`${COLABS_PATH}/${target.id}/accountUserId`] = source.accountUserId;
+            } else if (source.accountUserId && target.accountUserId) {
+                updates[`${USERS_PATH}/${source.accountUserId}/colaboradorId`] = null;
+            }
+
+            // Histórico avulso ligado pelo nome de origem passa a apontar
+            // para nome/unidade/função do destino — cobre tanto o nome atual
+            // quanto o de origem (sourceKey), caso o duplicado já tenha sido
+            // corrigido manualmente antes.
+            const { updates: resultUpdates, count } = await resultUpdatesForMerge(
+                [source.fullNameKey || normalizeName(source.fullName || ''), source.sourceKey],
+                target
+            );
+            Object.assign(updates, resultUpdates);
+
+            // O duplicado desvinculado deixa de existir — os dados dele já
+            // foram transferidos acima.
+            updates[`${COLABS_PATH}/${sourceId}`] = null;
+
+            await db.ref().update(updates);
+            closeMergeModal();
+            colaboradoresCache = await fetchColaboradores();
+            renderList(currentFilterTerm());
+            await U.refreshHistoryRows?.();
+            showWarning(count > 0
+                ? `Colaboradores unificados — ${count} registro(s) de histórico também foram corrigidos.`
+                : 'Colaboradores unificados com sucesso.');
+        } catch (error) {
+            mergeError_('Erro ao unificar: ' + error.message);
+        } finally {
+            mergeOk.disabled = false;
+        }
+    }
+
+    mergeOk?.addEventListener('click', submitMerge);
+    mergeCancel?.addEventListener('click', closeMergeModal);
+    mergeModal?.addEventListener('click', (event) => { if (event.target === mergeModal) closeMergeModal(); });
+    mergeModal?.addEventListener('keydown', (event) => {
+        const comboOpen = !!mergeModal.querySelector('.user-combobox-popover.active');
+        if (event.key === 'Enter' && !comboOpen) { event.preventDefault(); submitMerge(); }
+        if (event.key === 'Escape' && !comboOpen) closeMergeModal();
+    });
 
     function setSyncStatus(text) {
         const el = document.getElementById('cfg-colab-sync-status');
