@@ -909,7 +909,14 @@
                     <div class="panel-card">
                         <div class="panel-header">
                             <h2><i class="fas fa-circle-check" style="color:var(--cfg-success);margin-right:6px;"></i>Concluídos</h2>
-                            <div class="panel-search"><i class="fas fa-search"></i><input type="text" id="cfg-dash-course-completed-search" placeholder="Buscar nome..."></div>
+                            <div class="panel-header-actions">
+                                <select class="panel-select" id="cfg-dash-course-completed-situation">
+                                    <option value="">Todas as situações</option>
+                                    <option value="approved">Aprovado</option>
+                                    <option value="reproved">Reprovado</option>
+                                </select>
+                                <div class="panel-search"><i class="fas fa-search"></i><input type="text" id="cfg-dash-course-completed-search" placeholder="Buscar nome..."></div>
+                            </div>
                         </div>
                         <div class="panel-body">
                             <div id="cfg-dash-course-completed" class="dashboard-table-wrap"></div>
@@ -946,6 +953,17 @@
                     </div>
                 </div>
                 <div class="tab-content" id="cfg-dash-course-tab-charts">
+                    <div class="dashboard-chart-filters">
+                        <div class="hfilter-chip dash-year-chip" id="cfg-dash-course-year-chip">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por ano">
+                                <i class="fas fa-calendar-days"></i>
+                                <span class="hfilter-chip-label" data-default="Ano">Ano</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <div class="hfilter-chip-list" id="cfg-dash-course-year-list"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="dashboard-chart-row">
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header"><h2>Satisfação com o Curso</h2></div>
@@ -964,6 +982,7 @@
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header"><h2>Realização por Unidade</h2></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-byunit-chart"></canvas></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-course-byunit-pagination"></div>
                         </div>
                     </div>
                     <div class="dashboard-chart-row">
@@ -1008,6 +1027,17 @@
                     </div>
                 </div>
                 <div class="tab-content" id="cfg-dash-user-tab-charts">
+                    <div class="dashboard-chart-filters">
+                        <div class="hfilter-chip dash-year-chip" id="cfg-dash-user-year-chip">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por ano">
+                                <i class="fas fa-calendar-days"></i>
+                                <span class="hfilter-chip-label" data-default="Ano">Ano</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <div class="hfilter-chip-list" id="cfg-dash-user-year-list"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="panel-card dashboard-chart-card">
                         <div class="panel-header"><h2>Histórico de Notas</h2></div>
                         <div class="panel-body"><canvas id="cfg-dash-user-scores-chart"></canvas></div>

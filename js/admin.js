@@ -1196,6 +1196,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 if (await saveData()) {
                     resetThemeForm();
                     populateModuleThemes(); populateQuizThemes(); populateThemes(); showWarning('Assunto salvo com sucesso!');
+                    // Fecha o modal "Editar/Novo Curso" — clica no X em vez de
+                    // chamar ModalStack direto (vive em admin-courses.js, sem
+                    // acesso daqui) para reaproveitar o mesmo fechamento
+                    // (dimming/onClose) que o resto da tela já usa.
+                    document.getElementById('cfg-theme-form-close')?.click();
                 }
             } catch (error) { showWarning('Erro ao salvar assunto. Tente novamente.'); }
             finally { showSpinner('cfg-theme-loading', false); }

@@ -87,6 +87,22 @@
         });
     }
 
+    // Última tentativa de cada pessoa — usado por gráficos que devem refletir
+    // a situação final do curso, não repetir cada tentativa (ex.: prazo de
+    // realização não deve contar 2x quem tentou e reenviou).
+    function lastAttemptByPerson(rows) {
+        const byPerson = new Map();
+        rows.forEach(row => {
+            const key = personKeysOfRow(row)[0];
+            if (!key) return;
+            if (!byPerson.has(key)) byPerson.set(key, []);
+            byPerson.get(key).push(row);
+        });
+        return [...byPerson.values()].map(personRows =>
+            personRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0)).pop()
+        );
+    }
+
     // Categorias sem público definido por função: estágio é individual, não
     // tem "quem falta fazer" a calcular.
     const AUDIENCE_EXEMPT_SLUGS = ['estagios'];
@@ -114,6 +130,35 @@
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
         chartInstances[key] = new Chart(canvas, config);
+    }
+
+    // Tooltip padrão "valor (xx%)" para gráficos de pizza — % sobre o total
+    // do dataset.
+    function pieTooltipLabel(ctx) {
+        const total = ctx.dataset.data.reduce((a, b) => a + (Number(b) || 0), 0);
+        const value = Number(ctx.parsed) || 0;
+        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+        return `${ctx.label}: ${value} (${pct}%)`;
+    }
+
+    // Tooltip padrão "valor (xx%)" para barras empilhadas — % sobre a soma de
+    // todos os datasets naquele índice (a categoria inteira), não o total do
+    // gráfico.
+    function percentTooltipLabel(ctx) {
+        const index = ctx.dataIndex;
+        const total = ctx.chart.data.datasets.reduce((sum, ds) => sum + (Number(ds.data[index]) || 0), 0);
+        const value = Number(ctx.parsed.x ?? ctx.parsed.y) || 0;
+        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+        return `${ctx.dataset.label}: ${value} (${pct}%)`;
+    }
+
+    // Tooltip padrão "valor (xx%)" para barra com um único dataset (não
+    // empilhado) — % sobre a soma de todas as categorias do próprio dataset.
+    function singleSeriesTooltipLabel(ctx) {
+        const total = ctx.dataset.data.reduce((sum, v) => sum + (Number(v) || 0), 0);
+        const value = Number(ctx.parsed.x ?? ctx.parsed.y) || 0;
+        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+        return `${value} (${pct}%)`;
     }
 
     // ─── Carga inicial (uma vez por sessão do painel) ───
@@ -163,12 +208,40 @@
             .sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
     }
 
+    // Chave de curso de uma linha do histórico: prefere os ids (mais
+    // precisos), cai para o nome normalizado quando a linha é de importação
+    // de planilha/estágio livre e não tem subjectId/themeId.
+    function rowCourseKey(row) {
+        if (row.slug && row.subjectId && row.themeId) return `${row.slug}_${row.subjectId}_${row.themeId}`;
+        return normalizeName(`${row.subject || ''}|${row.theme || ''}`);
+    }
+
+    // Última tentativa de cada curso — usado nos gráficos do colaborador, que
+    // olham vários cursos de uma só pessoa e não devem repetir cada
+    // tentativa/reenvio, só a situação final de cada curso.
+    function lastAttemptByCourse(rows) {
+        const byCourse = new Map();
+        rows.forEach(row => {
+            const key = rowCourseKey(row);
+            if (!byCourse.has(key)) byCourse.set(key, []);
+            byCourse.get(key).push(row);
+        });
+        return [...byCourse.values()].map(courseRows =>
+            courseRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0)).pop()
+        );
+    }
+
     function userCardStats(colab) {
         const rows = flattenColaboradorResults(colab);
         const scores = rows.map(r => Number(r.score) || 0);
         const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-        const onTime = rows.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
-        const late = rows.length - onTime;
+        // "Com atraso" conta cursos, não tentativas: um curso entra na conta
+        // uma única vez, mesmo que tenha mais de um resultado atrasado.
+        const lateCourseKeys = new Set();
+        rows.forEach(r => {
+            if (!['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)) lateCourseKeys.add(rowCourseKey(r));
+        });
+        const late = lateCourseKeys.size;
         return { rows, avg, attempts: rows.length, late };
     }
 
@@ -271,7 +344,7 @@
                 <div class="dash-user-card-stats">
                     <span><i class="fas fa-clipboard-list"></i> ${stats.attempts} ${stats.attempts === 1 ? 'curso' : 'cursos'}</span>
                     <span><i class="fas fa-star"></i> ${stats.avg === null ? '—' : 'Média ' + stats.avg.toFixed(1).replace('.', ',')}</span>
-                    ${stats.late > 0 ? `<span class="is-warn"><i class="fas fa-triangle-exclamation"></i> ${stats.late} ${stats.late === 1 ? 'atraso' : 'atrasos'}</span>` : ''}
+                    ${stats.late > 0 ? `<span class="is-warn"><i class="fas fa-triangle-exclamation"></i> ${stats.late} concluído com atraso</span>` : ''}
                 </div>
             </div>`;
         card.onclick = () => {
@@ -387,11 +460,20 @@
         });
     }
 
-    function renderUserDashboard(colab, heroStatsEl) {
-        const rows = flattenColaboradorResults(colab);
+    let userChartRowsCache = [];
+    let userChartColabCache = null;
+    const userChartYearChip = createYearFilterChip('cfg-dash-user-year-chip', 'cfg-dash-user-year-list', () => {
+        if (userChartColabCache) renderUserCharts(userChartColabCache, userChartRowsCache);
+    });
+
+    // Parte da aba Gráficos que depende de data (Notas, Realização dos
+    // Cursos, Tentativas, Prazo por Mês) — respeita o filtro de ano.
+    // "Progresso em Cursos Pendentes" fica de fora: é sobre cursos ainda não
+    // feitos, sem data de conclusão para recortar.
+    function renderUserCharts(colab, allRows) {
+        const rows = filterRowsByYear(allRows, userChartYearChip.getValue());
         const labels = rows.map(r => new Date(r.submittedAt || 0).toLocaleDateString('pt-BR'));
         const scores = rows.map(r => r.score);
-        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
         const trend = movingAverage(scores);
 
         renderChart('userScores', 'cfg-dash-user-scores-chart', {
@@ -406,12 +488,15 @@
             options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 10 } } }
         });
 
-        const onTime = rows.filter(r => r.deadlineStatus === 'on_time' || r.deadlineStatus === 'livre' || r.deadlineStatus === 'forgiven').length;
-        const late = rows.length - onTime;
+        // "Realização dos Cursos": situação final por curso (última
+        // tentativa), não uma linha por tentativa/reenvio.
+        const lastAttempts = lastAttemptByCourse(rows);
+        const onTime = lastAttempts.filter(r => r.deadlineStatus === 'on_time' || r.deadlineStatus === 'livre' || r.deadlineStatus === 'forgiven').length;
+        const late = lastAttempts.length - onTime;
         renderChart('userDeadline', 'cfg-dash-user-deadline-chart', {
             type: 'pie',
             data: { labels: ['No prazo', 'Fora do prazo'], datasets: [{ data: [onTime, late], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => pieTooltipLabel(ctx) } } } }
         });
 
         const approved = rows.filter(r => r.approved).length;
@@ -419,14 +504,16 @@
         renderChart('userApproval', 'cfg-dash-user-approval-chart', {
             type: 'pie',
             data: { labels: ['Aprovação', 'Reprovação'], datasets: [{ data: [approved, reproved], backgroundColor: [CHART_COLORS.success, CHART_COLORS.danger] }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => pieTooltipLabel(ctx) } } } }
         });
 
-        renderUserPendingChart(colab, rows);
+        renderUserPendingChart(colab, allRows);
 
-        const monthBuckets = groupByMonth(rows);
-        const onTimeByMonth = groupByMonth(rows.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
-        const lateByMonth = groupByMonth(rows.filter(r => !['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
+        // "Prazo por Mês" segue o mesmo critério: 1 barra por curso concluído
+        // (situação final), agrupado pelo mês da última tentativa.
+        const monthBuckets = groupByMonth(lastAttempts);
+        const onTimeByMonth = groupByMonth(lastAttempts.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
+        const lateByMonth = groupByMonth(lastAttempts.filter(r => !['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)));
         renderChart('userDeadlineTrend', 'cfg-dash-user-deadlinetrend-chart', {
             type: 'bar',
             data: {
@@ -436,8 +523,28 @@
                     { label: 'Fora do prazo', data: lateByMonth.map(b => b.count), backgroundColor: CHART_COLORS.danger }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } } }
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { tooltip: { callbacks: { label: (ctx) => percentTooltipLabel(ctx) } } },
+                scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } }
+            }
         });
+    }
+
+    function renderUserDashboard(colab, heroStatsEl) {
+        const rows = flattenColaboradorResults(colab);
+        const scores = rows.map(r => r.score);
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+        // O hero (topo do modal) e a aba Histórico sempre mostram o total —
+        // só a aba Gráficos recorta por ano.
+        const lastAttemptsAll = lastAttemptByCourse(rows);
+        const lateAll = lastAttemptsAll.filter(r => !['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
+
+        userChartColabCache = colab;
+        userChartRowsCache = rows;
+        userChartYearChip.setYears(yearsFromRows(rows));
+        renderUserCharts(colab, rows);
 
         if (heroStatsEl) {
             const avgLabel = scores.length ? avg.toFixed(1).replace('.', ',') : '—';
@@ -446,7 +553,7 @@
                 <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'curso realizado' : 'cursos realizados'}</span>
                 <span class="hero-stat"><i class="fas fa-star"></i> Média ${avgLabel}</span>
                 <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
-                ${late > 0 ? `<span class="hero-stat is-warn"><i class="fas fa-triangle-exclamation"></i> ${late} ${late === 1 ? 'atraso' : 'atrasos'}</span>` : ''}
+                ${lateAll > 0 ? `<span class="hero-stat is-warn"><i class="fas fa-triangle-exclamation"></i> ${lateAll} concluído com atraso</span>` : ''}
             `;
         }
         renderUserHistoryTable(rows);
@@ -467,6 +574,7 @@
                 const themes = trainingData[subjectId]?.themes || {};
                 Object.keys(themes).forEach(themeId => {
                     const theme = themes[themeId];
+                    if (theme?.active === false) return;
                     const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
                     const targeted = roles.length === 0 || roles.some(role => normalizeName(role) === roleKey);
                     if (!targeted) return;
@@ -939,13 +1047,18 @@
     // mais antiga, com busca por nome e paginação de 5 por página.
     let completedRowsCache = [];
     let completedSearchTerm = '';
+    let completedSituationFilter = '';
 
     function paintCompletedPage() {
         const container = document.getElementById('cfg-dash-course-completed');
         if (!container) return;
-        const filtered = completedSearchTerm
+        let filtered = completedSearchTerm
             ? completedRowsCache.filter(r => normalizeName(r.fullName || '').includes(normalizeName(completedSearchTerm)))
             : completedRowsCache;
+        if (completedSituationFilter) {
+            const wantApproved = completedSituationFilter === 'approved';
+            filtered = filtered.filter(r => !!r.approved === wantApproved);
+        }
 
         if (completedRowsCache.length === 0) {
             container.innerHTML = emptyStateHtml('fa-clipboard-check', 'Ninguém concluiu este curso ainda.');
@@ -981,6 +1094,11 @@
 
     document.getElementById('cfg-dash-course-completed-search')?.addEventListener('input', (e) => {
         completedSearchTerm = e.target.value;
+        paintCompletedPage();
+    });
+
+    document.getElementById('cfg-dash-course-completed-situation')?.addEventListener('change', (e) => {
+        completedSituationFilter = e.target.value;
         paintCompletedPage();
     });
 
@@ -1116,17 +1234,110 @@
         }
     }
 
-    async function renderCourseDashboard(slug, courseKey) {
-        const [subjectId, themeId] = courseKey.split('_');
+    // Anos com dados em `rows` (ordem decrescente) — só entram anos que
+    // realmente têm pelo menos um resultado, nunca uma faixa fixa.
+    function yearsFromRows(rows) {
+        const years = new Set();
+        rows.forEach(r => { if (r.submittedAt) years.add(new Date(r.submittedAt).getFullYear()); });
+        return [...years].sort((a, b) => b - a);
+    }
 
-        const rows = await fetchCourseResults(slug, subjectId, themeId);
+    function filterRowsByYear(rows, year) {
+        if (!year) return rows;
+        return rows.filter(r => r.submittedAt && new Date(r.submittedAt).getFullYear() === Number(year));
+    }
+
+    // Chip de filtro por ano: botão redondo com popover de lista, mesmo
+    // padrão visual/comportamental dos chips de Unidade/Função. `onChange` é
+    // chamado com o ano selecionado ("" = todos) sempre que o valor muda.
+    function createYearFilterChip(chipId, listId, onChange) {
+        const chip = document.getElementById(chipId);
+        const listEl = document.getElementById(listId);
+        const btn = chip?.querySelector('.hfilter-chip-btn');
+        const label = chip?.querySelector('.hfilter-chip-label');
+        let value = '';
+
+        function closePopover() { chip?.classList.remove('is-open'); }
+
+        function paint(years) {
+            if (!listEl) return;
+            listEl.innerHTML = [`<div class="hfilter-chip-item ${!value ? 'is-selected' : ''}" data-value="">Todos os anos</div>`]
+                .concat(years.map(y => `<div class="hfilter-chip-item ${String(y) === value ? 'is-selected' : ''}" data-value="${y}">${y}</div>`))
+                .join('');
+            listEl.querySelectorAll('.hfilter-chip-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    value = item.dataset.value;
+                    closePopover();
+                    refresh(years);
+                    onChange(value);
+                });
+            });
+        }
+
+        function refresh(years) {
+            if (label) label.textContent = value || label.dataset.default;
+            chip?.classList.toggle('is-active', !!value);
+            paint(years);
+        }
+
+        btn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = chip.classList.contains('is-open');
+            document.querySelectorAll('.dash-year-chip.is-open').forEach(c => c.classList.remove('is-open'));
+            if (!isOpen) chip.classList.add('is-open');
+        });
+        chip?.addEventListener('click', (event) => event.stopPropagation());
+        document.addEventListener('click', closePopover);
+
+        return {
+            // Repopula com os anos disponíveis para o curso/colaborador atual;
+            // se o ano selecionado não existir mais nesse conjunto, volta a
+            // "Todos os anos" (mesmo critério do resto do painel).
+            setYears(years) {
+                if (value && !years.some(y => String(y) === value)) value = '';
+                refresh(years);
+            },
+            getValue() { return value; }
+        };
+    }
+
+    let courseChartRowsCache = [];
+    const courseChartYearChip = createYearFilterChip('cfg-dash-course-year-chip', 'cfg-dash-course-year-list', () => renderCourseCharts(courseChartRowsCache));
+
+    // Parte da aba Gráficos que depende de data (Satisfação, Prazo,
+    // Retentativas, Por Unidade) — respeita o filtro de ano. "Realização do
+    // Curso" fica de fora: compara com o público-alvo total, não faz sentido
+    // recortar por ano.
+    function renderCourseCharts(allRows) {
+        const rows = filterRowsByYear(allRows, courseChartYearChip.getValue());
 
         const ratingCounts = [1, 2, 3, 4, 5].map(star => rows.filter(r => r.rating === star).length);
         renderChart('courseSatisfaction', 'cfg-dash-course-satisfaction-chart', {
             type: 'bar',
             data: { labels: ['1★', '2★', '3★', '4★', '5★'], datasets: [{ data: ratingCounts, backgroundColor: CHART_COLORS.warning, borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => singleSeriesTooltipLabel(ctx) } } }
+            }
         });
+
+        const lastAttempts = lastAttemptByPerson(rows);
+        const onTime = lastAttempts.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
+        const late = lastAttempts.length - onTime;
+        renderChart('courseDeadline', 'cfg-dash-course-deadline-chart', {
+            type: 'pie',
+            data: { labels: ['No prazo', 'Fora do prazo'], datasets: [{ data: [onTime, late], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => pieTooltipLabel(ctx) } } } }
+        });
+
+        renderCourseRetriesChart(rows);
+        renderCourseByUnitChart(rows);
+    }
+
+    async function renderCourseDashboard(slug, courseKey) {
+        const [subjectId, themeId] = courseKey.split('_');
+
+        const rows = await fetchCourseResults(slug, subjectId, themeId);
 
         // "Realização do curso": denominador = público-alvo do curso (mesma
         // base de courseAudience usada nos cards e na tabela "Faltam
@@ -1151,15 +1362,7 @@
         renderChart('courseCompletion', 'cfg-dash-course-completion-chart', {
             type: 'pie',
             data: { labels: ['Realizou', 'Falta'], datasets: [{ data: [realizou, faltaram], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        const onTime = rows.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
-        const late = rows.length - onTime;
-        renderChart('courseDeadline', 'cfg-dash-course-deadline-chart', {
-            type: 'pie',
-            data: { labels: ['No prazo', 'Fora do prazo'], datasets: [{ data: [onTime, late], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => pieTooltipLabel(ctx) } } } }
         });
 
         renderCommentsTable(rows);
@@ -1168,8 +1371,9 @@
         renderCompletedTable(rows);
         if (theme) renderMissingTable(rows, slug, subjectId, { id: themeId, ...theme });
 
-        renderCourseRetriesChart(rows);
-        renderCourseByUnitChart(rows);
+        courseChartRowsCache = rows;
+        courseChartYearChip.setYears(yearsFromRows(rows));
+        renderCourseCharts(rows);
 
         renderCourseHero(rows);
         updateTabCounts(rows);
@@ -1192,32 +1396,69 @@
                     { label: 'Ainda reprovado', data: [stillFailed], backgroundColor: CHART_COLORS.danger }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } } }
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { tooltip: { callbacks: { label: (ctx) => percentTooltipLabel(ctx) } } },
+                scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } }
+            }
         });
     }
 
     // Comparativo de realização por unidade — ajuda o gestor a identificar
-    // qual unidade está atrasada para cobrar localmente.
+    // qual unidade está atrasada para cobrar localmente. Paginado: com muitas
+    // unidades o gráfico ficava espremido demais para ler.
+    const BYUNIT_PAGE_SIZE = 7;
+    let byUnitPage = 1;
+    let byUnitDataCache = [];
+
+    function paintByUnitPage() {
+        const totalPages = Math.max(1, Math.ceil(byUnitDataCache.length / BYUNIT_PAGE_SIZE));
+        byUnitPage = Math.min(Math.max(1, byUnitPage), totalPages);
+        const start = (byUnitPage - 1) * BYUNIT_PAGE_SIZE;
+        const pageUnits = byUnitDataCache.slice(start, start + BYUNIT_PAGE_SIZE);
+
+        renderChart('courseByUnit', 'cfg-dash-course-byunit-chart', {
+            type: 'bar',
+            data: {
+                labels: pageUnits.map(u => u.unit),
+                datasets: [
+                    { label: 'No prazo', data: pageUnits.map(u => u.onTime), backgroundColor: CHART_COLORS.accent },
+                    { label: 'Fora do prazo', data: pageUnits.map(u => u.late), backgroundColor: CHART_COLORS.danger }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { tooltip: { callbacks: { label: (ctx) => percentTooltipLabel(ctx) } } },
+                scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } }
+            }
+        });
+
+        const pager = document.getElementById('cfg-dash-course-byunit-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${byUnitPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${byUnitPage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${byUnitPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                byUnitPage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintByUnitPage();
+            });
+        });
+    }
+
     function renderCourseByUnitChart(rows) {
         const byUnit = new Map();
-        rows.forEach(r => {
+        lastAttemptByPerson(rows).forEach(r => {
             const unit = r.unit || 'Sem unidade';
             if (!byUnit.has(unit)) byUnit.set(unit, { onTime: 0, late: 0 });
             const entry = byUnit.get(unit);
             if (['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)) entry.onTime++; else entry.late++;
         });
         const units = [...byUnit.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-        renderChart('courseByUnit', 'cfg-dash-course-byunit-chart', {
-            type: 'bar',
-            data: {
-                labels: units,
-                datasets: [
-                    { label: 'No prazo', data: units.map(u => byUnit.get(u).onTime), backgroundColor: CHART_COLORS.accent },
-                    { label: 'Fora do prazo', data: units.map(u => byUnit.get(u).late), backgroundColor: CHART_COLORS.danger }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, ticks: { precision: 0 } }, y: { stacked: true } } }
-        });
+        byUnitDataCache = units.map(unit => ({ unit, ...byUnit.get(unit) }));
+        byUnitPage = 1;
+        paintByUnitPage();
     }
 
     // Resumo rápido no topo do modal: concluídos, pendentes e média — dá o
