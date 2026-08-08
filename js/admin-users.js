@@ -255,8 +255,23 @@
         return [...values].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
 
-    function closeUsersPopovers() {
-        usersFilterRow?.querySelectorAll('.hfilter-chip.is-open').forEach(chip => chip.classList.remove('is-open'));
+    function closeUsersPopovers({ keepSearch = false } = {}) {
+        usersFilterRow?.querySelectorAll('.hfilter-chip.is-open').forEach(chip => {
+            if (keepSearch && chip.classList.contains('hfilter-search-chip')) return;
+            chip.classList.remove('is-open');
+        });
+    }
+
+    // Fecha o chip de busca especificamente: some com o popover e limpa o
+    // termo digitado, já que fechado o campo não deve continuar filtrando.
+    function closeUsersSearchChip() {
+        const searchChip = usersFilterRow?.querySelector('.hfilter-search-chip');
+        if (!searchChip?.classList.contains('is-open')) return;
+        searchChip.classList.remove('is-open');
+        const input = document.getElementById('cfg-users-filter');
+        if (input) input.value = '';
+        renderList(currentFilterTerm());
+        refreshUsersFilterChips();
     }
 
     function refreshUsersFilterChips() {
@@ -308,12 +323,19 @@
         btn?.addEventListener('click', (event) => {
             event.stopPropagation();
             const isOpen = chip.classList.contains('is-open');
+            if (isSearchChip) {
+                // O ícone de busca só abre/fecha no próprio clique: clicar
+                // fora não fecha, e ao fechar o termo digitado é limpo (o
+                // filtro para de valer).
+                closeUsersPopovers({ keepSearch: true });
+                if (isOpen) { closeUsersSearchChip(); return; }
+                chip.classList.add('is-open');
+                search?.focus();
+                return;
+            }
             closeUsersPopovers();
             if (isOpen) return;
             chip.classList.add('is-open');
-            // O chip de busca reabre com o termo já digitado (não é uma lista
-            // de opções para filtrar/zerar como unidade/função).
-            if (isSearchChip) { search?.focus(); return; }
             if (search) { search.value = ''; }
             renderUsersFilterList(field, '');
             search?.focus();
@@ -321,7 +343,7 @@
         chip.addEventListener('click', (event) => event.stopPropagation());
         if (!isSearchChip) search?.addEventListener('input', () => renderUsersFilterList(field, search.value));
     });
-    document.addEventListener('click', closeUsersPopovers);
+    document.addEventListener('click', () => closeUsersPopovers({ keepSearch: true }));
 
     usersFilterClear?.addEventListener('click', () => {
         listFilters.unit = '';
