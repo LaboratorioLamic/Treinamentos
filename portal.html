@@ -1002,6 +1002,34 @@
                             <div class="panel-body"><canvas id="cfg-dash-course-scores-chart"></canvas></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Notas por Unidade</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-scores-byunit-chart"></canvas></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-course-scores-byunit-pagination"></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header">
+                                <h2>Tempo para Conclusão da Avaliação</h2>
+                                <div class="panel-header-actions">
+                                    <div class="hfilter-chip dash-unit-chip" id="cfg-dash-course-evaltime-unit-chip">
+                                        <button type="button" class="hfilter-chip-btn" title="Filtrar por unidade">
+                                            <i class="fas fa-building"></i>
+                                            <span class="hfilter-chip-label" data-default="Unidade">Unidade</span>
+                                        </button>
+                                        <div class="hfilter-chip-popover">
+                                            <div class="hfilter-chip-list" id="cfg-dash-course-evaltime-unit-list"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-course-evaltime-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-course-evaltime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-course-evaltime-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
                             <div class="panel-header">
                                 <h2>Tempo para Conclusão</h2>
                                 <div class="panel-header-actions">
@@ -1020,6 +1048,7 @@
                             <div class="panel-body">
                                 <canvas id="cfg-dash-course-completiontime-chart"></canvas>
                                 <p class="dashboard-table-empty" id="cfg-dash-course-completiontime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-course-completiontime-pagination"></div>
                             </div>
                         </div>
                     </div>

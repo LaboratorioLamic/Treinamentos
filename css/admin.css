@@ -993,6 +993,14 @@
             font-size: 12.5px; font-family: inherit; color: var(--text); background: var(--bg);
         }
         .hfilter-chip-search:focus { outline: none; border-color: var(--cfg-border-focus); }
+        .hfilter-chip-toggle-all {
+            width: 100%; display: flex; align-items: center; gap: 6px;
+            padding: 8px 9px; margin-bottom: 4px; border: none; border-radius: 8px;
+            background: none; font-size: 12.5px; font-weight: 600; color: var(--cfg-primary);
+            cursor: pointer; transition: background 0.1s; font-family: inherit;
+        }
+        .hfilter-chip-toggle-all:hover { background: var(--cfg-primary-light); }
+        .hfilter-chip-toggle-all i { font-size: 12px; }
         .hfilter-chip-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
         .hfilter-chip-item {
             padding: 8px 9px; border-radius: 8px; font-size: 12.5px; color: var(--text);

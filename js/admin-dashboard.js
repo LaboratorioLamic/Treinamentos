@@ -120,6 +120,22 @@
         );
     }
 
+    // Primeira tentativa de cada pessoa (mesmo se reprovada) — usado como
+    // fallback de "início do curso" em buildCompletionTimeData quando não há
+    // progress/byUser (curso sem módulos de vídeo, só avaliação).
+    function firstAttemptByPerson(rows) {
+        const byPerson = new Map();
+        rows.forEach(row => {
+            const key = personKeysOfRow(row)[0];
+            if (!key) return;
+            if (!byPerson.has(key)) byPerson.set(key, []);
+            byPerson.get(key).push(row);
+        });
+        return [...byPerson.values()].map(personRows =>
+            personRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0))[0]
+        );
+    }
+
     // Categorias sem público definido por função: estágio é individual, não
     // tem "quem falta fazer" a calcular.
     const AUDIENCE_EXEMPT_SLUGS = ['estagios'];
@@ -1012,9 +1028,11 @@
     function renderCommentsTable(rows) {
         const container = document.getElementById('cfg-dash-course-comments');
         const pager = document.getElementById('cfg-dash-course-comments-pagination');
-        // Nota baixa (≤4★) entra mesmo sem comentário — quem avaliou mal
-        // precisa aparecer pro gestor mesmo tendo deixado o campo em branco.
-        commentsRowsCache = rows.filter(r => r.comment || (Number(r.rating) || 0) <= 4)
+        // Só entra quem deixou o comentário em branco ou avaliou com nota
+        // baixa (≤3★) — comentário preenchido com nota boa não precisa de
+        // atenção do gestor, mas campo em branco (mesmo com nota alta) e
+        // nota baixa (mesmo sem comentário) sim.
+        commentsRowsCache = rows.filter(r => !r.comment || (Number(r.rating) || 0) <= 3)
             .sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
         commentsPage = 1;
         if (commentsRowsCache.length === 0) {
@@ -1444,6 +1462,13 @@
     let courseChartRowsCache = [];
     let courseChartAudienceCache = [];
     let courseChartCompletionTimeCache = [];
+    let courseChartEvalTimeCache = [];
+    // Slug do curso aberto no modal — "Tempo para Conclusão" precisa dele pra
+    // ler progress/byUser/<user>/<slug>/... (allProgress é organizado por
+    // slug de categoria; currentSlug() aqui apontaria pra categoria
+    // selecionada no topo do painel, não pra do curso aberto, que pode ser
+    // outra).
+    let courseChartSlugCache = null;
     const courseChartYearChip = createYearFilterChip('cfg-dash-course-year-chip', 'cfg-dash-course-year-list', () => renderCourseCharts(courseChartRowsCache));
 
     // Popover de seleção múltipla (checkbox) — mesmo visual do chip de ano,
@@ -1460,10 +1485,33 @@
         let values = new Set();
         let options = [];
 
+        // Botão "Marcar/desmarcar todos" fica em elemento próprio, injetado
+        // antes da lista (ver `paint`), pra não competir com o `.hfilter-chip-list`
+        // que já é sobrescrito por inteiro a cada pintura.
+        const toggleAllEl = listEl ? document.createElement('button') : null;
+        if (toggleAllEl) {
+            toggleAllEl.type = 'button';
+            toggleAllEl.className = 'hfilter-chip-toggle-all';
+            listEl.insertAdjacentElement('beforebegin', toggleAllEl);
+            toggleAllEl.addEventListener('click', (event) => {
+                event.stopPropagation();
+                values = values.size === options.length ? new Set() : new Set(options);
+                refresh();
+                onChange(values);
+            });
+        }
+
         function closePopover() { chip?.classList.remove('is-open'); }
 
         function paint() {
             if (!listEl) return;
+            if (toggleAllEl) {
+                toggleAllEl.style.display = options.length === 0 ? 'none' : '';
+                const allSelected = options.length > 0 && values.size === options.length;
+                toggleAllEl.innerHTML = allSelected
+                    ? `<i class="fas fa-square-minus"></i> Desmarcar todos`
+                    : `<i class="fas fa-square-check"></i> Marcar todos`;
+            }
             if (options.length === 0) {
                 listEl.innerHTML = `<div class="hfilter-chip-empty">Nenhuma unidade disponível.</div>`;
             } else {
@@ -1543,6 +1591,15 @@
         paintCompletionTimeUnitUsers
     );
 
+    // Chip de unidade do gráfico "Tempo para Conclusão da Avaliação" — usa
+    // courseChartEvalTimeCache (duração da prova, campo durationSeconds,
+    // mesmo valor da coluna "Tempo" do histórico), não o tempo até a
+    // aprovação usado pelo gráfico "Tempo para Conclusão" acima.
+    const courseChartEvalTimeUnitChip = createMultiFilterChip(
+        'cfg-dash-course-evaltime-unit-chip', 'cfg-dash-course-evaltime-unit-list',
+        () => renderCourseEvalTimeChart(courseChartEvalTimeCache)
+    );
+
     // Parte da aba Gráficos que depende de data (Satisfação, Prazo,
     // Retentativas, Por Unidade) — respeita o filtro de ano. "Realização do
     // Curso" fica de fora: compara com o público-alvo total, não faz sentido
@@ -1573,6 +1630,7 @@
         renderCourseByUnitChart(rows);
         renderCourseMistakesChart(rows);
         renderCourseScoresChart(rows);
+        renderCourseScoresByUnitChart(rows);
 
         // Só entram unidades com nome de verdade — vazio, "—" ou "Sem
         // unidade" viram ruído no filtro (não dá pra segmentar por elas).
@@ -1583,23 +1641,53 @@
         renderCourseUnitCompletionChart(allRows, courseChartAudienceCache);
 
         courseChartCompletionTimeUnitChip.setOptions(units);
-        courseChartCompletionTimeCache = buildCompletionTimeData(allRows);
+        courseChartCompletionTimeCache = buildCompletionTimeData(allRows, courseChartSlugCache);
         renderCourseCompletionTimeChart(courseChartCompletionTimeCache);
+
+        courseChartEvalTimeUnitChip.setOptions(units);
+        courseChartEvalTimeCache = buildEvalTimeData(allRows);
+        renderCourseEvalTimeChart(courseChartEvalTimeCache);
     }
 
-    // Tempo entre o início do 1º módulo assistido (startedAt, gravado em
-    // progress/byUser na primeira sincronização do curso) e a aprovação na
-    // avaliação (submittedAt da última tentativa aprovada). Só existe para
-    // quem tem conta (progresso é gravado por userId) e cursou depois do
-    // startedAt existir — sem esse dado a pessoa não entra no gráfico.
+    // Tempo entre o início do curso e a aprovação na avaliação (submittedAt
+    // da última tentativa aprovada). "Início" prioriza o startedAt de
+    // progress/byUser (1º módulo assistido, gravado por syncCourseProgressToCloud
+    // em js/main.js) — mas cursos só de avaliação (sem módulos de vídeo)
+    // nunca geram esse registro, então cai pro submittedAt da 1ª tentativa
+    // da pessoa (mesmo reprovada): mede o tempo até a aprovação a partir de
+    // quando ela começou a tentar. Quem passou de primeira sem módulos fica
+    // com duração 0 (não há "espera" real pra medir) e por isso é excluído
+    // — uma barra 0 não ajuda o gestor e polui a comparação.
     // Ordenado do maior tempo para o menor.
-    function buildCompletionTimeData(rows) {
+    function buildCompletionTimeData(rows, slug) {
+        const approved = lastAttemptByPerson(rows).filter(r => r.approved && r.submittedAt);
+        const firstAttempts = new Map(firstAttemptByPerson(rows).map(r => [personKeysOfRow(r)[0], r]));
+        return approved
+            .map(r => {
+                const key = personKeysOfRow(r)[0];
+                const progressStarted = r.userId ? allProgress[r.userId]?.[slug]?.[r.subjectId]?.[r.themeId]?.startedAt : null;
+                const firstAttemptStarted = firstAttempts.get(key)?.submittedAt;
+                const started = (progressStarted && progressStarted < r.submittedAt) ? progressStarted
+                    : (firstAttemptStarted && firstAttemptStarted < r.submittedAt) ? firstAttemptStarted
+                    : null;
+                if (!started) return null;
+                return { fullName: r.fullName, unit: r.unit, durationMs: r.submittedAt - started };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.durationMs - a.durationMs);
+    }
+
+    // Tempo de duração da PROVA em si (mesmo campo `durationSeconds` exibido
+    // na coluna "Tempo" do histórico) — não confundir com buildCompletionTimeData,
+    // que mede o tempo desde o início do curso até a aprovação. Usado só pelo
+    // gráfico "Tempo para Conclusão da Avaliação".
+    function buildEvalTimeData(rows) {
         const approved = lastAttemptByPerson(rows).filter(r => r.approved && r.submittedAt);
         return approved
             .map(r => {
-                const started = r.userId ? allProgress[r.userId]?.[currentSlug()]?.[r.subjectId]?.[r.themeId]?.startedAt : null;
-                if (!started || started >= r.submittedAt) return null;
-                return { fullName: r.fullName, unit: r.unit, durationMs: r.submittedAt - started };
+                const seconds = Number(r.durationSeconds);
+                if (!Number.isFinite(seconds)) return null;
+                return { fullName: r.fullName, unit: r.unit, durationMs: seconds * 1000 };
             })
             .filter(Boolean)
             .sort((a, b) => b.durationMs - a.durationMs);
@@ -1612,23 +1700,24 @@
         return `${days} ${days === 1 ? 'Dia' : 'Dias'} ${hours} ${hours === 1 ? 'Hora' : 'Horas'}`;
     }
 
-    function renderCourseCompletionTimeChart(data) {
-        const selectedUnits = courseChartCompletionTimeUnitChip.getValues();
-        const scoped = selectedUnits.size > 0 ? data.filter(d => selectedUnits.has(d.unit)) : data;
-        const canvas = document.getElementById('cfg-dash-course-completiontime-chart');
-        const emptyEl = document.getElementById('cfg-dash-course-completiontime-empty');
+    // Mesmo formato MM:SS da coluna "Tempo" do histórico (ver formatDuration),
+    // mas a partir de ms — usado no gráfico "Tempo para Conclusão da
+    // Avaliação", que mede duração de prova (curta, minutos), não dias.
+    function formatMsAsDuration(ms) {
+        return formatDuration(ms / 1000);
+    }
 
-        // Sem dado nenhum (ninguém com startedAt registrado ainda) o Chart.js
-        // desenha um eixo numérico "fantasma" com o canvas vazio — em vez
-        // disso mostra mensagem e não renderiza o gráfico.
-        if (scoped.length === 0) {
-            destroyChart('courseCompletionTime');
-            if (canvas) canvas.style.display = 'none';
-            if (emptyEl) emptyEl.style.display = 'flex';
-            return;
-        }
-        if (canvas) canvas.style.display = '';
-        if (emptyEl) emptyEl.style.display = 'none';
+    // Paginado do mesmo jeito que "Realização por Unidade" — com muitos
+    // aprovados uma barra por pessoa no mesmo canvas fica ilegível.
+    const COMPLETION_TIME_PAGE_SIZE = 7;
+    let completionTimePage = 1;
+    let completionTimeScopedCache = [];
+
+    function paintCompletionTimePage() {
+        const totalPages = Math.max(1, Math.ceil(completionTimeScopedCache.length / COMPLETION_TIME_PAGE_SIZE));
+        completionTimePage = Math.min(Math.max(1, completionTimePage), totalPages);
+        const start = (completionTimePage - 1) * COMPLETION_TIME_PAGE_SIZE;
+        const scoped = completionTimeScopedCache.slice(start, start + COMPLETION_TIME_PAGE_SIZE);
 
         renderChart('courseCompletionTime', 'cfg-dash-course-completiontime-chart', {
             type: 'bar',
@@ -1645,6 +1734,209 @@
                 scales: { x: { ticks: { callback: (v) => formatDaysHours(v) } } }
             }
         });
+
+        const pager = document.getElementById('cfg-dash-course-completiontime-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${completionTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${completionTimePage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${completionTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                completionTimePage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintCompletionTimePage();
+            });
+        });
+    }
+
+    function renderCourseCompletionTimeChart(data) {
+        const selectedUnits = courseChartCompletionTimeUnitChip.getValues();
+        const scoped = selectedUnits.size > 0 ? data.filter(d => selectedUnits.has(d.unit)) : data;
+        const canvas = document.getElementById('cfg-dash-course-completiontime-chart');
+        const emptyEl = document.getElementById('cfg-dash-course-completiontime-empty');
+        const pager = document.getElementById('cfg-dash-course-completiontime-pagination');
+
+        // Sem dado nenhum (ninguém com startedAt registrado ainda) o Chart.js
+        // desenha um eixo numérico "fantasma" com o canvas vazio — em vez
+        // disso mostra mensagem e não renderiza o gráfico.
+        if (scoped.length === 0) {
+            destroyChart('courseCompletionTime');
+            if (canvas) canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'flex';
+            if (pager) pager.innerHTML = '';
+            return;
+        }
+        if (canvas) canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        completionTimeScopedCache = scoped;
+        completionTimePage = 1;
+        paintCompletionTimePage();
+    }
+
+    // Plugin Chart.js que desenha a "barra de erro" (desvio padrão) sobre
+    // cada barra horizontal: um traço central + travessões nas pontas, no
+    // valor médio ± stddev. Não há plugin de error bar carregado no projeto
+    // (só chart.js@4 puro), então desenha à mão no afterDatasetsDraw.
+    // `chart.$stddevs[datasetIndex][dataIndex]` guarda o desvio de cada
+    // barra — setado por quem monta o gráfico, já que o Chart.js não tem
+    // onde guardar esse dado por ponto além do próprio array de `data`.
+    const stddevWhiskerPlugin = {
+        id: 'stddevWhisker',
+        afterDatasetsDraw(chart) {
+            const stddevs = chart.$stddevs;
+            if (!stddevs) return;
+            const { ctx, scales: { x: xScale } } = chart;
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (meta.hidden) return;
+                meta.data.forEach((bar, index) => {
+                    const sd = stddevs[datasetIndex]?.[index];
+                    if (!sd) return;
+                    const value = dataset.data[index];
+                    const y = bar.y;
+                    const xLo = xScale.getPixelForValue(Math.max(0, value - sd));
+                    const xHi = xScale.getPixelForValue(value + sd);
+                    const cap = Math.min(6, bar.height ? bar.height / 3 : 6);
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(xLo, y); ctx.lineTo(xHi, y);
+                    ctx.moveTo(xLo, y - cap); ctx.lineTo(xLo, y + cap);
+                    ctx.moveTo(xHi, y - cap); ctx.lineTo(xHi, y + cap);
+                    ctx.stroke();
+                    ctx.restore();
+                });
+            });
+        }
+    };
+
+    function mean(values) { return values.reduce((a, b) => a + b, 0) / values.length; }
+    function stddev(values, avg) {
+        if (values.length < 2) return 0;
+        const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / (values.length - 1);
+        return Math.sqrt(variance);
+    }
+
+    // Tempo médio de DURAÇÃO DA PROVA (campo durationSeconds, mesmo dado da
+    // coluna "Tempo" no histórico — não confundir com "Tempo para Conclusão",
+    // que mede início do curso até a aprovação), agregado por unidade —
+    // ordenado da maior média para a menor. Marcando uma ou mais
+    // unidades no filtro, troca a agregação para uma barra por pessoa
+    // daquelas unidades (pedido explícito), mantendo média±desvio por barra
+    // (desvio de 1 pessoa sozinha é 0, não aparece traço). Paginado como os
+    // outros gráficos "por unidade".
+    const EVALTIME_PAGE_SIZE = 7;
+    let evalTimePage = 1;
+    let evalTimeDataCache = [];
+
+    function paintEvalTimePage() {
+        // "Geral" (1ª posição do cache, ver renderCourseEvalTimeChart) não
+        // entra na paginação normal — fica fixa no topo de toda página, o
+        // resto das barras pagina em torno dela.
+        const generalRow = evalTimeDataCache[0];
+        const rest = evalTimeDataCache.slice(1);
+        const totalPages = Math.max(1, Math.ceil(rest.length / EVALTIME_PAGE_SIZE));
+        evalTimePage = Math.min(Math.max(1, evalTimePage), totalPages);
+        const start = (evalTimePage - 1) * EVALTIME_PAGE_SIZE;
+        const pageRows = generalRow ? [generalRow, ...rest.slice(start, start + EVALTIME_PAGE_SIZE)] : [];
+
+        const canvas = document.getElementById('cfg-dash-course-evaltime-chart');
+        const emptyEl = document.getElementById('cfg-dash-course-evaltime-empty');
+        const pager = document.getElementById('cfg-dash-course-evaltime-pagination');
+
+        if (evalTimeDataCache.length === 0) {
+            destroyChart('courseEvalTime');
+            if (canvas) canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'flex';
+            if (pager) pager.innerHTML = '';
+            return;
+        }
+        if (canvas) canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        renderChart('courseEvalTime', 'cfg-dash-course-evaltime-chart', {
+            type: 'bar',
+            data: {
+                labels: pageRows.map(r => r.label),
+                datasets: [{
+                    data: pageRows.map(r => r.avgMs),
+                    backgroundColor: pageRows.map(r => r.isGeneral ? CHART_COLORS.muted : CHART_COLORS.accent),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => {
+                        const r = pageRows[ctx.dataIndex];
+                        const base = `Média: ${formatMsAsDuration(r.avgMs)}`;
+                        return r.n > 1 ? `${base} (±${formatMsAsDuration(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
+                    } } }
+                },
+                scales: { x: { ticks: { callback: (v) => formatMsAsDuration(v) } } }
+            },
+            plugins: [stddevWhiskerPlugin]
+        });
+        chartInstances.courseEvalTime.$stddevs = [pageRows.map(r => r.stddevMs)];
+        chartInstances.courseEvalTime.update('none');
+
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${evalTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${evalTimePage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${evalTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                evalTimePage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintEvalTimePage();
+            });
+        });
+    }
+
+    function renderCourseEvalTimeChart(data) {
+        const selectedUnits = courseChartEvalTimeUnitChip.getValues();
+
+        if (selectedUnits.size > 0) {
+            // Unidade(s) marcada(s): uma barra por pessoa, maior tempo primeiro.
+            evalTimeDataCache = data
+                .filter(d => selectedUnits.has(d.unit))
+                .map(d => ({ label: d.fullName, avgMs: d.durationMs, stddevMs: 0, n: 1 }))
+                .sort((a, b) => b.avgMs - a.avgMs);
+        } else {
+            // Sem filtro: uma barra por unidade, média ± desvio padrão.
+            const byUnit = new Map();
+            data.forEach(d => {
+                const unit = d.unit || 'Sem unidade';
+                if (!byUnit.has(unit)) byUnit.set(unit, []);
+                byUnit.get(unit).push(d.durationMs);
+            });
+            evalTimeDataCache = [...byUnit.entries()]
+                .map(([unit, durations]) => {
+                    const avg = mean(durations);
+                    return { label: unit, avgMs: avg, stddevMs: stddev(durations, avg), n: durations.length };
+                })
+                .sort((a, b) => b.avgMs - a.avgMs);
+        }
+
+        // Barra "Geral" (cinza, sempre em 1º): média±desvio de TODOS os
+        // aprovados, ignorando filtro de unidade — fica fixa mesmo com
+        // unidade(s) marcada(s), pra servir de referência de comparação.
+        // Sem dado nenhum não entra, senão o cache nunca fica vazio de
+        // verdade e o card de "sem dados suficientes" nunca aparece.
+        if (data.length > 0) {
+            const allDurations = data.map(d => d.durationMs);
+            const generalAvg = mean(allDurations);
+            evalTimeDataCache.unshift({
+                label: 'Geral', avgMs: generalAvg, stddevMs: stddev(allDurations, generalAvg),
+                n: allDurations.length, isGeneral: true
+            });
+        }
+
+        evalTimePage = 1;
+        paintEvalTimePage();
     }
 
     // Taxa de conclusão do curso ao longo do tempo, em % do público-alvo:
@@ -1819,6 +2111,90 @@
         });
     }
 
+    // Faixa de nota para o empilhado por unidade: 10 verde, 8-9 limão, 6-7
+    // laranja, <6 crítico (vermelho) — critério pedido explicitamente,
+    // diferente das 5 faixas de scoreBarColor (que tem uma faixa a mais,
+    // 4-5, usada só no histograma "Notas").
+    const SCORE_BAND_DEFS = [
+        { key: 'nota10', label: 'Nota 10', color: CHART_COLORS.success, test: (s) => s >= 10 },
+        { key: 'nota89', label: 'Nota 8-9', color: CHART_COLORS.lime, test: (s) => s >= 8 },
+        { key: 'nota67', label: 'Nota 6-7', color: CHART_COLORS.orange, test: (s) => s >= 6 },
+        { key: 'critico', label: 'Crítico (<6)', color: CHART_COLORS.danger, test: () => true }
+    ];
+    function scoreBand(score) { return SCORE_BAND_DEFS.find(b => b.test(score)); }
+
+    // Notas por unidade, empilhadas por faixa (uma pessoa conta pela sua
+    // última tentativa, mesmo critério dos demais gráficos "por pessoa") e
+    // normalizadas em % da unidade — dá pra comparar unidades com números
+    // de gente bem diferentes. Ordenado pela pior situação primeiro (maior %
+    // crítico) pra chamar atenção de quem precisa de reforço. Paginado como
+    // os outros gráficos "por unidade".
+    const SCORES_BYUNIT_PAGE_SIZE = 7;
+    let scoresByUnitPage = 1;
+    let scoresByUnitDataCache = [];
+
+    function paintScoresByUnitPage() {
+        const totalPages = Math.max(1, Math.ceil(scoresByUnitDataCache.length / SCORES_BYUNIT_PAGE_SIZE));
+        scoresByUnitPage = Math.min(Math.max(1, scoresByUnitPage), totalPages);
+        const start = (scoresByUnitPage - 1) * SCORES_BYUNIT_PAGE_SIZE;
+        const pageUnits = scoresByUnitDataCache.slice(start, start + SCORES_BYUNIT_PAGE_SIZE);
+
+        renderChart('courseScoresByUnit', 'cfg-dash-course-scores-byunit-chart', {
+            type: 'bar',
+            data: {
+                labels: pageUnits.map(u => u.unit),
+                datasets: SCORE_BAND_DEFS.map(band => ({
+                    label: band.label, backgroundColor: band.color,
+                    data: pageUnits.map(u => u.total ? (u.counts[band.key] / u.total) * 100 : 0)
+                }))
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    tooltip: { callbacks: { label: (ctx) => {
+                        const u = pageUnits[ctx.dataIndex];
+                        const band = SCORE_BAND_DEFS[ctx.datasetIndex];
+                        const count = u.counts[band.key];
+                        return `${band.label}: ${count} (${Math.round(ctx.parsed.x)}%)`;
+                    } } }
+                },
+                scales: { x: { stacked: true, min: 0, max: 100, ticks: { callback: (v) => `${v}%` } }, y: { stacked: true } }
+            }
+        });
+
+        const pager = document.getElementById('cfg-dash-course-scores-byunit-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${scoresByUnitPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${scoresByUnitPage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${scoresByUnitPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                scoresByUnitPage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintScoresByUnitPage();
+            });
+        });
+    }
+
+    function renderCourseScoresByUnitChart(rows) {
+        const byUnit = new Map();
+        lastAttemptByPerson(rows).forEach(r => {
+            const score = Number(r.score);
+            if (!Number.isFinite(score)) return;
+            const unit = r.unit || 'Sem unidade';
+            if (!byUnit.has(unit)) byUnit.set(unit, { total: 0, counts: { nota10: 0, nota89: 0, nota67: 0, critico: 0 } });
+            const entry = byUnit.get(unit);
+            entry.total++;
+            entry.counts[scoreBand(score).key]++;
+        });
+
+        scoresByUnitDataCache = [...byUnit.entries()]
+            .map(([unit, e]) => ({ unit, total: e.total, counts: e.counts }))
+            .sort((a, b) => (b.total ? b.counts.critico / b.total : 0) - (a.total ? a.counts.critico / a.total : 0));
+        scoresByUnitPage = 1;
+        paintScoresByUnitPage();
+    }
+
     // Ranking das questões com mais erros, do maior para o menor — ajuda a
     // localizar perguntas mal formuladas ou conteúdo pouco compreendido.
     // Agrupa por enunciado (mesma questão pode mudar de índice entre
@@ -1970,6 +2346,7 @@
 
     async function renderCourseDashboard(slug, courseKey) {
         const [subjectId, themeId] = courseKey.split('_');
+        courseChartSlugCache = slug;
 
         const rows = await fetchCourseResults(slug, subjectId, themeId);
 
@@ -2010,7 +2387,7 @@
         courseChartYearChip.setYears(yearsFromRows(rows));
         renderCourseCharts(rows);
 
-        renderCourseHero(rows);
+        renderCourseHero(rows, theme);
         updateTabCounts(rows);
     }
 
@@ -2096,19 +2473,38 @@
         paintByUnitPage();
     }
 
-    // Resumo rápido no topo do modal: concluídos, pendentes e média — dá o
-    // panorama do curso sem precisar trocar de aba.
-    function renderCourseHero(rows) {
+    function formatShortDate(timestamp) {
+        if (!timestamp) return '—';
+        return new Date(timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    // Resumo rápido no topo do modal: concluídos, pendentes, média, tempo
+    // médio de prova, tempo médio de conclusão (do início ao aprovado) e o
+    // prazo do curso (quando configurado) — panorama sem trocar de aba.
+    function renderCourseHero(rows, theme) {
         if (!courseHeroStats) return;
         const scores = rows.map(r => Number(r.score) || 0);
         const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1).replace('.', ',') : '—';
         const pendentes = missingRowsCache.length;
         const durationLabel = formatDuration(avgDuration(rows));
+
+        const completionTimes = buildCompletionTimeData(rows, courseChartSlugCache);
+        const avgCompletionLabel = completionTimes.length
+            ? formatDaysHours(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
+            : '—';
+
+        const deadline = theme?.deadline;
+        const deadlineLabel = deadline?.mode === 'prazo' && (deadline.startAt || deadline.endAt)
+            ? `${formatShortDate(deadline.startAt)} - ${formatShortDate(deadline.endAt)}`
+            : null;
+
         courseHeroStats.innerHTML = `
             <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'concluído' : 'concluídos'}</span>
             <span class="hero-stat is-warn"><i class="fas fa-hourglass-half"></i> ${pendentes} ${pendentes === 1 ? 'pendente' : 'pendentes'}</span>
             <span class="hero-stat"><i class="fas fa-star"></i> Média ${avg}</span>
             <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
+            <span class="hero-stat"><i class="fas fa-hourglass-end"></i> Tempo médio de conclusão ${avgCompletionLabel}</span>
+            ${deadlineLabel ? `<span class="hero-stat"><i class="fas fa-calendar-days"></i> Prazo: ${deadlineLabel}</span>` : ''}
         `;
     }
 
