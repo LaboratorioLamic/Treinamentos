@@ -1028,11 +1028,10 @@
     function renderCommentsTable(rows) {
         const container = document.getElementById('cfg-dash-course-comments');
         const pager = document.getElementById('cfg-dash-course-comments-pagination');
-        // Só entra quem deixou o comentário em branco ou avaliou com nota
-        // baixa (≤3★) — comentário preenchido com nota boa não precisa de
-        // atenção do gestor, mas campo em branco (mesmo com nota alta) e
-        // nota baixa (mesmo sem comentário) sim.
-        commentsRowsCache = rows.filter(r => !r.comment || (Number(r.rating) || 0) <= 3)
+        // Entra todo mundo que deixou comentário (qualquer nota) e, além
+        // disso, quem deixou o campo em branco mas avaliou com nota baixa
+        // (≤3★) — campo em branco com nota alta não precisa de atenção.
+        commentsRowsCache = rows.filter(r => r.comment || (Number(r.rating) || 0) <= 3)
             .sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
         commentsPage = 1;
         if (commentsRowsCache.length === 0) {
