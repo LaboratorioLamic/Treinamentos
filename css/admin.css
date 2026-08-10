@@ -2119,6 +2119,23 @@
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip.is-open .dash-year-btn { border-color: var(--cfg-primary); }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip .hfilter-chip-popover { left: auto; right: 0; width: 150px; }
+        /* Unidade (múltipla escolha): abre pra esquerda, senão estoura a
+           borda direita do card; overflow:visible no card + z-index alto no
+           popover pra não ficar atrás do card vizinho nem cortado. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-chip .hfilter-chip-popover { left: auto; right: 0; width: 220px; z-index: 60; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-chip.is-open { position: relative; z-index: 41; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card:has(.dash-unit-chip.is-open) { overflow: visible; }
+
+        /* Popover de unidade que também lista os usuários das unidades
+           marcadas (Tempo para Conclusão) — mais largo que o chip simples
+           de filtro pra caber os nomes sem quebrar demais. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-users-chip .hfilter-chip-popover { width: 260px; }
+        .hfilter-chip-unit-users { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cfg-border); }
+        .hfilter-chip-unit-users:empty { display: none; }
+        .hfilter-chip-unit-users-title { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .02em; padding: 2px 9px 6px; }
+        .hfilter-chip-unit-users-list { max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+        .hfilter-chip-unit-user { padding: 6px 9px; border-radius: 8px; font-size: 12.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+        .hfilter-chip-unit-user i { font-size: 10px; color: var(--text-3); }
 
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .panel-body { height: 260px; display: flex; align-items: center; justify-content: center; }
@@ -2202,6 +2219,17 @@
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-select:hover,
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-select:focus { border-color: var(--cfg-primary); }
 
+        /* Toggle "Críticos" (notas < 6) no painel de Reprovados */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle {
+            display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface); box-sizing: border-box;
+            font-size: 12px; font-family: inherit; color: var(--text-2); cursor: pointer; transition: all 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle:hover { border-color: var(--cfg-danger); color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle.is-active {
+            background: var(--cfg-danger-light); border-color: var(--cfg-danger); color: var(--cfg-danger);
+        }
+
         /* --- Comentários: cards em vez de tabela crua, com estrelas douradas --- */
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-cards { display: flex; flex-direction: column; gap: 10px; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card {
@@ -2228,6 +2256,7 @@
             cursor: pointer;
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text.is-expanded { -webkit-line-clamp: unset; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text.is-empty { font-style: italic; color: var(--text-3); cursor: default; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-more {
             font-size: 11px; font-weight: 700; color: var(--cfg-primary); cursor: pointer; margin-top: 4px; display: inline-block;
         }

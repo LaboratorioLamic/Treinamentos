@@ -52,7 +52,7 @@
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
     const CHART_COLORS = {
         accent: '#4f8ef7', success: '#10b981', danger: '#ef4444', warning: '#f59e0b',
-        muted: '#94a3b8', purple: '#8b5cf6', yellow: '#eab308', orange: '#f97316'
+        muted: '#94a3b8', purple: '#8b5cf6', yellow: '#eab308', orange: '#f97316', lime: '#84cc16'
     };
     const MONTH_LABELS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -988,8 +988,8 @@
                     <span class="comment-card-name"><i class="fas fa-user-circle"></i> ${escapeHtml(r.fullName)}</span>
                     <span class="comment-card-rating">${scoreBadgeGradientHtml(r.score)}${starsHtml(r.rating)}</span>
                 </div>
-                <p class="comment-card-text">${escapeHtml(r.comment)}</p>
-                <span class="comment-card-more" data-action="toggle-comment">Ver mais</span>
+                <p class="comment-card-text ${r.comment ? '' : 'is-empty'}">${r.comment ? escapeHtml(r.comment) : 'Em branco'}</p>
+                ${r.comment ? '<span class="comment-card-more" data-action="toggle-comment">Ver mais</span>' : ''}
             </div>`;
         }).join('')}</div>`;
         container.querySelectorAll('.comment-card-more').forEach(btn => {
@@ -1012,7 +1012,10 @@
     function renderCommentsTable(rows) {
         const container = document.getElementById('cfg-dash-course-comments');
         const pager = document.getElementById('cfg-dash-course-comments-pagination');
-        commentsRowsCache = rows.filter(r => r.comment).sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
+        // Nota baixa (≤4★) entra mesmo sem comentário — quem avaliou mal
+        // precisa aparecer pro gestor mesmo tendo deixado o campo em branco.
+        commentsRowsCache = rows.filter(r => r.comment || (Number(r.rating) || 0) <= 4)
+            .sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
         commentsPage = 1;
         if (commentsRowsCache.length === 0) {
             container.innerHTML = '<p class="dashboard-table-empty">Nenhum comentário registrado para este curso.</p>';
@@ -1155,6 +1158,7 @@
     let completedSearchTerm = '';
     let reprovedRowsCache = [];
     let reprovedSearchTerm = '';
+    let reprovedCriticalOnly = false;
     let conclusionsCourseIds = { slug: '', subjectId: '', themeId: '' };
 
     function conclusionRowHtml(r, i) {
@@ -1206,7 +1210,9 @@
     }
 
     function paintReprovedPage() {
-        paintConclusionsTable('cfg-dash-course-reproved', reprovedRowsCache, reprovedSearchTerm, 'fa-circle-xmark', 'Nenhuma reprovação registrada para este curso.');
+        const rows = reprovedCriticalOnly ? reprovedRowsCache.filter(r => Number(r.score) < 6) : reprovedRowsCache;
+        const emptyMessage = reprovedCriticalOnly ? 'Nenhuma reprovação crítica (nota abaixo de 6) registrada para este curso.' : 'Nenhuma reprovação registrada para este curso.';
+        paintConclusionsTable('cfg-dash-course-reproved', rows, reprovedSearchTerm, 'fa-circle-xmark', emptyMessage);
     }
 
     function renderCompletedTable(rows, slug, subjectId, themeId) {
@@ -1214,6 +1220,8 @@
         const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         completedRowsCache = sorted.filter(r => r.approved);
         reprovedRowsCache = sorted.filter(r => !r.approved);
+        reprovedCriticalOnly = false;
+        document.getElementById('cfg-dash-course-reproved-critical')?.classList.remove('is-active');
         paintCompletedPage();
         paintReprovedPage();
     }
@@ -1225,6 +1233,12 @@
 
     document.getElementById('cfg-dash-course-reproved-search')?.addEventListener('input', (e) => {
         reprovedSearchTerm = e.target.value;
+        paintReprovedPage();
+    });
+
+    document.getElementById('cfg-dash-course-reproved-critical')?.addEventListener('click', (e) => {
+        reprovedCriticalOnly = !reprovedCriticalOnly;
+        e.currentTarget.classList.toggle('is-active', reprovedCriticalOnly);
         paintReprovedPage();
     });
 
@@ -1428,7 +1442,106 @@
     }
 
     let courseChartRowsCache = [];
+    let courseChartAudienceCache = [];
+    let courseChartCompletionTimeCache = [];
     const courseChartYearChip = createYearFilterChip('cfg-dash-course-year-chip', 'cfg-dash-course-year-list', () => renderCourseCharts(courseChartRowsCache));
+
+    // Popover de seleção múltipla (checkbox) — mesmo visual do chip de ano,
+    // mas permite marcar várias opções ao mesmo tempo (ex.: comparar a
+    // conclusão de várias unidades juntas no gráfico de tendência).
+    // `onPaint(values)`, se passado, roda a cada (re)pintura — usado pelo chip
+    // de "Tempo para Conclusão" pra listar os colaboradores das unidades
+    // marcadas logo abaixo das opções, dentro do mesmo popover.
+    function createMultiFilterChip(chipId, listId, onChange, onPaint) {
+        const chip = document.getElementById(chipId);
+        const listEl = document.getElementById(listId);
+        const btn = chip?.querySelector('.hfilter-chip-btn');
+        const label = chip?.querySelector('.hfilter-chip-label');
+        let values = new Set();
+        let options = [];
+
+        function closePopover() { chip?.classList.remove('is-open'); }
+
+        function paint() {
+            if (!listEl) return;
+            if (options.length === 0) {
+                listEl.innerHTML = `<div class="hfilter-chip-empty">Nenhuma unidade disponível.</div>`;
+            } else {
+                listEl.innerHTML = options.map(opt => `
+                    <div class="hfilter-chip-item ${values.has(opt) ? 'is-selected' : ''}" data-value="${escapeHtml(opt)}">
+                        <i class="fas ${values.has(opt) ? 'fa-square-check' : 'fa-square'}"></i> ${escapeHtml(opt)}
+                    </div>`).join('');
+                listEl.querySelectorAll('.hfilter-chip-item').forEach(item => {
+                    item.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        const value = item.dataset.value;
+                        if (values.has(value)) values.delete(value); else values.add(value);
+                        refresh();
+                        onChange(values);
+                    });
+                });
+            }
+            onPaint?.(values);
+        }
+
+        function refresh() {
+            if (label) {
+                label.textContent = values.size === 0 ? label.dataset.default
+                    : values.size === 1 ? [...values][0]
+                    : `${values.size} unidades`;
+            }
+            chip?.classList.toggle('is-active', values.size > 0);
+            paint();
+        }
+
+        btn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = chip.classList.contains('is-open');
+            document.querySelectorAll('.hfilter-chip.is-open').forEach(c => c.classList.remove('is-open'));
+            if (!isOpen) chip.classList.add('is-open');
+        });
+        chip?.addEventListener('click', (event) => event.stopPropagation());
+        document.addEventListener('click', closePopover);
+
+        return {
+            // Repopula com as unidades disponíveis para o curso atual; remove
+            // da seleção qualquer unidade que não exista mais nesse conjunto.
+            setOptions(newOptions) {
+                options = newOptions;
+                values = new Set([...values].filter(v => options.includes(v)));
+                refresh();
+            },
+            getValues() { return values; }
+        };
+    }
+
+    const courseChartUnitChip = createMultiFilterChip('cfg-dash-course-unit-chip', 'cfg-dash-course-unit-list', () => renderCourseCompletionTrendChart(courseChartRowsCache, courseChartAudienceCache));
+
+    // Chip de unidade do gráfico "Tempo para Conclusão" — além de filtrar o
+    // gráfico, lista os colaboradores das unidades marcadas dentro do
+    // próprio popover (pedido explícito: selecionar unidade mostra quem é
+    // dela, podendo marcar mais de uma ao mesmo tempo).
+    const completionTimeUnitUsersEl = document.getElementById('cfg-dash-course-completiontime-unit-users');
+    function paintCompletionTimeUnitUsers(values) {
+        if (!completionTimeUnitUsersEl) return;
+        if (values.size === 0) { completionTimeUnitUsersEl.innerHTML = ''; return; }
+        const people = courseChartAudienceCache
+            .filter(c => values.has(c.unit))
+            .slice()
+            .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'pt-BR'));
+        completionTimeUnitUsersEl.innerHTML = `
+            <div class="hfilter-chip-unit-users-title">${people.length} colaborador${people.length === 1 ? '' : 'es'}</div>
+            <div class="hfilter-chip-unit-users-list">${
+                people.length
+                    ? people.map(p => `<div class="hfilter-chip-unit-user"><i class="fas fa-user"></i> ${escapeHtml(p.fullName)}</div>`).join('')
+                    : `<div class="hfilter-chip-empty">Nenhum colaborador nessa unidade.</div>`
+            }</div>`;
+    }
+    const courseChartCompletionTimeUnitChip = createMultiFilterChip(
+        'cfg-dash-course-completiontime-unit-chip', 'cfg-dash-course-completiontime-unit-list',
+        () => renderCourseCompletionTimeChart(courseChartCompletionTimeCache),
+        paintCompletionTimeUnitUsers
+    );
 
     // Parte da aba Gráficos que depende de data (Satisfação, Prazo,
     // Retentativas, Por Unidade) — respeita o filtro de ano. "Realização do
@@ -1459,6 +1572,251 @@
         renderCourseRetriesChart(rows);
         renderCourseByUnitChart(rows);
         renderCourseMistakesChart(rows);
+        renderCourseScoresChart(rows);
+
+        // Só entram unidades com nome de verdade — vazio, "—" ou "Sem
+        // unidade" viram ruído no filtro (não dá pra segmentar por elas).
+        const invalidUnit = (u) => !u || !u.trim() || u.trim() === '—' || normalizeName(u) === normalizeName('Sem unidade');
+        const units = [...new Set(courseChartAudienceCache.map(c => c.unit).filter(u => !invalidUnit(u)))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        courseChartUnitChip.setOptions(units);
+        renderCourseCompletionTrendChart(allRows, courseChartAudienceCache);
+        renderCourseUnitCompletionChart(allRows, courseChartAudienceCache);
+
+        courseChartCompletionTimeUnitChip.setOptions(units);
+        courseChartCompletionTimeCache = buildCompletionTimeData(allRows);
+        renderCourseCompletionTimeChart(courseChartCompletionTimeCache);
+    }
+
+    // Tempo entre o início do 1º módulo assistido (startedAt, gravado em
+    // progress/byUser na primeira sincronização do curso) e a aprovação na
+    // avaliação (submittedAt da última tentativa aprovada). Só existe para
+    // quem tem conta (progresso é gravado por userId) e cursou depois do
+    // startedAt existir — sem esse dado a pessoa não entra no gráfico.
+    // Ordenado do maior tempo para o menor.
+    function buildCompletionTimeData(rows) {
+        const approved = lastAttemptByPerson(rows).filter(r => r.approved && r.submittedAt);
+        return approved
+            .map(r => {
+                const started = r.userId ? allProgress[r.userId]?.[currentSlug()]?.[r.subjectId]?.[r.themeId]?.startedAt : null;
+                if (!started || started >= r.submittedAt) return null;
+                return { fullName: r.fullName, unit: r.unit, durationMs: r.submittedAt - started };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.durationMs - a.durationMs);
+    }
+
+    function formatDaysHours(ms) {
+        const totalHours = Math.floor(ms / 3600000);
+        const days = Math.floor(totalHours / 24);
+        const hours = totalHours % 24;
+        return `${days} ${days === 1 ? 'Dia' : 'Dias'} ${hours} ${hours === 1 ? 'Hora' : 'Horas'}`;
+    }
+
+    function renderCourseCompletionTimeChart(data) {
+        const selectedUnits = courseChartCompletionTimeUnitChip.getValues();
+        const scoped = selectedUnits.size > 0 ? data.filter(d => selectedUnits.has(d.unit)) : data;
+        const canvas = document.getElementById('cfg-dash-course-completiontime-chart');
+        const emptyEl = document.getElementById('cfg-dash-course-completiontime-empty');
+
+        // Sem dado nenhum (ninguém com startedAt registrado ainda) o Chart.js
+        // desenha um eixo numérico "fantasma" com o canvas vazio — em vez
+        // disso mostra mensagem e não renderiza o gráfico.
+        if (scoped.length === 0) {
+            destroyChart('courseCompletionTime');
+            if (canvas) canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'flex';
+            return;
+        }
+        if (canvas) canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        renderChart('courseCompletionTime', 'cfg-dash-course-completiontime-chart', {
+            type: 'bar',
+            data: {
+                labels: scoped.map(d => d.fullName),
+                datasets: [{ data: scoped.map(d => d.durationMs), backgroundColor: CHART_COLORS.accent, borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => formatDaysHours(scoped[ctx.dataIndex].durationMs) } }
+                },
+                scales: { x: { ticks: { callback: (v) => formatDaysHours(v) } } }
+            }
+        });
+    }
+
+    // Taxa de conclusão do curso ao longo do tempo, em % do público-alvo:
+    // acumula quem concluiu (última tentativa de cada pessoa) dia a dia e
+    // divide pelo total de pessoas elegíveis. Não respeita o filtro de ano
+    // do card (a curva precisa do histórico completo pra fazer sentido como
+    // acumulado) — só o filtro de unidade, que também recalcula o total.
+    function renderCourseCompletionTrendChart(allRows, audience) {
+        const selectedUnits = courseChartUnitChip.getValues();
+        const scopedRows = selectedUnits.size > 0
+            ? allRows.filter(r => selectedUnits.has(r.unit))
+            : allRows;
+        const scopedAudience = selectedUnits.size > 0
+            ? audience.filter(c => selectedUnits.has(c.unit))
+            : audience;
+        const total = scopedAudience.length || 1;
+
+        const last = lastAttemptByPerson(scopedRows)
+            .filter(r => r.submittedAt)
+            .sort((a, b) => a.submittedAt - b.submittedAt);
+
+        // Agrupa por dia (data local, sem hora) e acumula.
+        const byDay = new Map();
+        last.forEach(r => {
+            const day = new Date(r.submittedAt).toLocaleDateString('pt-BR');
+            byDay.set(day, (byDay.get(day) || 0) + 1);
+        });
+
+        let running = 0;
+        const labels = [];
+        const data = [];
+        const runningCounts = [];
+        [...byDay.entries()].forEach(([day, count]) => {
+            running += count;
+            labels.push(day);
+            data.push(Math.round((running / total) * 100));
+            runningCounts.push(running);
+        });
+
+        renderChart('courseCompletionTrend', 'cfg-dash-course-completion-trend-chart', {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Taxa de conclusão', data,
+                    borderColor: CHART_COLORS.accent, backgroundColor: CHART_COLORS.accent + '22',
+                    fill: true, tension: 0.25, pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => `${runningCounts[ctx.dataIndex]} de ${total} concluíram (${ctx.parsed.y}%)` } }
+                },
+                scales: { y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } }
+            }
+        });
+    }
+
+    // % de conclusão por unidade — denominador é o total de pessoas do
+    // público-alvo daquela unidade (não só quem já concluiu), então a barra
+    // mostra o quanto falta de fato. Paginado e ordenado da maior taxa para
+    // a menor, mesmo critério visual do gráfico "Realização por Unidade".
+    const UNIT_COMPLETION_PAGE_SIZE = 7;
+    let unitCompletionPage = 1;
+    let unitCompletionDataCache = [];
+
+    function paintUnitCompletionPage() {
+        const totalPages = Math.max(1, Math.ceil(unitCompletionDataCache.length / UNIT_COMPLETION_PAGE_SIZE));
+        unitCompletionPage = Math.min(Math.max(1, unitCompletionPage), totalPages);
+        const start = (unitCompletionPage - 1) * UNIT_COMPLETION_PAGE_SIZE;
+        const pageUnits = unitCompletionDataCache.slice(start, start + UNIT_COMPLETION_PAGE_SIZE);
+
+        renderChart('courseUnitCompletion', 'cfg-dash-course-unit-completion-chart', {
+            type: 'bar',
+            data: {
+                labels: pageUnits.map(u => u.unit),
+                datasets: [{ data: pageUnits.map(u => u.pct), backgroundColor: CHART_COLORS.accent, borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => {
+                        const u = pageUnits[ctx.dataIndex];
+                        return `${u.done} de ${u.total} concluíram (${u.pct}%)`;
+                    } } }
+                },
+                scales: { x: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } }
+            }
+        });
+
+        const pager = document.getElementById('cfg-dash-course-unit-completion-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${unitCompletionPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${unitCompletionPage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${unitCompletionPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                unitCompletionPage += btn.dataset.page === 'prev' ? -1 : 1;
+                paintUnitCompletionPage();
+            });
+        });
+    }
+
+    function renderCourseUnitCompletionChart(allRows, audience) {
+        const doneKeys = new Set();
+        lastAttemptByPerson(allRows).forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
+
+        const byUnit = new Map();
+        audience.forEach(colab => {
+            const unit = colab.unit || 'Sem unidade';
+            if (!byUnit.has(unit)) byUnit.set(unit, { total: 0, done: 0 });
+            const entry = byUnit.get(unit);
+            entry.total++;
+            if (personKeysOfColaborador(colab).some(key => doneKeys.has(key))) entry.done++;
+        });
+
+        unitCompletionDataCache = [...byUnit.entries()]
+            .map(([unit, e]) => ({ unit, total: e.total, done: e.done, pct: e.total ? Math.round((e.done / e.total) * 100) : 0 }))
+            .sort((a, b) => b.pct - a.pct);
+        unitCompletionPage = 1;
+        paintUnitCompletionPage();
+    }
+
+    // Distribuição das notas de prova, arredondadas sem casa decimal (0-10),
+    // coloridas por faixa: 10 verde, 8-9 limão, 6-7 amarelo, 4-5 laranja,
+    // <4 vermelho.
+    function scoreBarColor(score) {
+        if (score >= 10) return CHART_COLORS.success;
+        if (score >= 8) return CHART_COLORS.lime;
+        if (score >= 6) return CHART_COLORS.yellow;
+        if (score >= 4) return CHART_COLORS.orange;
+        return CHART_COLORS.danger;
+    }
+
+    function renderCourseScoresChart(rows) {
+        const counts = new Array(11).fill(0); // índice 0..10
+        let total = 0;
+        rows.forEach(r => {
+            const score = Number(r.score);
+            if (!Number.isFinite(score)) return;
+            const rounded = Math.min(10, Math.max(0, Math.round(score)));
+            counts[rounded]++;
+            total++;
+        });
+
+        renderChart('courseScores', 'cfg-dash-course-scores-chart', {
+            type: 'bar',
+            data: {
+                labels: counts.map((_, score) => String(score)),
+                datasets: [{ data: counts, backgroundColor: counts.map((_, score) => scoreBarColor(score)), borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => {
+                        // Chart vertical: valor real vem de parsed.y, não .x
+                        // (singleSeriesTooltipLabel assume barra horizontal e
+                        // pegaria o rótulo do eixo x — a própria nota — como
+                        // se fosse a contagem).
+                        const value = Number(ctx.parsed.y) || 0;
+                        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                        return `${value} (${pct}%)`;
+                    } } }
+                },
+                scales: { x: { title: { display: true, text: 'Nota' } }, y: { ticks: { precision: 0 } } }
+            }
+        });
     }
 
     // Ranking das questões com mais erros, do maior para o menor — ajuda a
@@ -1628,12 +1986,14 @@
             const audience = courseAudience(theme);
             realizou = audience.filter(colab => personKeysOfColaborador(colab).some(key => doneKeys.has(key))).length;
             faltaram = Math.max(0, audience.length - realizou);
+            courseChartAudienceCache = audience;
         } else {
             // Sem público-alvo definido (ex.: estágios): volta ao total de
             // contas cadastradas, mesmo critério de antes.
             const totalUsers = Object.keys(allUsers).length;
             realizou = rows.filter(r => r.userId).length;
             faltaram = Math.max(0, totalUsers - realizou);
+            courseChartAudienceCache = Object.keys(allColaboradores).map(id => ({ id, ...allColaboradores[id] })).filter(c => c.fullName);
         }
         renderChart('courseCompletion', 'cfg-dash-course-completion-chart', {
             type: 'pie',

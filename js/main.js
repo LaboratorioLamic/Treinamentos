@@ -159,6 +159,11 @@
         let currentVideoId = null;
         let assessmentResults = {};
 
+        // Cache do startedAt já gravado na nuvem por curso (subjectId/themeId)
+        // — precisa ser preservado entre syncs (não sobrescrito), pois é a
+        // referência usada no gráfico "Tempo para Conclusão" do dashboard.
+        let remoteProgressStartedAt = {};
+
         function loadProgression() {
             const savedCompletion = localStorage.getItem('completionStatus');
             const savedAssessments = localStorage.getItem('assessmentResults');
@@ -197,11 +202,20 @@
             if (!theme) return;
             const { total, done, pct } = courseProgress(currentTrainingId, theme);
             const approved = assessmentResults[currentTrainingId]?.[currentThemeId];
+            // startedAt é gravado só na primeira sync do curso e preservado
+            // depois — marca (aproximadamente) o início do 1º módulo, usado
+            // no gráfico "Tempo para Conclusão" do dashboard (Config >
+            // Dashboard > curso > Gráficos).
+            const existingStartedAt = remoteProgressStartedAt[currentTrainingId]?.[currentThemeId];
+            const startedAt = existingStartedAt || Date.now();
             const record = {
                 total, done, pct,
                 approved: approved !== undefined ? approved : null,
+                startedAt,
                 updatedAt: Date.now()
             };
+            if (!remoteProgressStartedAt[currentTrainingId]) remoteProgressStartedAt[currentTrainingId] = {};
+            remoteProgressStartedAt[currentTrainingId][currentThemeId] = startedAt;
             const path = `${progressPathFor(session.userId)}/${currentTrainingId}/${currentThemeId}`;
             U.ref(U.db, path).set(record).catch(error => {
                 console.error('Erro ao sincronizar progressão do curso:', error);
@@ -226,6 +240,10 @@
                     Object.keys(trainingData[subjectId]?.themes || {}).forEach(themeId => {
                         const theme = trainingData[subjectId].themes[themeId];
                         const entry = remote[subjectId]?.[themeId];
+                        if (entry?.startedAt) {
+                            if (!remoteProgressStartedAt[subjectId]) remoteProgressStartedAt[subjectId] = {};
+                            remoteProgressStartedAt[subjectId][themeId] = entry.startedAt;
+                        }
                         const localDone = (completionStatus[subjectId]?.[themeId] || []).filter(Boolean).length;
                         const remoteDone = entry?.done || 0;
 
