@@ -1458,6 +1458,102 @@
         .history-detail-question .q-option.was-selected.is-wrong { background: var(--cfg-danger-light); color: var(--cfg-danger); font-weight: 600; }
         .history-detail-question .q-option.is-answer-key { background: var(--cfg-success-light); color: var(--cfg-success); font-weight: 600; }
 
+        /* === MODAL: detalhe da avaliação (clique num comentário) === */
+        #cfg-root .comment-card.is-clickable { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+        #cfg-root .comment-card.is-clickable:hover { transform: translateY(-1px); box-shadow: var(--cfg-shadow-sm); }
+
+        #cfg-dash-review-modal .dash-review-modal-content {
+            max-width: 900px; width: 92vw; max-height: 88vh; overflow-y: auto;
+            padding: 0; border-radius: 16px;
+        }
+        #cfg-dash-review-modal .close {
+            position: absolute; top: 16px; right: 18px; z-index: 2;
+        }
+        #cfg-dash-review-modal .dash-review-student {
+            display: flex; align-items: center; gap: 16px; padding: 24px 28px 18px;
+            background: linear-gradient(135deg, var(--cfg-primary-light), transparent 70%);
+            border-bottom: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-review-modal .dash-review-avatar {
+            width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
+            color: #fff; font-weight: 700; font-size: 18px;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.28);
+        }
+        #cfg-dash-review-modal .dash-review-student-info h2 {
+            font-size: 18px; font-weight: 700; color: var(--text); margin: 0 0 6px;
+        }
+        #cfg-dash-review-modal .dash-review-student-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        #cfg-dash-review-modal .dash-review-stats {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+            background: var(--cfg-border); border-bottom: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-review-modal .dash-review-stat {
+            display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: var(--cfg-surface);
+        }
+        #cfg-dash-review-modal .dash-review-stat i { font-size: 17px; color: var(--cfg-primary); flex-shrink: 0; }
+        #cfg-dash-review-modal .dash-review-stat div { display: flex; flex-direction: column; line-height: 1.25; }
+        #cfg-dash-review-modal .dash-review-stat b { font-size: 16px; font-weight: 700; color: var(--text); }
+        #cfg-dash-review-modal .dash-review-stat span { font-size: 11px; color: var(--text-2); font-weight: 600; }
+
+        #cfg-dash-review-modal .dash-review-body { padding: 22px 28px 28px; display: flex; flex-direction: column; gap: 22px; }
+        #cfg-dash-review-modal .dash-review-section h3 {
+            font-size: 13.5px; font-weight: 700; color: var(--text); margin: 0 0 12px;
+            display: flex; align-items: center; gap: 7px;
+        }
+        #cfg-dash-review-modal .dash-review-section h3 i { color: var(--cfg-primary); font-size: 13px; }
+
+        #cfg-dash-review-modal .dash-review-summary {
+            border: 1.5px solid var(--cfg-border); border-radius: 14px; padding: 18px 20px; background: var(--cfg-bg-2, #f8fafc);
+        }
+        #cfg-dash-review-modal .dash-review-summary-head {
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+        }
+        #cfg-dash-review-modal .dash-review-summary-head h3 { margin: 0; }
+        #cfg-dash-review-modal .dash-review-course-name {
+            font-size: 11.5px; font-weight: 700; color: var(--cfg-primary); background: var(--cfg-primary-light);
+            padding: 3px 10px; border-radius: 999px;
+        }
+        #cfg-dash-review-modal .dash-review-summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 14px;
+        }
+        #cfg-dash-review-modal .dash-review-summary-item {
+            display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+        }
+        #cfg-dash-review-modal .dash-review-summary-item > span:last-child {
+            font-size: 10.5px; color: var(--text-2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+        }
+        #cfg-dash-review-modal .dash-review-date { font-size: 12.5px; color: var(--text); font-weight: 600; }
+        #cfg-dash-review-modal .comment-stars { display: inline-flex; gap: 2px; }
+        #cfg-dash-review-modal .comment-stars i { font-size: 15px; color: #e2c88a; }
+        #cfg-dash-review-modal .comment-stars i.is-filled {
+            background: linear-gradient(180deg, #ffd76a, #f5a623);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 0.5px 0.5px rgba(191, 130, 8, 0.4));
+        }
+        #cfg-dash-review-modal .comment-stars i.is-empty { color: var(--cfg-border); }
+        #cfg-dash-review-modal .dash-review-comment {
+            display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px;
+            background: var(--cfg-surface); border-radius: 10px; border: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-review-modal .dash-review-comment i { color: var(--cfg-primary); opacity: 0.5; font-size: 15px; margin-top: 2px; }
+        #cfg-dash-review-modal .dash-review-comment p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.5; font-style: italic; }
+        #cfg-dash-review-modal .dash-review-no-comment { margin: 0; font-size: 12.5px; color: var(--text-2); font-style: italic; }
+
+        #cfg-dash-review-modal .history-detail-questions { display: flex; flex-direction: column; gap: 8px; }
+        #cfg-dash-review-modal .conclusion-situation {
+            display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+            font-size: 11.5px; font-weight: 700; white-space: nowrap;
+        }
+        #cfg-dash-review-modal .conclusion-situation.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-review-modal .conclusion-situation.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        @media (max-width: 640px) {
+            #cfg-dash-review-modal .dash-review-stats { grid-template-columns: 1fr; }
+        }
+
         /* === BUTTONS === */
         #cfg-root .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -2125,6 +2221,7 @@
             font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name i { color: var(--cfg-primary); font-size: 14px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-rating { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text {
             font-size: 12.5px; color: var(--text-2); line-height: 1.5;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;

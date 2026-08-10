@@ -908,18 +908,24 @@
                 <div class="tab-content active" id="cfg-dash-course-tab-conclusions">
                     <div class="panel-card">
                         <div class="panel-header">
-                            <h2><i class="fas fa-circle-check" style="color:var(--cfg-success);margin-right:6px;"></i>Concluídos</h2>
+                            <h2><i class="fas fa-circle-check" style="color:var(--cfg-success);margin-right:6px;"></i>Aprovados</h2>
                             <div class="panel-header-actions">
-                                <select class="panel-select" id="cfg-dash-course-completed-situation">
-                                    <option value="">Todas as situações</option>
-                                    <option value="approved">Aprovado</option>
-                                    <option value="reproved">Reprovado</option>
-                                </select>
                                 <div class="panel-search"><i class="fas fa-search"></i><input type="text" id="cfg-dash-course-completed-search" placeholder="Buscar nome..."></div>
                             </div>
                         </div>
                         <div class="panel-body">
                             <div id="cfg-dash-course-completed" class="dashboard-table-wrap"></div>
+                        </div>
+                    </div>
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <h2><i class="fas fa-circle-xmark" style="color:var(--cfg-danger);margin-right:6px;"></i>Reprovados</h2>
+                            <div class="panel-header-actions">
+                                <div class="panel-search"><i class="fas fa-search"></i><input type="text" id="cfg-dash-course-reproved-search" placeholder="Buscar nome..."></div>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-course-reproved" class="dashboard-table-wrap"></div>
                         </div>
                     </div>
                     <div class="panel-card">
@@ -943,12 +949,6 @@
                         <div class="panel-body">
                             <div id="cfg-dash-course-comments" class="dashboard-table-wrap"></div>
                             <div class="dash-comments-pagination" id="cfg-dash-course-comments-pagination"></div>
-                        </div>
-                    </div>
-                    <div class="panel-card">
-                        <div class="panel-header"><h2>Reprovações</h2></div>
-                        <div class="panel-body">
-                            <div id="cfg-dash-course-reprovals" class="dashboard-table-wrap"></div>
                         </div>
                     </div>
                 </div>
@@ -989,6 +989,10 @@
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header"><h2>Retentativas</h2></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-retries-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Principais Erros</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-course-mistakes-chart"></canvas></div>
                         </div>
                     </div>
                 </div>
@@ -1062,6 +1066,35 @@
                             <div class="panel-body"><canvas id="cfg-dash-user-deadlinetrend-chart"></canvas></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de detalhe da avaliação (clique num comentário da Pesquisa de Satisfação) -->
+    <div class="modal" id="cfg-dash-review-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-review-modal-title">
+        <div class="modal-content dash-review-modal-content">
+            <span class="close" id="cfg-dash-review-modal-close">&times;</span>
+            <div class="dash-review-student">
+                <div class="dash-review-avatar" id="cfg-dash-review-avatar">?</div>
+                <div class="dash-review-student-info">
+                    <h2 id="cfg-dash-review-modal-title">Colaborador</h2>
+                    <div class="dash-review-student-tags" id="cfg-dash-review-student-tags"></div>
+                </div>
+            </div>
+            <div class="dash-review-stats" id="cfg-dash-review-stats"></div>
+            <div class="dash-review-body">
+                <div class="dash-review-section dash-review-summary">
+                    <div class="dash-review-summary-head">
+                        <h3><i class="fas fa-clipboard-check"></i> Avaliação deste curso</h3>
+                        <span class="dash-review-course-name" id="cfg-dash-review-course-name"></span>
+                    </div>
+                    <div class="dash-review-summary-grid" id="cfg-dash-review-summary-grid"></div>
+                    <div class="dash-review-comment" id="cfg-dash-review-comment"></div>
+                </div>
+                <div class="dash-review-section" id="cfg-dash-review-questions-section">
+                    <h3><i class="fas fa-circle-question"></i> Questões incorretas</h3>
+                    <div class="history-detail-questions" id="cfg-dash-review-questions"></div>
                 </div>
             </div>
         </div>

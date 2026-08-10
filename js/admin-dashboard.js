@@ -32,10 +32,27 @@
         return `<span class="hist-score ${cls}"><b>${formatScore(n)}</b><small>/10</small></span>`;
     }
 
+    // Balão colorido da nota numa escala CONTÍNUA vermelho→amarelo→verde
+    // (0 a 10), em vez de 3 faixas fixas — usado onde a variação fina de
+    // nota importa mais (ex.: comentários da pesquisa de satisfação). Cor
+    // calculada inline (não depende de classes CSS) para nunca ficar sem
+    // estilo por escopo de seletor.
+    function scoreBadgeGradientHtml(score) {
+        const n = Number(score);
+        if (!Number.isFinite(n)) return '—';
+        const t = Math.max(0, Math.min(1, n / 10));
+        // vermelho (0) -> amarelo (0.5) -> verde (1), interpolado em HSL
+        // (hue 0=vermelho, 50=amarelo, 142=verde) para uma transição suave.
+        const hue = t <= 0.5 ? (t / 0.5) * 50 : 50 + ((t - 0.5) / 0.5) * 92;
+        const bg = `hsl(${hue.toFixed(0)}, 88%, 94%)`;
+        const fg = `hsl(${hue.toFixed(0)}, 70%, 32%)`;
+        return `<span class="hist-score" style="background:${bg};color:${fg};"><b>${formatScore(n)}</b><small>/10</small></span>`;
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
     const CHART_COLORS = {
         accent: '#4f8ef7', success: '#10b981', danger: '#ef4444', warning: '#f59e0b',
-        muted: '#94a3b8', purple: '#8b5cf6'
+        muted: '#94a3b8', purple: '#8b5cf6', yellow: '#eab308', orange: '#f97316'
     };
     const MONTH_LABELS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -962,24 +979,31 @@
         const start = (commentsPage - 1) * COMMENTS_PAGE_SIZE;
         const pageRows = rows.slice(start, start + COMMENTS_PAGE_SIZE);
 
-        container.innerHTML = `<div class="comment-cards">${pageRows.map(r => {
+        container.innerHTML = `<div class="comment-cards">${pageRows.map((r, i) => {
             const n = Number(r.rating) || 0;
             const ratingClass = n >= 4 ? 'rating-high' : n === 3 ? 'rating-mid' : 'rating-low';
             return `
-            <div class="comment-card ${ratingClass}">
+            <div class="comment-card ${ratingClass} is-clickable" data-row-i="${start + i}" title="Ver detalhes da avaliação">
                 <div class="comment-card-head">
                     <span class="comment-card-name"><i class="fas fa-user-circle"></i> ${escapeHtml(r.fullName)}</span>
-                    ${starsHtml(r.rating)}
+                    <span class="comment-card-rating">${scoreBadgeGradientHtml(r.score)}${starsHtml(r.rating)}</span>
                 </div>
                 <p class="comment-card-text">${escapeHtml(r.comment)}</p>
                 <span class="comment-card-more" data-action="toggle-comment">Ver mais</span>
             </div>`;
         }).join('')}</div>`;
         container.querySelectorAll('.comment-card-more').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
                 const text = btn.previousElementSibling;
                 const expanded = text.classList.toggle('is-expanded');
                 btn.textContent = expanded ? 'Ver menos' : 'Ver mais';
+            });
+        });
+        container.querySelectorAll('.comment-card.is-clickable').forEach(card => {
+            card.addEventListener('click', () => {
+                const row = commentsRowsCache[Number(card.dataset.rowI)];
+                if (row) openReviewModal(row);
             });
         });
         renderCommentsPagination(totalPages);
@@ -998,30 +1022,111 @@
         paintCommentsPage();
     }
 
-    function renderReprovalsTable(rows, slug, subjectId, themeId) {
-        const container = document.getElementById('cfg-dash-course-reprovals');
-        const reproved = rows.filter(r => !r.approved);
-        if (reproved.length === 0) {
-            container.innerHTML = '<p class="dashboard-table-empty">Nenhuma reprovação registrada para este curso.</p>';
-            return;
-        }
-        container.innerHTML = `<table>
-            <thead><tr><th>Nome</th><th>Nota</th><th>Data</th><th>Status do prazo</th><th></th></tr></thead>
-            <tbody>${reproved.map(r => {
-                const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('pt-BR') : '—';
-                const statusLabel = U.Deadlines.STATUS_LABELS[r.deadlineStatus] || r.deadlineStatus || '—';
-                const canForgive = r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
-                return `<tr>
-                    <td>${escapeHtml(r.fullName)}</td><td>${formatScore(r.score)}/10</td><td>${dateLabel}</td><td>${escapeHtml(statusLabel)}</td>
-                    <td>${canForgive ? `<button class="dash-forgive-btn" data-user-id="${escapeHtml(r.userId)}" data-slug="${slug}" data-subject-id="${subjectId}" data-theme-id="${themeId}">Desconsiderar atraso</button>` : ''}</td>
-                </tr>`;
-            }).join('')}</tbody>
-        </table>`;
+    // ─── Modal de detalhe da avaliação (clique num comentário) ───
+    // Mostra quem é o aluno (unidade, cargo, média geral e total de cursos
+    // entre TODOS os cursos que já fez) ao lado da avaliação específica deste
+    // curso (nota, estrelas, comentário e as questões que errou/acertou).
+    const reviewModal = document.getElementById('cfg-dash-review-modal');
+    const reviewModalClose = document.getElementById('cfg-dash-review-modal-close');
 
-        container.querySelectorAll('.dash-forgive-btn').forEach(btn => {
-            btn.addEventListener('click', () => handleForgiveDeadline(btn.dataset));
-        });
+    function closeReviewModal() { if (reviewModal) reviewModal.style.display = 'none'; }
+
+    // Acha o cadastro do colaborador dono de uma linha de histórico, pela
+    // mesma chave (conta ou nome normalizado) usada no resto do dashboard.
+    function findColaboradorForRow(row) {
+        const keys = new Set(personKeysOfRow(row));
+        const entry = Object.entries(allColaboradores).find(([, colab]) => personKeysOfColaborador(colab).some(key => keys.has(key)));
+        return entry ? { id: entry[0], colab: entry[1] } : null;
     }
+
+    function openReviewModal(row) {
+        if (!reviewModal) return;
+        const found = findColaboradorForRow(row);
+        const colab = found?.colab || { fullName: row.fullName, unit: row.unit, role: row.role };
+
+        const allRows = found ? flattenColaboradorResults(colab) : [row];
+        const scores = allRows.map(r => Number(r.score) || 0);
+        const overallAvg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+        const ratedRows = allRows.filter(r => r.rating);
+        const ratingAvg = ratedRows.length ? ratedRows.reduce((a, r) => a + (Number(r.rating) || 0), 0) / ratedRows.length : null;
+        const courseCount = new Set(allRows.map(rowCourseKey)).size;
+
+        const titleEl = document.getElementById('cfg-dash-review-modal-title');
+        if (titleEl) titleEl.textContent = colab.fullName || 'Colaborador';
+        const avatarEl = document.getElementById('cfg-dash-review-avatar');
+        if (avatarEl) avatarEl.textContent = themeInitials(colab.fullName || '?');
+        const tagsEl = document.getElementById('cfg-dash-review-student-tags');
+        if (tagsEl) {
+            tagsEl.innerHTML = `
+                ${colab.role ? `<span class="dash-course-subject-tag"><i class="fas fa-briefcase"></i> ${escapeHtml(colab.role)}</span>` : ''}
+                ${colab.unit ? `<span class="dash-course-subject-tag"><i class="fas fa-building"></i> ${escapeHtml(colab.unit)}</span>` : ''}`;
+        }
+        const statsEl = document.getElementById('cfg-dash-review-stats');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="dash-review-stat"><i class="fas fa-layer-group"></i><div><b>${courseCount}</b><span>${courseCount === 1 ? 'curso realizado' : 'cursos realizados'}</span></div></div>
+                <div class="dash-review-stat"><i class="fas fa-chart-line"></i><div><b>${overallAvg === null ? '—' : formatScore(overallAvg)}</b><span>média geral</span></div></div>
+                <div class="dash-review-stat"><i class="fas fa-star"></i><div><b>${ratingAvg === null ? '—' : ratingAvg.toFixed(1).replace('.', ',')}</b><span>média de avaliação</span></div></div>`;
+        }
+
+        const courseNameEl = document.getElementById('cfg-dash-review-course-name');
+        if (courseNameEl) courseNameEl.textContent = row.theme || row.subject || '';
+        const summaryEl = document.getElementById('cfg-dash-review-summary-grid');
+        if (summaryEl) {
+            const dateLabel = row.submittedAt ? new Date(row.submittedAt).toLocaleString('pt-BR') : '—';
+            summaryEl.innerHTML = `
+                <div class="dash-review-summary-item">${scoreBadgeHtml(row.score)}<span>Nota da prova</span></div>
+                <div class="dash-review-summary-item">${starsHtml(row.rating)}<span>Avaliação do curso</span></div>
+                <div class="dash-review-summary-item"><span class="conclusion-situation ${row.approved ? 'is-ok' : 'is-bad'}"><i class="fas ${row.approved ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${row.approved ? 'Aprovado' : 'Reprovado'}</span><span>Situação</span></div>
+                <div class="dash-review-summary-item"><span class="dash-review-date"><i class="fas fa-calendar"></i> ${dateLabel}</span><span>Data</span></div>`;
+        }
+        const commentEl = document.getElementById('cfg-dash-review-comment');
+        if (commentEl) {
+            commentEl.innerHTML = row.comment
+                ? `<i class="fas fa-quote-left"></i><p>${escapeHtml(row.comment)}</p>`
+                : `<p class="dash-review-no-comment">Nenhum comentário deixado.</p>`;
+        }
+
+        const questionsSection = document.getElementById('cfg-dash-review-questions-section');
+        const questionsEl = document.getElementById('cfg-dash-review-questions');
+        if (questionsEl) {
+            const answers = row.answers || [];
+            const wrongAnswers = answers
+                .map((a, idx) => ({ a, idx }))
+                .filter(({ a }) => a.selected !== a.correct);
+
+            // Só mostra questões erradas — quem acertou tudo não tem nada a
+            // revisar aqui, então a seção inteira fica oculta.
+            if (questionsSection) questionsSection.style.display = wrongAnswers.length === 0 ? 'none' : '';
+
+            questionsEl.innerHTML = wrongAnswers.map(({ a, idx }) => `
+                <div class="history-detail-question is-wrong">
+                    <div class="q-title wrong">
+                        <i class="fas fa-circle-xmark"></i>
+                        <span>${idx + 1}. ${escapeHtml(a.question)}</span>
+                    </div>
+                    ${(a.options || []).map((opt, optIdx) => {
+                        const wasSelected = optIdx === a.selected;
+                        const isKey = optIdx === a.correct;
+                        let cls = 'q-option';
+                        if (wasSelected && isKey) cls += ' was-selected is-right';
+                        else if (wasSelected && !isKey) cls += ' was-selected is-wrong';
+                        else if (isKey) cls += ' is-answer-key';
+                        const marker = wasSelected ? '<i class="fas fa-arrow-right" style="margin-right:6px;"></i>' : '';
+                        const keyMarker = isKey ? ' <i class="fas fa-check" style="margin-left:6px;"></i>' : '';
+                        return `<div class="${cls}">${marker}${escapeHtml(opt)}${keyMarker}</div>`;
+                    }).join('')}
+                </div>`).join('');
+        }
+
+        reviewModal.style.display = 'flex';
+    }
+
+    reviewModalClose?.addEventListener('click', closeReviewModal);
+    reviewModal?.addEventListener('click', (event) => { if (event.target === reviewModal) closeReviewModal(); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && reviewModal?.style.display === 'flex') closeReviewModal();
+    });
 
     // ─── Aba Conclusões: quem já concluiu x quem falta ───
 
@@ -1043,25 +1148,42 @@
         return `<span class="deadline-pill ${tone}"><i class="fas ${icon}"></i> ${escapeHtml(label)}</span>`;
     }
 
-    // "Concluídos": uma linha por realização, ordenado da mais recente para a
-    // mais antiga, com busca por nome e paginação de 5 por página.
+    // "Aprovados" / "Reprovados": uma linha por realização, ordenado da mais
+    // recente para a mais antiga, com busca por nome — cada situação com sua
+    // própria tabela (antes era uma lista só com filtro de situação).
     let completedRowsCache = [];
     let completedSearchTerm = '';
-    let completedSituationFilter = '';
+    let reprovedRowsCache = [];
+    let reprovedSearchTerm = '';
+    let conclusionsCourseIds = { slug: '', subjectId: '', themeId: '' };
 
-    function paintCompletedPage() {
-        const container = document.getElementById('cfg-dash-course-completed');
+    function conclusionRowHtml(r, i) {
+        const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
+        const situationOk = !!r.approved;
+        const { slug, subjectId, themeId } = conclusionsCourseIds;
+        const canForgive = !situationOk && r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
+        return `<tr style="--row-i:${i}">
+            <td>${dateLabel}</td>
+            <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
+            <td>${escapeHtml(r.unit || '—')}</td>
+            <td>${escapeHtml(r.role || '—')}</td>
+            <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
+            <td>${scoreBadgeHtml(r.score)}</td>
+            <td>${formatDuration(r.durationSeconds)}</td>
+            <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
+            <td>${canForgive ? `<button class="dash-forgive-btn" data-user-id="${escapeHtml(r.userId)}" data-slug="${slug}" data-subject-id="${subjectId}" data-theme-id="${themeId}">Desconsiderar atraso</button>` : ''}</td>
+        </tr>`;
+    }
+
+    function paintConclusionsTable(containerId, rowsCache, searchTerm, emptyIcon, emptyMessage) {
+        const container = document.getElementById(containerId);
         if (!container) return;
-        let filtered = completedSearchTerm
-            ? completedRowsCache.filter(r => normalizeName(r.fullName || '').includes(normalizeName(completedSearchTerm)))
-            : completedRowsCache;
-        if (completedSituationFilter) {
-            const wantApproved = completedSituationFilter === 'approved';
-            filtered = filtered.filter(r => !!r.approved === wantApproved);
-        }
+        const filtered = searchTerm
+            ? rowsCache.filter(r => normalizeName(r.fullName || '').includes(normalizeName(searchTerm)))
+            : rowsCache;
 
-        if (completedRowsCache.length === 0) {
-            container.innerHTML = emptyStateHtml('fa-clipboard-check', 'Ninguém concluiu este curso ainda.');
+        if (rowsCache.length === 0) {
+            container.innerHTML = emptyStateHtml(emptyIcon, emptyMessage);
             return;
         }
         if (filtered.length === 0) {
@@ -1070,26 +1192,30 @@
         }
 
         container.innerHTML = `<table class="is-sticky">
-            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Situação</th></tr></thead>
-            <tbody>${filtered.map((r, i) => {
-                const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
-                const situationOk = !!r.approved;
-                return `<tr style="--row-i:${i}">
-                    <td>${dateLabel}</td>
-                    <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
-                    <td>${escapeHtml(r.unit || '—')}</td>
-                    <td>${escapeHtml(r.role || '—')}</td>
-                    <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
-                    <td>${scoreBadgeHtml(r.score)}</td>
-                    <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
-                </tr>`;
-            }).join('')}</tbody>
+            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Tempo</th><th>Situação</th><th></th></tr></thead>
+            <tbody>${filtered.map((r, i) => conclusionRowHtml(r, i)).join('')}</tbody>
         </table>`;
+
+        container.querySelectorAll('.dash-forgive-btn').forEach(btn => {
+            btn.addEventListener('click', () => handleForgiveDeadline(btn.dataset));
+        });
     }
 
-    function renderCompletedTable(rows) {
-        completedRowsCache = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+    function paintCompletedPage() {
+        paintConclusionsTable('cfg-dash-course-completed', completedRowsCache, completedSearchTerm, 'fa-clipboard-check', 'Ninguém foi aprovado neste curso ainda.');
+    }
+
+    function paintReprovedPage() {
+        paintConclusionsTable('cfg-dash-course-reproved', reprovedRowsCache, reprovedSearchTerm, 'fa-circle-xmark', 'Nenhuma reprovação registrada para este curso.');
+    }
+
+    function renderCompletedTable(rows, slug, subjectId, themeId) {
+        conclusionsCourseIds = { slug, subjectId, themeId };
+        const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        completedRowsCache = sorted.filter(r => r.approved);
+        reprovedRowsCache = sorted.filter(r => !r.approved);
         paintCompletedPage();
+        paintReprovedPage();
     }
 
     document.getElementById('cfg-dash-course-completed-search')?.addEventListener('input', (e) => {
@@ -1097,9 +1223,9 @@
         paintCompletedPage();
     });
 
-    document.getElementById('cfg-dash-course-completed-situation')?.addEventListener('change', (e) => {
-        completedSituationFilter = e.target.value;
-        paintCompletedPage();
+    document.getElementById('cfg-dash-course-reproved-search')?.addEventListener('input', (e) => {
+        reprovedSearchTerm = e.target.value;
+        paintReprovedPage();
     });
 
     // Progresso (%) de um colaborador neste curso, lido de progress/byUser.
@@ -1332,6 +1458,156 @@
 
         renderCourseRetriesChart(rows);
         renderCourseByUnitChart(rows);
+        renderCourseMistakesChart(rows);
+    }
+
+    // Ranking das questões com mais erros, do maior para o menor — ajuda a
+    // localizar perguntas mal formuladas ou conteúdo pouco compreendido.
+    // Agrupa por enunciado (mesma questão pode mudar de índice entre
+    // versões do quiz) e mostra só o trecho inicial no eixo, enunciado
+    // completo no tooltip.
+    const MISTAKES_TOP_N = 8;
+
+    function renderCourseMistakesChart(rows) {
+        const canvas = document.getElementById('cfg-dash-course-mistakes-chart');
+        if (!canvas) return;
+
+        // Conta por PESSOA, não por tentativa — quem errou a mesma questão
+        // em várias retentativas entra só uma vez (senão retentativa infla
+        // artificialmente a taxa de erro de uma questão fácil).
+        // Denominador da % é o total de pessoas que concluíram o curso
+        // (universo fixo, igual pra todas as questões) — não só quem
+        // respondeu aquela questão específica, senão quem pulou/não chegou
+        // nela infla a taxa de erro artificialmente.
+        const totalPeople = new Set();
+        const stats = new Map(); // enunciado -> { number, question, wrongPeople: Set }
+        rows.forEach(r => {
+            const personKey = personKeysOfRow(r)[0];
+            if (!personKey) return;
+            totalPeople.add(personKey);
+            (r.answers || []).forEach((a, index) => {
+                if (!a || !a.question) return;
+                const key = a.question;
+                const entry = stats.get(key) || { number: index + 1, question: a.question, wrongPeople: new Set() };
+                if (a.selected !== a.correct) entry.wrongPeople.add(personKey);
+                stats.set(key, entry);
+            });
+        });
+
+        const ranked = Array.from(stats.values())
+            .map(e => ({ number: e.number, question: e.question, wrong: e.wrongPeople.size, total: totalPeople.size }))
+            .filter(e => e.wrong > 0)
+            .sort((a, b) => b.wrong - a.wrong)
+            .slice(0, MISTAKES_TOP_N);
+
+        if (ranked.length === 0) {
+            renderChart('courseMistakes', 'cfg-dash-course-mistakes-chart', {
+                type: 'bar', data: { labels: [], datasets: [] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            return;
+        }
+
+        // Quebra o enunciado em linhas curtas por palavra inteira — Chart.js
+        // renderiza um array de strings do callback `label` como um tooltip
+        // multi-linha.
+        const wrapText = (text, maxLen = 42) => {
+            const words = text.trim().split(/\s+/);
+            const lines = [];
+            let line = '';
+            words.forEach(word => {
+                const candidate = line ? `${line} ${word}` : word;
+                if (candidate.length > maxLen && line) {
+                    lines.push(line);
+                    line = word;
+                } else {
+                    line = candidate;
+                }
+            });
+            if (line) lines.push(line);
+            return lines;
+        };
+
+        const errorPct = (e) => e.total > 0 ? (e.wrong / e.total) * 100 : 0;
+
+        // Cor pela TAXA de erro (% de alunos que erraram), não pelo nº
+        // absoluto de erros que o eixo x mostra — amarelo até 5%, laranja até
+        // 10%, vermelho acima disso. Quando a barra cruza um desses limiares
+        // (ex.: taxa de 39% numa barra que representa 0%–39%), o degradê
+        // marca a transição de faixa dentro do próprio trecho da barra;
+        // acima de 10% a barra já nasce vermelha (sem faixas anteriores pra
+        // mostrar).
+        const mistakeGradient = (ctx) => {
+            const { chart, dataIndex } = ctx;
+            const { ctx: c, chartArea } = chart;
+            if (!chartArea || dataIndex == null) return CHART_COLORS.danger;
+            const entry = ranked[dataIndex];
+            const pct = errorPct(entry);
+
+            // Gradiente tem que cobrir só o trecho da barra (0 até o valor
+            // dela no eixo x), não o chartArea inteiro — senão a barra mais
+            // curta mostra uma fatia do degradê pensado pra barra mais longa
+            // e as faixas de cor saem desalinhadas com a % real de erro.
+            const xScale = chart.scales.x;
+            const barStart = chartArea.left;
+            const barEnd = xScale ? xScale.getPixelForValue(entry.wrong) : chartArea.right;
+
+            if (pct <= 5) return CHART_COLORS.yellow;
+
+            // Transição levemente suave entre faixas (blend de ~4% da barra
+            // em vez de corte seco) — evita degradê brusco entre as cores.
+            const BLEND = 0.04;
+            const blendAround = (stop) => [Math.max(0, stop - BLEND), Math.min(1, stop + BLEND)];
+
+            const gradient = c.createLinearGradient(barStart, 0, barEnd, 0);
+            if (pct <= 10) {
+                // Cruza só o limiar amarelo→laranja: sólida até proporção
+                // 5/pct da barra, laranja no resto.
+                const split = 5 / pct;
+                const [a, b] = blendAround(split);
+                gradient.addColorStop(0, CHART_COLORS.yellow);
+                gradient.addColorStop(a, CHART_COLORS.yellow);
+                gradient.addColorStop(b, CHART_COLORS.orange);
+                gradient.addColorStop(1, CHART_COLORS.orange);
+                return gradient;
+            }
+            // Acima de 10%: cruza as duas faixas — amarelo até 5%, laranja
+            // até 10%, vermelho no resto (posições proporcionais a pct).
+            const yellowSplit = 5 / pct;
+            const orangeSplit = 10 / pct;
+            const [ya, yb] = blendAround(yellowSplit);
+            const [oa, ob] = blendAround(orangeSplit);
+            gradient.addColorStop(0, CHART_COLORS.yellow);
+            gradient.addColorStop(ya, CHART_COLORS.yellow);
+            gradient.addColorStop(Math.min(yb, oa - 0.001), CHART_COLORS.orange);
+            gradient.addColorStop(oa, CHART_COLORS.orange);
+            gradient.addColorStop(ob, CHART_COLORS.danger);
+            gradient.addColorStop(1, CHART_COLORS.danger);
+            return gradient;
+        };
+
+        renderChart('courseMistakes', 'cfg-dash-course-mistakes-chart', {
+            type: 'bar',
+            data: {
+                labels: ranked.map(e => `Questão ${e.number}`),
+                datasets: [{ data: ranked.map(e => e.wrong), backgroundColor: mistakeGradient, borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: {
+                        title: (items) => `Questão ${ranked[items[0].dataIndex].number}`,
+                        label: (ctx) => wrapText(ranked[ctx.dataIndex].question),
+                        afterLabel: (ctx) => {
+                            const e = ranked[ctx.dataIndex];
+                            return `Erros: ${e.wrong} de ${e.total} (${Math.round(errorPct(e))}%)`;
+                        }
+                    } }
+                },
+                scales: { x: { ticks: { precision: 0 } } }
+            }
+        });
     }
 
     async function renderCourseDashboard(slug, courseKey) {
@@ -1366,9 +1642,8 @@
         });
 
         renderCommentsTable(rows);
-        renderReprovalsTable(rows, slug, subjectId, themeId);
 
-        renderCompletedTable(rows);
+        renderCompletedTable(rows, slug, subjectId, themeId);
         if (theme) renderMissingTable(rows, slug, subjectId, { id: themeId, ...theme });
 
         courseChartRowsCache = rows;
