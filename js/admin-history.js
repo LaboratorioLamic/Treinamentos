@@ -768,6 +768,7 @@
             details: [
                 'Afeta Treinamentos, Educação Continuada e Estágios.',
                 'O progresso local do aluno (localStorage) não é afetado, só o histórico central.',
+                'Contadores de tentativas e cursos bloqueados também são zerados.',
                 { text: 'Não há como desfazer — exporte um backup antes, se precisar.', alert: true }
             ],
             requireWord: 'SIM',
@@ -781,7 +782,11 @@
                 [`/${dbRoot}/results/byUser`]: null,
                 [`/${dbRoot}/results/byCourse`]: null,
                 [`/${dbRoot}/results/estagiosLivre`]: null,
-                [`/${dbRoot}/results/imported`]: null
+                [`/${dbRoot}/results/imported`]: null,
+                // Contador de tentativas (js/attempts.js) é derivado do
+                // histórico — some junto para não deixar cursos travados
+                // "órfãos" sem nenhum resultado que os explique.
+                [`/${dbRoot}/attempts/byUser`]: null
             };
             await db.ref().update(updates);
             showWarning('Histórico apagado com sucesso.');

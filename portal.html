@@ -86,7 +86,13 @@
             <div class="quiz-intro-facts">
                 <div class="quiz-intro-fact"><i class="fas fa-list-ol"></i><span id="quiz-intro-count">— questões</span></div>
                 <div class="quiz-intro-fact"><i class="fas fa-hourglass-half"></i><span id="quiz-intro-time">— minutos</span></div>
+                <div class="quiz-intro-fact" id="quiz-intro-attempts-fact" style="display:none;"><i class="fas fa-rotate-right"></i><span id="quiz-intro-attempts">— tentativas</span></div>
             </div>
+            <p class="quiz-intro-note" id="quiz-intro-attempts-note" style="display:none;">
+                <i class="fas fa-triangle-exclamation"></i>
+                Esta é sua última tentativa. Se reprovar novamente, será necessário falar com um
+                administrador para liberar novas tentativas.
+            </p>
             <p class="quiz-intro-note">
                 <i class="fas fa-triangle-exclamation"></i>
                 Ao esgotar o tempo, a avaliação será enviada automaticamente apenas com as
@@ -2135,6 +2141,7 @@
     <script src="js/firebase-config.js"></script>
     <script src="js/crypto-utils.js"></script>
     <script src="js/deadlines.js"></script>
+    <script src="js/attempts.js"></script>
     <script src="js/certificate.js"></script>
     <script src="js/colaboradores-sync.js"></script>
     <script src="js/ui.js"></script>

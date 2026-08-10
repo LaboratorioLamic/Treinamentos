@@ -1014,11 +1014,11 @@
                 if (currentCategory !== 'Estágios' && !window.UniAdmin?.StudentAuth?.getSession()) {
                     window.UniAdmin.StudentAuth.openModal({
                         intent: 'assessment',
-                        onSuccess: () => openQuiz(subjectId, themeId)
+                        onSuccess: () => openQuizGuarded(subjectId, themeId)
                     });
                     return;
                 }
-                openQuiz(subjectId, themeId);
+                openQuizGuarded(subjectId, themeId);
             };
             modulesDiv.appendChild(assessmentDiv);
 
@@ -1069,7 +1069,38 @@
             return `${m}:${s}`;
         }
 
-        function openQuiz(subjectId, themeId) {
+        // Trava de tentativas (js/attempts.js): confere o bloqueio na nuvem
+        // antes de abrir a prova, para valer mesmo se o aluno trocar de
+        // dispositivo. Estágios não tem conta, então não entra nesta trava.
+        async function openQuizGuarded(subjectId, themeId) {
+            const session = window.UniAdmin?.StudentAuth?.getSession();
+            if (!session || !window.UniAdmin?.Attempts) { openQuiz(subjectId, themeId); return; }
+
+            const state = await window.UniAdmin.Attempts.getState(session.userId, currentCategorySlug, subjectId, themeId);
+            if (state.locked) { showAttemptsLockedAlert(state); return; }
+            openQuiz(subjectId, themeId, state);
+        }
+
+        // Alerta elegante exibido quando as tentativas disponíveis foram
+        // usadas sem aprovação. Substitui a tela normal de conteúdo — não é
+        // um toast, pois a ação (falar com admin) precisa ficar visível até
+        // o aluno sair.
+        function showAttemptsLockedAlert(state) {
+            const A = window.UniAdmin?.Attempts;
+            const limit = A ? A.limitFor(state) : 3;
+            resetContent();
+            contentDiv.style.display = 'block';
+            resultContainer.innerHTML = `
+                <div class="attempts-locked-card">
+                    <div class="attempts-locked-icon"><i class="fas fa-lock"></i></div>
+                    <h2>Limite de tentativas atingido</h2>
+                    <p>Você usou as ${limit} tentativas disponíveis para esta avaliação e não atingiu a nota mínima.</p>
+                    <p>Fale com um administrador para liberar novas tentativas.</p>
+                </div>`;
+            resultContainer.style.display = 'flex';
+        }
+
+        function openQuiz(subjectId, themeId, attemptsState = null) {
             if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
             customPlayerContainer.style.display = 'none';
             video.style.display = 'none';
@@ -1087,22 +1118,43 @@
             const existing = loadQuizAttempt(subjectId, themeId);
             if (existing) { loadQuiz(subjectId, themeId); return; }
 
-            openQuizIntro(subjectId, themeId, questions.length);
+            openQuizIntro(subjectId, themeId, questions.length, attemptsState);
         }
 
-        function openQuizIntro(subjectId, themeId, questionCount) {
+        function openQuizIntro(subjectId, themeId, questionCount, attemptsState = null) {
             resetContent();
             window.scrollTo({ top: 0, behavior: 'smooth' });
             const minutes = questionCount * 3;
             document.getElementById('quiz-intro-count').textContent = `${questionCount} questões`;
             document.getElementById('quiz-intro-time').textContent = `${minutes} minutos`;
 
+            // Contador de tentativas (js/attempts.js): só aparece para aluno
+            // logado com pelo menos 1 reprovação já registrada neste curso —
+            // na primeira tentativa não há o que avisar ainda. O limite
+            // exibido já reflete tentativas extras liberadas pelo admin.
+            const attemptsFact = document.getElementById('quiz-intro-attempts-fact');
+            const attemptsNote = document.getElementById('quiz-intro-attempts-note');
+            const A = window.UniAdmin?.Attempts;
+            const usedAttempts = attemptsState?.count || 0;
+            const limit = A && attemptsState ? A.limitFor(attemptsState) : (A ? A.MAX_ATTEMPTS : 3);
+            if (usedAttempts > 0) {
+                const isLastChance = usedAttempts + 1 >= limit;
+                const hasExtra = attemptsState?.extraAttempts > 0;
+                document.getElementById('quiz-intro-attempts').textContent = `Tentativa ${usedAttempts + 1} de ${limit}${hasExtra ? ' (+1 extra liberada)' : ''}`;
+                attemptsFact.style.display = 'flex';
+                attemptsFact.classList.toggle('quiz-intro-fact--last-chance', isLastChance);
+                attemptsNote.style.display = isLastChance ? 'block' : 'none';
+            } else {
+                attemptsFact.style.display = 'none';
+                attemptsNote.style.display = 'none';
+            }
+
             const modal = document.getElementById('quiz-intro-modal');
             const startBtn = document.getElementById('quiz-intro-start-btn');
             const cancelBtn = document.getElementById('quiz-intro-cancel-btn');
 
             const close = () => { modal.classList.remove('active'); cleanup(); };
-            const handleStart = () => { close(); openQuizConfirm(subjectId, themeId); };
+            const handleStart = () => { close(); openQuizConfirm(subjectId, themeId, attemptsState); };
             const handleCancel = () => close();
             const handleOverlayClick = (e) => { if (e.target === modal) handleCancel(); };
 
@@ -1119,7 +1171,7 @@
             modal.classList.add('active');
         }
 
-        function openQuizConfirm(subjectId, themeId) {
+        function openQuizConfirm(subjectId, themeId, attemptsState = null) {
             const modal = document.getElementById('quiz-confirm-modal');
             const startBtn = document.getElementById('quiz-confirm-start-btn');
             const backBtn = document.getElementById('quiz-confirm-back-btn');
@@ -1135,7 +1187,7 @@
                 });
                 loadQuiz(subjectId, themeId);
             };
-            const handleBack = () => { close(); openQuizIntro(subjectId, themeId, (quizData[`${subjectId}_${themeId}`] || []).length); };
+            const handleBack = () => { close(); openQuizIntro(subjectId, themeId, (quizData[`${subjectId}_${themeId}`] || []).length, attemptsState); };
             const handleOverlayClick = (e) => { if (e.target === modal) handleBack(); };
 
             function cleanup() {
@@ -1548,6 +1600,16 @@
                 durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : null
             };
 
+            // Trava de tentativas (js/attempts.js): só conta para aluno logado
+            // (Estágios não tem conta para associar o contador). Reprovação
+            // soma 1 tentativa; aprovação zera o contador do curso.
+            const updateAttemptsCounter = async () => {
+                if (freeName || !session || !window.UniAdmin?.Attempts) return { locked: false };
+                const A = window.UniAdmin.Attempts;
+                if (score >= 8) { await A.resetOnPass(session.userId, currentCategorySlug, currentTrainingId, currentThemeId); return { locked: false }; }
+                return A.registerFailedAttempt(session.userId, currentCategorySlug, currentTrainingId, currentThemeId);
+            };
+
             const finishSubmit = () => {
                 loadingSpinner.style.display = 'none';
                 submitButton.disabled = false;
@@ -1555,7 +1617,7 @@
                 // Tentativa concluída e registrada: libera o localStorage. Só
                 // agora, pois falha no envio deve manter o estado para retry.
                 clearQuizAttempt(currentTrainingId, currentThemeId);
-                showResult(score);
+                updateAttemptsCounter().then(attemptsState => showResult(score, attemptsState));
             };
 
             const saveResult = freeName
@@ -1618,7 +1680,8 @@
             resultContainer.appendChild(btn);
         }
 
-        function showResult(score) {
+        function showResult(score, attemptsState = null) {
+            const locked = !!attemptsState?.locked;
             resetContent();
             contentDiv.style.display = 'block';
             resultContainer.innerHTML = '';
@@ -1635,7 +1698,18 @@
             scoreCard.appendChild(scoreLabel);
             resultContainer.appendChild(scoreCard);
 
-            if (score < 8) {
+            if (score < 8 && locked) {
+                // 3ª reprovação: sem botão de tentar de novo, só o aviso de
+                // que precisa de liberação do administrador.
+                const lockCard = document.createElement('div');
+                lockCard.className = 'attempts-locked-card attempts-locked-card--inline';
+                const limit = window.UniAdmin?.Attempts?.limitFor(attemptsState) || 3;
+                lockCard.innerHTML = `
+                    <div class="attempts-locked-icon"><i class="fas fa-lock"></i></div>
+                    <p><strong>Limite de ${limit} tentativas atingido.</strong></p>
+                    <p>Fale com um administrador para liberar novas tentativas.</p>`;
+                resultContainer.appendChild(lockCard);
+            } else if (score < 8) {
                 const p = document.createElement('p');
                 p.textContent = 'Você não atingiu a nota mínima. Tente novamente!';
                 p.style.color = 'var(--text-muted)';
@@ -1644,7 +1718,7 @@
                 retryBtn.id = 'retry-btn';
                 retryBtn.style.display = 'inline-block';
                 retryBtn.innerHTML = '<i class="fas fa-redo" style="margin-right:8px;"></i>Tentar Novamente';
-                retryBtn.onclick = () => openQuiz(currentTrainingId, currentThemeId);
+                retryBtn.onclick = () => openQuizGuarded(currentTrainingId, currentThemeId);
                 resultContainer.appendChild(retryBtn);
             } else {
                 const successDiv = document.createElement('div');

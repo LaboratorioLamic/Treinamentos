@@ -1257,14 +1257,54 @@
             background: #b91c1c; color: #fff; font-size: 11px; font-weight: 800;
         }
         .user-reproved-chip .hfilter-chip-popover {
-            top: calc(100% + 8px); left: auto; right: 0; width: 300px;
+            top: calc(100% + 8px); left: auto; right: 0; width: 320px;
         }
         .user-reproved-chip .hfilter-chip-popover.is-open { display: block; }
         .user-reproved-item {
             display: flex; flex-direction: column; gap: 2px; cursor: pointer;
         }
+        .user-reproved-item-main { display: flex; flex-direction: column; gap: 2px; }
         .user-reproved-item strong { font-size: 12.5px; color: var(--text); }
         .user-reproved-item small { font-size: 11.5px; color: var(--text-3); }
+        .user-reproved-item.is-locked { padding-bottom: 4px; }
+
+        /* Bolinha de alerta no botão "Reprovações" quando há curso travado */
+        .user-reproved-locked-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #f59e0b; box-shadow: 0 0 0 2px #fef2f2;
+            display: inline-block; margin-left: -2px;
+            animation: reprovedLockedPulse 1.8s ease-in-out infinite;
+        }
+        @keyframes reprovedLockedPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(0.85); }
+        }
+
+        /* Bloco de liberação de tentativas dentro do item de reprovação */
+        .user-reproved-locked-row {
+            margin-top: 6px; padding-top: 8px; border-top: 1px dashed #fecaca;
+            display: flex; flex-direction: column; gap: 7px;
+        }
+        .user-attempts-locked-badge,
+        .user-reproved-locked-badge {
+            display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+            padding: 3px 9px; border-radius: 999px;
+            background: #fff1e6; color: #9a3412; border: 1px solid #fed7aa;
+            font-size: 10.5px; font-weight: 700;
+        }
+        .user-attempts-unlock-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 7px 12px; border-radius: 10px; border: none; cursor: pointer;
+            background: linear-gradient(135deg, var(--cfg-primary), #8b5cf6);
+            color: #fff; font-size: 11.5px; font-weight: 700; font-family: inherit;
+            box-shadow: 0 4px 14px -6px rgba(99, 102, 241, 0.65);
+            transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+        }
+        .user-attempts-unlock-btn:hover {
+            transform: translateY(-1px); filter: brightness(1.06);
+            box-shadow: 0 6px 18px -6px rgba(99, 102, 241, 0.75);
+        }
+        .user-attempts-unlock-btn:active { transform: translateY(0); }
 
         .user-course-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 18px;
@@ -2340,7 +2380,7 @@
         /* === MODAL DE CONFIRMACAO === */
         /* Compartilhado entre #cfg-confirm-modal e #cfg-reset-password-modal
            (mesma estrutura .modal-content.confirm-content). */
-        #cfg-confirm-modal, #cfg-reset-password-modal { z-index: 2600; }
+        #cfg-confirm-modal, #cfg-reset-password-modal { z-index: 2700; }
         #cfg-confirm-modal .confirm-content, #cfg-reset-password-modal .confirm-content { max-width: 380px; }
         #cfg-confirm-modal .confirm-content::before, #cfg-reset-password-modal .confirm-content::before {
             background: linear-gradient(90deg, #dc2626, #f87171);

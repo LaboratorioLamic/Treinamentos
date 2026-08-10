@@ -478,10 +478,11 @@
 
         showSpinner(true);
         try {
-            const [historyRows, courseIndex, progressRows] = await Promise.all([
+            const [historyRows, courseIndex, progressRows, attemptsState] = await Promise.all([
                 U.getHistoryRows(),
                 U.getCourseIndex(),
-                U.StudentAuth.getCourseProgressForUser(userId)
+                U.StudentAuth.getCourseProgressForUser(userId),
+                U.Attempts.getAllForUser(userId)
             ]);
             historyRowsCache = historyRows;
             buildApprovedCounts();
@@ -540,20 +541,42 @@
                 </button>`;
             }).join('');
 
+            // Cruza cada curso reprovado com o contador de tentativas
+            // (js/attempts.js) para saber se o aluno está travado — o
+            // agrupamento por resultado (`attempts.length`) não serve aqui
+            // porque results/byUser guarda só a submissão mais recente.
+            const reprovedLockInfo = reprovedGroups.map(group => {
+                const course = courseIndex.get(normalizeName(`${group.latest.subject}|${group.latest.theme}`));
+                const state = course ? attemptsState.get(`${course.slug}|${course.subjectId}|${course.themeId}`) : null;
+                const limit = state ? U.Attempts.limitFor(state) : U.Attempts.MAX_ATTEMPTS;
+                return { course, state, locked: !!state?.locked, count: state?.count || 0, limit };
+            });
+
             const reprovedBtnHtml = reprovedGroups.length === 0 ? '' : `
                 <div class="user-reproved-chip">
                     <button type="button" class="user-reproved-btn" id="user-reproved-btn">
                         <i class="fas fa-circle-xmark"></i> Reprovações
                         <span class="user-reproved-count">${reprovedGroups.length}</span>
+                        ${reprovedLockInfo.some(i => i.locked) ? '<span class="user-reproved-locked-dot" title="Há curso bloqueado"></span>' : ''}
                     </button>
                     <div class="hfilter-chip-popover" id="user-reproved-popover">
                         <div class="hfilter-chip-list">
                             ${reprovedGroups.map((group, i) => {
                                 const { latest, attempts } = group;
+                                const { locked, count, limit } = reprovedLockInfo[i];
                                 return `
-                                <div class="hfilter-chip-item user-reproved-item" data-reproved-index="${i}">
-                                    <strong>${escapeHtml(latest.theme)}</strong>
-                                    <small>${escapeHtml(latest.subject)} · ${formatDate(latest.submittedAt)} · ${formatScore(latest.score)}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                                <div class="hfilter-chip-item user-reproved-item ${locked ? 'is-locked' : ''}" data-reproved-index="${i}">
+                                    <div class="user-reproved-item-main">
+                                        <strong>${escapeHtml(latest.theme)}</strong>
+                                        <small>${escapeHtml(latest.subject)} · ${formatDate(latest.submittedAt)} · ${formatScore(latest.score)}/10 · ${attempts.length} tentativa${attempts.length > 1 ? 's' : ''}</small>
+                                    </div>
+                                    ${locked ? `
+                                        <div class="user-reproved-locked-row">
+                                            <span class="user-reproved-locked-badge"><i class="fas fa-lock"></i> ${count}/${limit} tentativas — bloqueado</span>
+                                            <button type="button" class="user-attempts-unlock-btn" data-unlock-index="${i}">
+                                                <i class="fas fa-unlock"></i> Liberar +1 tentativa
+                                            </button>
+                                        </div>` : ''}
                                 </div>`;
                             }).join('')}
                         </div>
@@ -583,6 +606,18 @@
                     const { attempts, latest } = reprovedGroups[Number(item.dataset.reprovedIndex)];
                     reprovedPopover?.classList.remove('is-open');
                     openCourseAttempts(latest, attempts);
+                });
+            });
+
+            // Botão "Liberar tentativas": fica dentro do item clicável acima,
+            // então precisa de stopPropagation para não também abrir o
+            // detalhe da avaliação por baixo dele.
+            userHistoryTableWrap.querySelectorAll('.user-attempts-unlock-btn').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const info = reprovedLockInfo[Number(btn.dataset.unlockIndex)];
+                    const group = reprovedGroups[Number(btn.dataset.unlockIndex)];
+                    handleUnlockAttempts(user, group.latest, info.course);
                 });
             });
 
@@ -1089,6 +1124,30 @@
             showWarning(`Conta ${isCurrentlyDisabled ? 'reativada' : 'desativada'} com sucesso.`);
         } catch (error) {
             showWarning('Erro ao atualizar conta: ' + error.message);
+        }
+    }
+
+    // Libera as tentativas de um curso específico travado por reprovação
+    // (js/attempts.js) — não mexe em senha/conta, só zera o contador daquele
+    // curso para o aluno poder refazer a avaliação.
+    async function handleUnlockAttempts(user, row, course) {
+        if (!course) { showWarning('Não foi possível localizar este curso para liberar.'); return; }
+        const confirmed = await showConfirm({
+            title: 'Liberar tentativas',
+            message: `Liberar mais 1 tentativa de "${row.theme}" para ${user.fullName}?`,
+            icon: 'fa-unlock',
+            tone: 'neutral',
+            details: ['O aluno ganha exatamente 1 nova tentativa — as reprovações já feitas continuam contando.'],
+            confirmText: 'Liberar 1 tentativa'
+        });
+        if (!confirmed) return;
+
+        try {
+            await U.Attempts.unlock(user.userId, course.slug, course.subjectId, course.themeId, 'Administrador');
+            showWarning('1 tentativa liberada com sucesso.');
+            await openUserHistory(user.userId);
+        } catch (error) {
+            showWarning('Erro ao liberar tentativa: ' + error.message);
         }
     }
 

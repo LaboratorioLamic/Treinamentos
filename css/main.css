@@ -1044,6 +1044,48 @@
             gap: 10px;
         }
 
+        /* ─── Alerta de limite de tentativas esgotado ─── */
+        .attempts-locked-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            max-width: 420px;
+            padding: 28px 32px;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(165deg, #fff7ed, #fef2f2);
+            border: 1px solid #fecdd3;
+            box-shadow: 0 10px 32px -14px rgba(239, 68, 68, 0.35);
+            animation: successPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .attempts-locked-card--inline { margin-top: 4px; }
+        .attempts-locked-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--danger), #f97316);
+            color: #fff;
+            font-size: 1.3em;
+            box-shadow: 0 6px 18px -4px rgba(239, 68, 68, 0.55);
+            margin-bottom: 4px;
+        }
+        .attempts-locked-card h2 {
+            font-size: 1.15em;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .attempts-locked-card p {
+            margin: 0;
+            font-size: 0.92em;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+        .attempts-locked-card p strong { color: var(--danger-hover); }
+
         @keyframes successPop {
             0% { transform: scale(0.7); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -1958,6 +2000,15 @@
         }
 
         .quiz-intro-note i { color: var(--warning); margin-right: 6px; }
+
+        /* Chip de tentativas em destaque quando é a última chance */
+        .quiz-intro-fact--last-chance {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger-hover);
+            font-weight: 700;
+        }
+        .quiz-intro-fact--last-chance i { color: var(--danger); }
 
         .quiz-intro-actions {
             display: flex;

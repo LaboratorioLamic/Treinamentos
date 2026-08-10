@@ -2576,7 +2576,7 @@
 
         const confirmed = await showConfirm({
             title: 'Resetar curso',
-            message: `Todo o progresso e as avaliações de "${openCourseName || 'este curso'}" serão apagados para todos os colaboradores. Eles poderão assistir e avaliar o curso novamente. Esta ação não pode ser desfeita.`,
+            message: `Todo o progresso, as avaliações e o contador de tentativas de "${openCourseName || 'este curso'}" serão apagados para todos os colaboradores. Eles poderão assistir e avaliar o curso novamente, sem nenhum bloqueio. Esta ação não pode ser desfeita.`,
             icon: 'fa-rotate-left',
             requireWord: 'RESETAR',
             confirmText: 'Resetar'
@@ -2611,6 +2611,15 @@
                     updates[`/${dbRoot}/progress/byUser/${userId}/${openCourseSlug}/${subjectId}/${themeId}`] = null;
                 }
             });
+
+            // attempts/byUser (js/attempts.js) é o contador de tentativas
+            // deste curso — reseta o histórico, então o bloqueio também some
+            // (senão o aluno ficaria travado num curso sem nenhum resultado).
+            if (byCourseSnap.exists()) {
+                Object.keys(byCourseSnap.val()).forEach(userId => {
+                    updates[`/${dbRoot}/attempts/byUser/${userId}/${openCourseSlug}/${subjectId}/${themeId}`] = null;
+                });
+            }
 
             await db.ref().update(updates);
 
