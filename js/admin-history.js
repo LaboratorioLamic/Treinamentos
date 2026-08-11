@@ -37,6 +37,20 @@
         return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
     }
 
+    // Tempo ATIVO com o curso aberto até a aprovação (campo activeMs de
+    // progress/byUser, ver resumeActiveCourseTimer/pauseActiveCourseTimer em
+    // js/main.js), em HH:MM:SS — HH sem teto. Ausente (registro anterior a
+    // essa métrica, ou reprovado/estágio sem conta vinculada) vira "—".
+    function formatHHMMSS(ms) {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n <= 0) return '—';
+        const totalSeconds = Math.round(n / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
 
     let allRows = [];
@@ -126,17 +140,19 @@
     }
 
     async function fetchAllData() {
-        const [usersSnap, resultsSnap, courseNames] = await Promise.all([
+        const [usersSnap, resultsSnap, progressSnap, courseNames] = await Promise.all([
             get(ref(db, `/${dbRoot}/users`)),
             get(ref(db, `/${dbRoot}/results`)),
+            get(ref(db, `/${dbRoot}/progress/byUser`)),
             fetchCourseNames()
         ]);
         const users = usersSnap.exists() ? usersSnap.val() : {};
         const results = resultsSnap.exists() ? resultsSnap.val() : {};
-        return { users, results, courseNames };
+        const progress = progressSnap.exists() ? progressSnap.val() : {};
+        return { users, results, progress, courseNames };
     }
 
-    function flatten({ users, results, courseNames }) {
+    function flatten({ users, results, progress, courseNames }) {
         const rows = [];
 
         Object.keys(results.byUser || {}).forEach(userId => {
@@ -146,6 +162,10 @@
                     Object.keys(results.byUser[userId][slug][subjectId] || {}).forEach(themeId => {
                         const r = results.byUser[userId][slug][subjectId][themeId];
                         const course = courseNames[slug]?.[`${subjectId}_${themeId}`];
+                        // Tempo ativo com o curso aberto (ver formatHHMMSS) —
+                        // vive em progress/byUser, não em results, pois é
+                        // acumulado durante o curso, não só no momento do envio.
+                        const activeMs = progress?.[userId]?.[slug]?.[subjectId]?.[themeId]?.activeMs ?? null;
                         rows.push({
                             userId, slug, subjectId, themeId,
                             fullName: user?.fullName || '(conta excluída)',
@@ -153,7 +173,8 @@
                             role: user?.role || '',
                             subject: course?.subject || subjectId,
                             theme: course?.theme || themeId,
-                            ...r
+                            ...r,
+                            activeMs
                         });
                     });
                 });
@@ -385,7 +406,7 @@
     }
 
     // `colClass` casa com as larguras definidas em css/admin.css
-    // (#cfg-root .history-table-wrap col.hc-*) — mantém as 13 colunas
+    // (#cfg-root .history-table-wrap col.hc-*) — mantém as 14 colunas
     // cabendo na largura do painel sem scroll horizontal.
     const COLUMNS = [
         { key: 'submittedAt', label: 'Data/Hora', colClass: 'hc-date', render: dateCellHtml },
@@ -396,6 +417,9 @@
         { key: 'fullName', label: 'Nome', colClass: 'hc-name', render: r => `<span class="hist-name">${escapeHtml(r.fullName)}</span>` },
         { key: 'score', label: 'Nota', colClass: 'hc-score', render: scoreHtml },
         { key: 'durationSeconds', label: 'Tempo', colClass: 'hc-duration', render: r => `<span class="hist-duration">${formatDuration(r.durationSeconds)}</span>` },
+        // Tempo ATIVO com o curso aberto até a aprovação (ver formatHHMMSS) —
+        // não confundir com "Tempo" acima, que é a duração da PROVA em si.
+        { key: 'activeMs', label: 'Conclusão', colClass: 'hc-conclusion', render: r => `<span class="hist-duration">${formatHHMMSS(r.activeMs)}</span>` },
         { key: '__errors', label: 'Erros', colClass: 'hc-errors', sortable: false, render: errorsBadge },
         { key: 'rating', label: 'Avaliação', colClass: 'hc-rating', render: r => starsHtml(r.rating) },
         { key: 'deadlineStatus', label: 'Prazo', colClass: 'hc-deadline', render: deadlinePreview },
@@ -738,6 +762,7 @@
             'Nome': r.fullName,
             'Nota': r.score,
             'Tempo': formatDuration(r.durationSeconds),
+            'Conclusão': formatHHMMSS(r.activeMs),
             'Erros': r.errorsText || r.errors || '',
             'Avaliação': r.rating || '',
             'Comentários': r.comment || '',

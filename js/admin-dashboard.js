@@ -14,6 +14,14 @@
         return n.toFixed(1).replace('.', ',');
     }
 
+    // Reconstrói uma data local (meia-noite) a partir do formato "dd/mm/aaaa"
+    // usado pelas labels de dia dos gráficos — evita reparsing ambíguo do
+    // toLocaleDateString('pt-BR') pelo construtor padrão de Date.
+    function parseBrDate(brDate) {
+        const [day, month, year] = brDate.split('/').map(Number);
+        return new Date(year, month - 1, day).getTime();
+    }
+
     // Duração da avaliação (segundos) em mm:ss — ausente em registros
     // anteriores ao timer da prova.
     function formatDuration(seconds) {
@@ -120,22 +128,6 @@
         );
     }
 
-    // Primeira tentativa de cada pessoa (mesmo se reprovada) — usado como
-    // fallback de "início do curso" em buildCompletionTimeData quando não há
-    // progress/byUser (curso sem módulos de vídeo, só avaliação).
-    function firstAttemptByPerson(rows) {
-        const byPerson = new Map();
-        rows.forEach(row => {
-            const key = personKeysOfRow(row)[0];
-            if (!key) return;
-            if (!byPerson.has(key)) byPerson.set(key, []);
-            byPerson.get(key).push(row);
-        });
-        return [...byPerson.values()].map(personRows =>
-            personRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0))[0]
-        );
-    }
-
     // Categorias sem público definido por função: estágio é individual, não
     // tem "quem falta fazer" a calcular.
     const AUDIENCE_EXEMPT_SLUGS = ['estagios'];
@@ -151,7 +143,7 @@
     let historyRows = [];
     let allTrainingData = {}; // allTrainingData[slug] = trainingData
     let allQuizData = {};     // allQuizData[slug] = quizData (contagem de questões nos cards)
-    let allProgress = {};     // allProgress[userId][slug][subjectId][themeId] = { total, done, pct, updatedAt }
+    let allProgress = {};     // allProgress[userId][slug][subjectId][themeId] = { total, done, pct, startedAt, activeMs, updatedAt }
     const chartInstances = {};
 
     function destroyChart(key) {
@@ -1051,6 +1043,36 @@
 
     function closeReviewModal() { if (reviewModal) reviewModal.style.display = 'none'; }
 
+    // Cadastro do curso (certificateEnabled/Title/Hours/Topics), lido direto
+    // de allTrainingData (já carregado em memória) — mesma fonte usada pelo
+    // resto do painel, sem precisar de fetch assíncrono como em admin-history.js.
+    function courseCadastroForRow(row) {
+        if (!row.slug || !row.subjectId || !row.themeId) return null;
+        return allTrainingData[row.slug]?.[row.subjectId]?.themes?.[row.themeId] || null;
+    }
+
+    function renderReviewCertificateButton(row) {
+        const holder = document.getElementById('cfg-dash-review-cert');
+        if (!holder) return;
+        holder.innerHTML = '';
+        if (!row.approved) return;
+
+        const course = courseCadastroForRow(row);
+        if (!U.Certificate?.isEnabled(course)) return;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'history-cert-btn';
+        btn.innerHTML = '<i class="fas fa-award"></i> Baixar certificado';
+        btn.addEventListener('click', () => U.Certificate.download({
+            studentName: row.fullName,
+            course,
+            courseName: row.theme,
+            submittedAt: row.submittedAt
+        }));
+        holder.appendChild(btn);
+    }
+
     // Acha o cadastro do colaborador dono de uma linha de histórico, pela
     // mesma chave (conta ou nome normalizado) usada no resto do dashboard.
     function findColaboradorForRow(row) {
@@ -1094,11 +1116,15 @@
         const summaryEl = document.getElementById('cfg-dash-review-summary-grid');
         if (summaryEl) {
             const dateLabel = row.submittedAt ? new Date(row.submittedAt).toLocaleString('pt-BR') : '—';
+            const activeMs = row.userId ? allProgress[row.userId]?.[row.slug]?.[row.subjectId]?.[row.themeId]?.activeMs : null;
+            const completionLabel = Number.isFinite(activeMs) && activeMs > 0 ? formatHHMM(activeMs) : '—';
             summaryEl.innerHTML = `
                 <div class="dash-review-summary-item">${scoreBadgeHtml(row.score)}<span>Nota da prova</span></div>
                 <div class="dash-review-summary-item">${starsHtml(row.rating)}<span>Avaliação do curso</span></div>
                 <div class="dash-review-summary-item"><span class="conclusion-situation ${row.approved ? 'is-ok' : 'is-bad'}"><i class="fas ${row.approved ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${row.approved ? 'Aprovado' : 'Reprovado'}</span><span>Situação</span></div>
-                <div class="dash-review-summary-item"><span class="dash-review-date"><i class="fas fa-calendar"></i> ${dateLabel}</span><span>Data</span></div>`;
+                <div class="dash-review-summary-item"><span class="dash-review-date"><i class="fas fa-calendar"></i> ${dateLabel}</span><span>Data</span></div>
+                <div class="dash-review-summary-item"><span class="dash-review-date"><i class="fas fa-stopwatch"></i> ${formatDuration(row.durationSeconds)}</span><span>Tempo de prova</span></div>
+                <div class="dash-review-summary-item"><span class="dash-review-date"><i class="fas fa-hourglass-end"></i> ${completionLabel}</span><span>Tempo de conclusão</span></div>`;
         }
         const commentEl = document.getElementById('cfg-dash-review-comment');
         if (commentEl) {
@@ -1106,6 +1132,8 @@
                 ? `<i class="fas fa-quote-left"></i><p>${escapeHtml(row.comment)}</p>`
                 : `<p class="dash-review-no-comment">Nenhum comentário deixado.</p>`;
         }
+
+        renderReviewCertificateButton(row);
 
         const questionsSection = document.getElementById('cfg-dash-review-questions-section');
         const questionsEl = document.getElementById('cfg-dash-review-questions');
@@ -1183,7 +1211,7 @@
         const situationOk = !!r.approved;
         const { slug, subjectId, themeId } = conclusionsCourseIds;
         const canForgive = !situationOk && r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
-        return `<tr style="--row-i:${i}">
+        return `<tr style="--row-i:${i}" class="is-clickable" data-row-i="${i}" title="Ver detalhes">
             <td>${dateLabel}</td>
             <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
             <td>${escapeHtml(r.unit || '—')}</td>
@@ -1218,7 +1246,13 @@
         </table>`;
 
         container.querySelectorAll('.dash-forgive-btn').forEach(btn => {
-            btn.addEventListener('click', () => handleForgiveDeadline(btn.dataset));
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                handleForgiveDeadline(btn.dataset);
+            });
+        });
+        container.querySelectorAll('tr.is-clickable').forEach(tr => {
+            tr.addEventListener('click', () => openReviewModal(filtered[Number(tr.dataset.rowI)]));
         });
     }
 
@@ -1648,29 +1682,21 @@
         renderCourseEvalTimeChart(courseChartEvalTimeCache);
     }
 
-    // Tempo entre o início do curso e a aprovação na avaliação (submittedAt
-    // da última tentativa aprovada). "Início" prioriza o startedAt de
-    // progress/byUser (1º módulo assistido, gravado por syncCourseProgressToCloud
-    // em js/main.js) — mas cursos só de avaliação (sem módulos de vídeo)
-    // nunca geram esse registro, então cai pro submittedAt da 1ª tentativa
-    // da pessoa (mesmo reprovada): mede o tempo até a aprovação a partir de
-    // quando ela começou a tentar. Quem passou de primeira sem módulos fica
-    // com duração 0 (não há "espera" real pra medir) e por isso é excluído
-    // — uma barra 0 não ajuda o gestor e polui a comparação.
+    // Tempo ATIVO com o curso aberto até a aprovação (campo activeMs de
+    // progress/byUser, gravado por resumeActiveCourseTimer/
+    // pauseActiveCourseTimer em js/main.js): soma só o tempo em que o aluno
+    // esteve de fato com o curso na tela (aba visível), não o tempo corrido
+    // — fechar o curso por dias não infla o número. Contador some ao aprovar.
+    // Registros antigos (gravados antes dessa métrica existir) não têm
+    // activeMs e são excluídos — não há tempo ativo real para mostrar.
     // Ordenado do maior tempo para o menor.
     function buildCompletionTimeData(rows, slug) {
         const approved = lastAttemptByPerson(rows).filter(r => r.approved && r.submittedAt);
-        const firstAttempts = new Map(firstAttemptByPerson(rows).map(r => [personKeysOfRow(r)[0], r]));
         return approved
             .map(r => {
-                const key = personKeysOfRow(r)[0];
-                const progressStarted = r.userId ? allProgress[r.userId]?.[slug]?.[r.subjectId]?.[r.themeId]?.startedAt : null;
-                const firstAttemptStarted = firstAttempts.get(key)?.submittedAt;
-                const started = (progressStarted && progressStarted < r.submittedAt) ? progressStarted
-                    : (firstAttemptStarted && firstAttemptStarted < r.submittedAt) ? firstAttemptStarted
-                    : null;
-                if (!started) return null;
-                return { fullName: r.fullName, unit: r.unit, durationMs: r.submittedAt - started };
+                const activeMs = r.userId ? allProgress[r.userId]?.[slug]?.[r.subjectId]?.[r.themeId]?.activeMs : null;
+                if (!Number.isFinite(activeMs) || activeMs <= 0) return null;
+                return { fullName: r.fullName, unit: r.unit, durationMs: activeMs };
             })
             .filter(Boolean)
             .sort((a, b) => b.durationMs - a.durationMs);
@@ -1692,11 +1718,13 @@
             .sort((a, b) => b.durationMs - a.durationMs);
     }
 
-    function formatDaysHours(ms) {
-        const totalHours = Math.floor(ms / 3600000);
-        const days = Math.floor(totalHours / 24);
-        const hours = totalHours % 24;
-        return `${days} ${days === 1 ? 'Dia' : 'Dias'} ${hours} ${hours === 1 ? 'Hora' : 'Horas'}`;
+    // HH:MM a partir de ms — HH não tem teto (curso aberto por 30h vira
+    // "30:00", não volta para "06:00" do dia seguinte).
+    function formatHHMM(ms) {
+        const totalMinutes = Math.round(ms / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
 
     // Mesmo formato MM:SS da coluna "Tempo" do histórico (ver formatDuration),
@@ -1706,35 +1734,74 @@
         return formatDuration(ms / 1000);
     }
 
-    // Paginado do mesmo jeito que "Realização por Unidade" — com muitos
-    // aprovados uma barra por pessoa no mesmo canvas fica ilegível.
-    const COMPLETION_TIME_PAGE_SIZE = 7;
+    // Mesmo modelo do gráfico "Tempo para Conclusão da Avaliação" (ver
+    // paintEvalTimePage/renderCourseEvalTimeChart): sem filtro, uma barra por
+    // unidade com média±desvio padrão, ordenada da maior média para a menor;
+    // marcando uma ou mais unidades, troca para uma barra por pessoa daquelas
+    // unidades. Barra "Geral" (cinza, fixa no topo) com média±desvio de todos
+    // os aprovados, ignorando o filtro. Paginado igual aos outros gráficos
+    // "por unidade".
+    // 5 (+ "Geral" fixo = 6 barras no canvas) — 7 deixava as barras achatadas
+    // no card de altura fixa (260px).
+    const COMPLETION_TIME_PAGE_SIZE = 5;
     let completionTimePage = 1;
-    let completionTimeScopedCache = [];
+    let completionTimeDataCache = [];
 
     function paintCompletionTimePage() {
-        const totalPages = Math.max(1, Math.ceil(completionTimeScopedCache.length / COMPLETION_TIME_PAGE_SIZE));
+        // "Geral" (1ª posição do cache, ver renderCourseCompletionTimeChart)
+        // não entra na paginação normal — fica fixa no topo de toda página, o
+        // resto das barras pagina em torno dela.
+        const generalRow = completionTimeDataCache[0];
+        const rest = completionTimeDataCache.slice(1);
+        const totalPages = Math.max(1, Math.ceil(rest.length / COMPLETION_TIME_PAGE_SIZE));
         completionTimePage = Math.min(Math.max(1, completionTimePage), totalPages);
         const start = (completionTimePage - 1) * COMPLETION_TIME_PAGE_SIZE;
-        const scoped = completionTimeScopedCache.slice(start, start + COMPLETION_TIME_PAGE_SIZE);
+        const pageRows = generalRow ? [generalRow, ...rest.slice(start, start + COMPLETION_TIME_PAGE_SIZE)] : [];
+
+        const canvas = document.getElementById('cfg-dash-course-completiontime-chart');
+        const emptyEl = document.getElementById('cfg-dash-course-completiontime-empty');
+        const pager = document.getElementById('cfg-dash-course-completiontime-pagination');
+
+        // Sem dado nenhum (ninguém com activeMs registrado ainda) o Chart.js
+        // desenha um eixo numérico "fantasma" com o canvas vazio — em vez
+        // disso mostra mensagem e não renderiza o gráfico.
+        if (completionTimeDataCache.length === 0) {
+            destroyChart('courseCompletionTime');
+            if (canvas) canvas.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'flex';
+            if (pager) pager.innerHTML = '';
+            return;
+        }
+        if (canvas) canvas.style.display = '';
+        if (emptyEl) emptyEl.style.display = 'none';
 
         renderChart('courseCompletionTime', 'cfg-dash-course-completiontime-chart', {
             type: 'bar',
             data: {
-                labels: scoped.map(d => d.fullName),
-                datasets: [{ data: scoped.map(d => d.durationMs), backgroundColor: CHART_COLORS.accent, borderRadius: 4 }]
+                labels: pageRows.map(r => r.label),
+                datasets: [{
+                    data: pageRows.map(r => r.avgMs),
+                    backgroundColor: pageRows.map(r => r.isGeneral ? CHART_COLORS.muted : CHART_COLORS.accent),
+                    borderRadius: 4
+                }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: (ctx) => formatDaysHours(scoped[ctx.dataIndex].durationMs) } }
+                    tooltip: { callbacks: { label: (ctx) => {
+                        const r = pageRows[ctx.dataIndex];
+                        const base = `Média: ${formatHHMM(r.avgMs)}`;
+                        return r.n > 1 ? `${base} (±${formatHHMM(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
+                    } } }
                 },
-                scales: { x: { ticks: { callback: (v) => formatDaysHours(v) } } }
-            }
+                scales: { x: { ticks: { callback: (v) => formatHHMM(v) } } }
+            },
+            plugins: [stddevWhiskerPlugin]
         });
+        chartInstances.courseCompletionTime.$stddevs = [pageRows.map(r => r.stddevMs)];
+        chartInstances.courseCompletionTime.update('none');
 
-        const pager = document.getElementById('cfg-dash-course-completiontime-pagination');
         if (!pager) return;
         if (totalPages <= 1) { pager.innerHTML = ''; return; }
         pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${completionTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
@@ -1750,25 +1817,43 @@
 
     function renderCourseCompletionTimeChart(data) {
         const selectedUnits = courseChartCompletionTimeUnitChip.getValues();
-        const scoped = selectedUnits.size > 0 ? data.filter(d => selectedUnits.has(d.unit)) : data;
-        const canvas = document.getElementById('cfg-dash-course-completiontime-chart');
-        const emptyEl = document.getElementById('cfg-dash-course-completiontime-empty');
-        const pager = document.getElementById('cfg-dash-course-completiontime-pagination');
 
-        // Sem dado nenhum (ninguém com startedAt registrado ainda) o Chart.js
-        // desenha um eixo numérico "fantasma" com o canvas vazio — em vez
-        // disso mostra mensagem e não renderiza o gráfico.
-        if (scoped.length === 0) {
-            destroyChart('courseCompletionTime');
-            if (canvas) canvas.style.display = 'none';
-            if (emptyEl) emptyEl.style.display = 'flex';
-            if (pager) pager.innerHTML = '';
-            return;
+        if (selectedUnits.size > 0) {
+            // Unidade(s) marcada(s): uma barra por pessoa, maior tempo primeiro.
+            completionTimeDataCache = data
+                .filter(d => selectedUnits.has(d.unit))
+                .map(d => ({ label: d.fullName, avgMs: d.durationMs, stddevMs: 0, n: 1 }))
+                .sort((a, b) => b.avgMs - a.avgMs);
+        } else {
+            // Sem filtro: uma barra por unidade, média ± desvio padrão.
+            const byUnit = new Map();
+            data.forEach(d => {
+                const unit = d.unit || 'Sem unidade';
+                if (!byUnit.has(unit)) byUnit.set(unit, []);
+                byUnit.get(unit).push(d.durationMs);
+            });
+            completionTimeDataCache = [...byUnit.entries()]
+                .map(([unit, durations]) => {
+                    const avg = mean(durations);
+                    return { label: unit, avgMs: avg, stddevMs: stddev(durations, avg), n: durations.length };
+                })
+                .sort((a, b) => b.avgMs - a.avgMs);
         }
-        if (canvas) canvas.style.display = '';
-        if (emptyEl) emptyEl.style.display = 'none';
 
-        completionTimeScopedCache = scoped;
+        // Barra "Geral" (cinza, sempre em 1º): média±desvio de TODOS os
+        // aprovados, ignorando filtro de unidade — fica fixa mesmo com
+        // unidade(s) marcada(s), pra servir de referência de comparação.
+        // Sem dado nenhum não entra, senão o cache nunca fica vazio de
+        // verdade e o card de "sem dados suficientes" nunca aparece.
+        if (data.length > 0) {
+            const allDurations = data.map(d => d.durationMs);
+            const generalAvg = mean(allDurations);
+            completionTimeDataCache.unshift({
+                label: 'Geral', avgMs: generalAvg, stddevMs: stddev(allDurations, generalAvg),
+                n: allDurations.length, isGeneral: true
+            });
+        }
+
         completionTimePage = 1;
         paintCompletionTimePage();
     }
@@ -1826,7 +1911,9 @@
     // daquelas unidades (pedido explícito), mantendo média±desvio por barra
     // (desvio de 1 pessoa sozinha é 0, não aparece traço). Paginado como os
     // outros gráficos "por unidade".
-    const EVALTIME_PAGE_SIZE = 7;
+    // 5 (+ "Geral" fixo = 6 barras no canvas) — 7 deixava as barras achatadas
+    // no card de altura fixa (260px).
+    const EVALTIME_PAGE_SIZE = 5;
     let evalTimePage = 1;
     let evalTimeDataCache = [];
 
@@ -1964,13 +2051,23 @@
             byDay.set(day, (byDay.get(day) || 0) + 1);
         });
 
+        // Eixo X em dias corridos desde o primeiro dia com dado (dia 1), em
+        // vez da data — mais legível para comparar a velocidade de adesão
+        // entre cursos com janelas de tempo diferentes.
+        const dayKeys = [...byDay.keys()];
+        const firstDay = dayKeys.length ? parseBrDate(dayKeys[0]) : null;
+
         let running = 0;
         const labels = [];
+        const dateLabels = [];
         const data = [];
         const runningCounts = [];
-        [...byDay.entries()].forEach(([day, count]) => {
+        dayKeys.forEach(day => {
+            const count = byDay.get(day);
             running += count;
-            labels.push(day);
+            const dayNum = firstDay ? Math.round((parseBrDate(day) - firstDay) / 86400000) + 1 : 1;
+            labels.push(`${dayNum}º dia`);
+            dateLabels.push(day);
             data.push(Math.round((running / total) * 100));
             runningCounts.push(running);
         });
@@ -1989,7 +2086,10 @@
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: (ctx) => `${runningCounts[ctx.dataIndex]} de ${total} concluíram (${ctx.parsed.y}%)` } }
+                    tooltip: { callbacks: {
+                        title: (items) => `${items[0].label} · ${dateLabels[items[0].dataIndex]}`,
+                        label: (ctx) => `${runningCounts[ctx.dataIndex]} de ${total} concluíram (${ctx.parsed.y}%)`
+                    } }
                 },
                 scales: { y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } }
             }
@@ -2076,12 +2176,17 @@
 
     function renderCourseScoresChart(rows) {
         const counts = new Array(11).fill(0); // índice 0..10
+        const peopleByScore = Array.from({ length: 11 }, () => []); // pessoas por nota, pra clique na barra
         let total = 0;
         rows.forEach(r => {
             const score = Number(r.score);
             if (!Number.isFinite(score)) return;
-            const rounded = Math.min(10, Math.max(0, Math.round(score)));
+            // Arredonda pra baixo, não pro mais próximo — nota 9,5 é nota 9,
+            // não deve inflar a barra do 10 (critério de aprovação é por
+            // nota cheia, não por proximidade).
+            const rounded = Math.min(10, Math.max(0, Math.floor(score)));
             counts[rounded]++;
+            peopleByScore[rounded].push({ fullName: r.fullName || 'Sem nome', unit: r.unit || 'Sem unidade', score });
             total++;
         });
 
@@ -2093,6 +2198,16 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const score = elements[0].index;
+                    const pct = total > 0 ? Math.round((counts[score] / total) * 100) : 0;
+                    openPeopleModal(`Nota ${score}`, '', peopleByScore[score],
+                        `${counts[score]} de ${total} colaboradores tiraram nota ${score} (${pct}%)`);
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (ctx) => {
@@ -2149,6 +2264,19 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const { datasetIndex, index } = elements[0];
+                    const u = pageUnits[index];
+                    const band = SCORE_BAND_DEFS[datasetIndex];
+                    const count = u.counts[band.key];
+                    const pct = u.total > 0 ? Math.round((count / u.total) * 100) : 0;
+                    openPeopleModal(`${band.label} — ${u.unit}`, '', u.people[band.key],
+                        `${count} de ${u.total} colaboradores da unidade (${pct}%)`);
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                },
                 plugins: {
                     tooltip: { callbacks: { label: (ctx) => {
                         const u = pageUnits[ctx.dataIndex];
@@ -2181,14 +2309,20 @@
             const score = Number(r.score);
             if (!Number.isFinite(score)) return;
             const unit = r.unit || 'Sem unidade';
-            if (!byUnit.has(unit)) byUnit.set(unit, { total: 0, counts: { nota10: 0, nota89: 0, nota67: 0, critico: 0 } });
+            if (!byUnit.has(unit)) byUnit.set(unit, {
+                total: 0,
+                counts: { nota10: 0, nota89: 0, nota67: 0, critico: 0 },
+                people: { nota10: [], nota89: [], nota67: [], critico: [] }
+            });
             const entry = byUnit.get(unit);
             entry.total++;
-            entry.counts[scoreBand(score).key]++;
+            const band = scoreBand(score).key;
+            entry.counts[band]++;
+            entry.people[band].push({ fullName: r.fullName || 'Sem nome', unit, score });
         });
 
         scoresByUnitDataCache = [...byUnit.entries()]
-            .map(([unit, e]) => ({ unit, total: e.total, counts: e.counts }))
+            .map(([unit, e]) => ({ unit, total: e.total, counts: e.counts, people: e.people }))
             .sort((a, b) => (b.total ? b.counts.critico / b.total : 0) - (a.total ? a.counts.critico / a.total : 0));
         scoresByUnitPage = 1;
         paintScoresByUnitPage();
@@ -2213,7 +2347,7 @@
         // respondeu aquela questão específica, senão quem pulou/não chegou
         // nela infla a taxa de erro artificialmente.
         const totalPeople = new Set();
-        const stats = new Map(); // enunciado -> { number, question, wrongPeople: Set }
+        const stats = new Map(); // enunciado -> { number, question, wrongPeople: Map<personKey, {fullName, unit}> }
         rows.forEach(r => {
             const personKey = personKeysOfRow(r)[0];
             if (!personKey) return;
@@ -2221,14 +2355,14 @@
             (r.answers || []).forEach((a, index) => {
                 if (!a || !a.question) return;
                 const key = a.question;
-                const entry = stats.get(key) || { number: index + 1, question: a.question, wrongPeople: new Set() };
-                if (a.selected !== a.correct) entry.wrongPeople.add(personKey);
+                const entry = stats.get(key) || { number: index + 1, question: a.question, wrongPeople: new Map() };
+                if (a.selected !== a.correct) entry.wrongPeople.set(personKey, { fullName: r.fullName || 'Sem nome', unit: r.unit || 'Sem unidade' });
                 stats.set(key, entry);
             });
         });
 
         const ranked = Array.from(stats.values())
-            .map(e => ({ number: e.number, question: e.question, wrong: e.wrongPeople.size, total: totalPeople.size }))
+            .map(e => ({ number: e.number, question: e.question, wrong: e.wrongPeople.size, total: totalPeople.size, wrongPeople: Array.from(e.wrongPeople.values()) }))
             .filter(e => e.wrong > 0)
             .sort((a, b) => b.wrong - a.wrong)
             .slice(0, MISTAKES_TOP_N);
@@ -2327,6 +2461,13 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    openMistakeModal(ranked[elements[0].index]);
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: {
@@ -2342,6 +2483,60 @@
             }
         });
     }
+
+    // ─── Modal "quem errou": colaboradores por unidade que erraram a
+    // questão clicada no gráfico "Principais Erros" ───
+    const mistakeModal = document.getElementById('cfg-dash-mistake-modal');
+    const mistakeModalTitle = document.getElementById('cfg-dash-mistake-modal-title');
+    const mistakeModalClose = document.getElementById('cfg-dash-mistake-modal-close');
+    const mistakeModalSubtitle = document.getElementById('cfg-dash-mistake-modal-subtitle');
+    const mistakeModalBody = document.getElementById('cfg-dash-mistake-modal-body');
+
+    function closeMistakeModal() { if (mistakeModal) mistakeModal.style.display = 'none'; }
+
+    // Modal genérico "lista de colaboradores por unidade" — usado pelo
+    // clique nas barras de Principais Erros, Notas e Notas por Unidade.
+    // `people`: array de {fullName, unit, score?} — `score`, quando presente
+    // (gráficos de nota), mostra a nota exata do aluno ao lado do nome.
+    // `countLabel`: texto do resumo no topo (já pronto, cada gráfico formata o seu).
+    function openPeopleModal(title, subtitle, people, countLabel) {
+        if (!mistakeModal) return;
+        if (mistakeModalTitle) mistakeModalTitle.textContent = title;
+        if (mistakeModalSubtitle) mistakeModalSubtitle.textContent = subtitle || '';
+        if (mistakeModalBody) {
+            const byUnit = new Map();
+            people
+                .slice()
+                .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'))
+                .forEach(p => {
+                    const unit = p.unit || 'Sem unidade';
+                    if (!byUnit.has(unit)) byUnit.set(unit, []);
+                    byUnit.get(unit).push(p);
+                });
+            const units = Array.from(byUnit.entries()).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+            mistakeModalBody.innerHTML = (countLabel ? `<p class="dash-mistake-modal-count">${countLabel}</p>` : '') +
+                (units.length === 0 ? emptyStateHtml('fa-users', 'Nenhum colaborador encontrado.') :
+                units.map(([unit, unitPeople]) => `
+                    <div class="dash-mistake-unit-group">
+                        <h3><i class="fas fa-building"></i> ${escapeHtml(unit)} <span class="tab-count">${unitPeople.length}</span></h3>
+                        <ul class="dash-mistake-name-list">${unitPeople.map(p => `<li><span class="row-name">${avatarHtml(p.fullName)} ${escapeHtml(p.fullName)}</span>${Number.isFinite(p.score) ? scoreBadgeHtml(p.score) : ''}</li>`).join('')}</ul>
+                    </div>
+                `).join(''));
+        }
+        mistakeModal.style.display = 'flex';
+    }
+
+    function openMistakeModal(entry) {
+        const pct = entry.total > 0 ? Math.round((entry.wrong / entry.total) * 100) : 0;
+        openPeopleModal(`Questão ${entry.number}`, entry.question, entry.wrongPeople,
+            `${entry.wrong} de ${entry.total} colaboradores erraram (${pct}%)`);
+    }
+
+    mistakeModalClose?.addEventListener('click', closeMistakeModal);
+    mistakeModal?.addEventListener('click', (event) => { if (event.target === mistakeModal) closeMistakeModal(); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && mistakeModal?.style.display === 'flex') closeMistakeModal();
+    });
 
     async function renderCourseDashboard(slug, courseKey) {
         const [subjectId, themeId] = courseKey.split('_');
@@ -2489,7 +2684,7 @@
 
         const completionTimes = buildCompletionTimeData(rows, courseChartSlugCache);
         const avgCompletionLabel = completionTimes.length
-            ? formatDaysHours(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
+            ? formatHHMM(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
             : '—';
 
         const deadline = theme?.deadline;

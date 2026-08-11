@@ -27,10 +27,10 @@ function initializeTabs() {
     const allTabContents = document.querySelectorAll('#cfg-root .content-area > .tab-content');
     allTabButtons.forEach(btn => btn.classList.remove('active'));
     allTabContents.forEach(content => content.classList.remove('active'));
-    const coursesBtn = document.querySelector('#cfg-root .sidebar-nav .tab-btn[data-tab="courses"]');
-    const coursesTab = document.getElementById('cfg-courses-tab');
-    if (coursesBtn) coursesBtn.classList.add('active');
-    if (coursesTab) coursesTab.classList.add('active');
+    const dashboardBtn = document.querySelector('#cfg-root .sidebar-nav .tab-btn[data-tab="dashboard"]');
+    const dashboardTab = document.getElementById('cfg-dashboard-tab');
+    if (dashboardBtn) dashboardBtn.classList.add('active');
+    if (dashboardTab) dashboardTab.classList.add('active');
 }
 
 function escapeHtml(value) {
@@ -277,12 +277,13 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 initializeOrderFields();
                 populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
                 window.UniAdminCourses?.refresh?.();
-                tabButtons.forEach(b => b.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-                const coursesBtn = document.querySelector('#cfg-root .tab-btn[data-tab="courses"]');
-                const coursesTab = document.getElementById('cfg-courses-tab');
-                if (coursesBtn) coursesBtn.classList.add('active');
-                if (coursesTab) coursesTab.classList.add('active');
+                // Não força mais a aba "Cursos" aqui — isso sobrescrevia a
+                // aba padrão do HTML (Dashboard) toda vez que uma categoria
+                // era carregada, fazendo o painel sempre abrir em Cursos em
+                // vez de respeitar a aba ativa (ex.: ?cat= vindo do portal).
+                if (document.querySelector('#cfg-root .tab-btn[data-tab="dashboard"]')?.classList.contains('active')) {
+                    window.UniAdmin.initDashboard?.();
+                }
             } catch (error) {
                 console.error('Erro ao carregar dados:', error.message);
                 showWarning('Não foi possível carregar os dados. Tente novamente.');

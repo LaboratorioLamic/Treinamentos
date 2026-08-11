@@ -1092,6 +1092,20 @@
         </div>
     </div>
 
+    <!-- Modal "quem errou" (Dashboard > Por curso > Gráficos > Principais Erros): lista de colaboradores por unidade que erraram a questão clicada -->
+    <div class="modal" id="cfg-dash-mistake-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-mistake-modal-title">
+        <div class="modal-content dash-mistake-modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 id="cfg-dash-mistake-modal-title">Questão</h2>
+                    <p class="dash-mistake-modal-subtitle" id="cfg-dash-mistake-modal-subtitle"></p>
+                </div>
+                <span class="close" id="cfg-dash-mistake-modal-close">&times;</span>
+            </div>
+            <div class="modal-body" id="cfg-dash-mistake-modal-body"></div>
+        </div>
+    </div>
+
     <!-- Modal do colaborador (Dashboard > Por colaborador): Informações + Gráficos -->
     <div class="modal" id="cfg-dash-user-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-user-modal-title">
         <div class="modal-content dash-course-modal-content">
@@ -1178,6 +1192,7 @@
                     </div>
                     <div class="dash-review-summary-grid" id="cfg-dash-review-summary-grid"></div>
                     <div class="dash-review-comment" id="cfg-dash-review-comment"></div>
+                    <div class="dash-review-cert" id="cfg-dash-review-cert"></div>
                 </div>
                 <div class="dash-review-section" id="cfg-dash-review-questions-section">
                     <h3><i class="fas fa-circle-question"></i> Questões incorretas</h3>
@@ -1362,7 +1377,10 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Navegação</div>
                 <nav class="sidebar-nav">
-                    <button class="tab-btn active" data-tab="courses">
+                    <button class="tab-btn active" data-tab="dashboard">
+                        <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>Dashboard
+                    </button>
+                    <button class="tab-btn" data-tab="courses">
                         <span class="nav-icon"><i class="fas fa-graduation-cap"></i></span>Cursos
                     </button>
                     <button class="tab-btn" data-tab="colaboradores">
@@ -1370,9 +1388,6 @@
                     </button>
                     <button class="tab-btn" data-tab="users">
                         <span class="nav-icon"><i class="fas fa-users"></i></span>Usuários
-                    </button>
-                    <button class="tab-btn" data-tab="dashboard">
-                        <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>Dashboard
                     </button>
                     <button class="tab-btn" data-tab="history">
                         <span class="nav-icon"><i class="fas fa-table-list"></i></span>Histórico
@@ -1409,7 +1424,7 @@
             <main class="content-area">
 
                 <!-- Cursos Tab (unifica Temas/Assuntos/Módulos/Avaliações) -->
-                <div class="tab-content active" id="cfg-courses-tab">
+                <div class="tab-content" id="cfg-courses-tab">
                     <div class="courses-toolbar">
                         <div class="filter-popover-wrap">
                             <button type="button" class="filter-picker-btn" id="cfg-courses-filter-btn"
@@ -1924,7 +1939,7 @@
                 </div>
 
                 <!-- Dashboard Tab -->
-                <div class="tab-content" id="cfg-dashboard-tab">
+                <div class="tab-content active" id="cfg-dashboard-tab">
                     <div class="dashboard-mode-toggle">
                         <button type="button" class="deadline-mode-btn active" id="cfg-dash-mode-user" data-mode="user">
                             <i class="fas fa-user"></i> Por colaborador

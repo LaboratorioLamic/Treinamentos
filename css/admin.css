@@ -1079,19 +1079,20 @@
         /* Larguras relativas das 13 colunas (soma ~100%), na ordem de COLUMNS
            em admin-history.js: Data/Hora, Tema, Assunto, Nome, Nota, Erros,
            Avaliação, Prazo, Unidade, Cargo, Coment., Situação, Ações. */
-        #cfg-root .history-table-wrap col.hc-date { width: 9%; }
-        #cfg-root .history-table-wrap col.hc-subject { width: 10%; }
-        #cfg-root .history-table-wrap col.hc-theme { width: 10%; }
-        #cfg-root .history-table-wrap col.hc-name { width: 12%; }
+        #cfg-root .history-table-wrap col.hc-date { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-subject { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-theme { width: 8%; }
+        #cfg-root .history-table-wrap col.hc-name { width: 10%; }
         #cfg-root .history-table-wrap col.hc-score { width: 6%; }
         #cfg-root .history-table-wrap col.hc-duration { width: 6%; }
-        #cfg-root .history-table-wrap col.hc-errors { width: 7%; }
-        #cfg-root .history-table-wrap col.hc-rating { width: 7%; }
-        #cfg-root .history-table-wrap col.hc-deadline { width: 7%; }
-        #cfg-root .history-table-wrap col.hc-unit { width: 8%; }
-        #cfg-root .history-table-wrap col.hc-role { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-conclusion { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-errors { width: 6%; }
+        #cfg-root .history-table-wrap col.hc-rating { width: 6%; }
+        #cfg-root .history-table-wrap col.hc-deadline { width: 6%; }
+        #cfg-root .history-table-wrap col.hc-unit { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-role { width: 6%; }
         #cfg-root .history-table-wrap col.hc-comment { width: 4%; }
-        #cfg-root .history-table-wrap col.hc-approved { width: 7%; }
+        #cfg-root .history-table-wrap col.hc-approved { width: 6%; }
         #cfg-root .history-table-wrap col.hc-actions { width: 6%; }
 
         #cfg-root .history-status-pill {
@@ -1589,6 +1590,8 @@
         #cfg-dash-review-modal .dash-review-comment i { color: var(--cfg-primary); opacity: 0.5; font-size: 15px; margin-top: 2px; }
         #cfg-dash-review-modal .dash-review-comment p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.5; font-style: italic; }
         #cfg-dash-review-modal .dash-review-no-comment { margin: 0; font-size: 12.5px; color: var(--text-2); font-style: italic; }
+        #cfg-dash-review-modal .dash-review-cert:not(:empty) { margin-top: 4px; }
+        #cfg-dash-review-modal .dash-review-cert .history-cert-btn { margin-bottom: 0; }
 
         #cfg-dash-review-modal .history-detail-questions { display: flex; flex-direction: column; gap: 8px; }
         #cfg-dash-review-modal .conclusion-situation {
@@ -2186,8 +2189,18 @@
         .hfilter-chip-unit-user i { font-size: 10px; color: var(--text-3); }
 
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .panel-body { height: 260px; display: flex; align-items: center; justify-content: center; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card canvas { max-height: 100%; }
+        /* column, não row: canvas e paginação (quando presente) empilham em
+           vez de disputar espaço lado a lado — sem isso, com muitas barras
+           (ex.: "Tempo para Conclusão da Avaliação" com todas as unidades
+           marcadas) o pager espremia ao lado do canvas em vez de ficar
+           embaixo. min-height:0 deixa o canvas de fato encolher dentro do
+           flex quando o pager ocupa espaço, já que canvas sozinho não respeita
+           o container sem isso. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .panel-body {
+            height: 260px; display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card canvas { flex: 1 1 auto; min-height: 0; max-height: 100%; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .dash-comments-pagination { flex: 0 0 auto; }
         @media (max-width: 900px) {
             :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { grid-template-columns: 1fr; }
         }
@@ -2214,6 +2227,9 @@
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:nth-child(even) { background: var(--bg); }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:hover { background: var(--cfg-primary-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable { cursor: pointer; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable:hover { background: var(--cfg-primary-light); box-shadow: inset 3px 0 0 var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable td:last-child { position: relative; z-index: 1; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
         @keyframes rowFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -2376,6 +2392,50 @@
             transition: background 0.15s, transform 0.15s;
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-reset-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); }
+
+        /* === MODAL: "quem errou" (clique numa barra do gráfico Principais Erros) === */
+        #cfg-dash-mistake-modal { z-index: 2100; }
+        #cfg-dash-mistake-modal .dash-mistake-modal-content { max-width: 640px; width: 92vw; max-height: 82vh; display: flex; flex-direction: column; }
+        #cfg-dash-mistake-modal .modal-header h2 { font-size: 16px; }
+        #cfg-dash-mistake-modal .dash-mistake-modal-subtitle {
+            font-size: 12.5px; color: var(--text-3); margin-top: 4px; line-height: 1.4;
+        }
+        #cfg-dash-mistake-modal .modal-body { overflow-y: auto; flex: 1; padding: 4px 24px 24px; }
+        #cfg-dash-mistake-modal .dash-mistake-modal-count {
+            font-size: 12.5px; font-weight: 700; color: var(--text-2);
+            background: var(--cfg-surface); border: 1px solid var(--cfg-border);
+            border-radius: 8px; padding: 8px 12px; margin-bottom: 16px;
+        }
+        #cfg-dash-mistake-modal .dash-mistake-unit-group { margin-bottom: 16px; }
+        #cfg-dash-mistake-modal .dash-mistake-unit-group h3 {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+        }
+        #cfg-dash-mistake-modal .dash-mistake-unit-group h3 .tab-count {
+            display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+            padding: 0 5px; border-radius: 999px; background: var(--cfg-border); color: var(--text-2);
+            font-size: 10.5px; font-weight: 700;
+        }
+        #cfg-dash-mistake-modal .dash-mistake-name-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        #cfg-dash-mistake-modal .dash-mistake-name-list li {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 7px 10px; border-radius: 8px; background: var(--cfg-surface); border: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-mistake-modal .row-name { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; font-size: 12.5px; }
+        #cfg-dash-mistake-modal .row-avatar {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; font-weight: 800; color: #fff;
+            background: hsl(var(--avatar-hue, 210), 65%, 52%); font-size: 11px;
+        }
+        #cfg-dash-mistake-modal .hist-score {
+            display: inline-flex; align-items: baseline; gap: 1px; flex-shrink: 0;
+            padding: 4px 7px; border-radius: 9px; font-variant-numeric: tabular-nums; white-space: nowrap;
+        }
+        #cfg-dash-mistake-modal .hist-score b { font-size: 12px; font-weight: 800; }
+        #cfg-dash-mistake-modal .hist-score small { font-size: 9px; font-weight: 700; opacity: 0.65; }
+        #cfg-dash-mistake-modal .hist-score.is-high { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-mistake-modal .hist-score.is-mid { background: #fef3c7; color: #b45309; }
+        #cfg-dash-mistake-modal .hist-score.is-low { background: var(--cfg-danger-light); color: var(--cfg-danger); }
 
         /* === MODAL DE CONFIRMACAO === */
         /* Compartilhado entre #cfg-confirm-modal e #cfg-reset-password-modal

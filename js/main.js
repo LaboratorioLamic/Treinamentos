@@ -164,6 +164,70 @@
         // referência usada no gráfico "Tempo para Conclusão" do dashboard.
         let remoteProgressStartedAt = {};
 
+        // Cache do tempo ativo já acumulado e gravado na nuvem por curso
+        // (subjectId/themeId), em ms — igual ao startedAt acima, preservado
+        // entre syncs e somado à sessão em andamento (ver activeCourseTimer).
+        let remoteProgressActiveMs = {};
+
+        // "Contador oculto" do tempo com o curso aberto: soma só o tempo em
+        // que a aba está visível com o curso carregado (loadTraining) — pausa
+        // ao trocar de curso, sair para a galeria, trocar de aba/minimizar ou
+        // fechar a página, e retoma na próxima abertura. Finaliza (para de
+        // vez) quando a avaliação é aprovada. Guiado por timestamp real do
+        // início da sessão corrente, não por contador incremental, para não
+        // perder tempo em caso de recarregar a página no meio de uma sessão.
+        let activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null };
+
+        // Fecha a sessão corrente (se houver) somando o tempo decorrido ao
+        // acumulado em nuvem e sincronizando. Chamado ao trocar de curso, sair
+        // para a galeria, esconder a aba ou aprovar na avaliação. `forget`
+        // limpa subjectId/themeId do timer (usado ao sair para a galeria) —
+        // sem isso, um simples minimizar/restaurar a aba na galeria faria o
+        // visibilitychange achar que ainda há curso aberto e retomar a conta.
+        function pauseActiveCourseTimer(forget = false) {
+            const { subjectId, themeId, sessionStartedAt } = activeCourseTimer;
+            if (forget) { activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null }; }
+            if (!subjectId || !themeId || !sessionStartedAt) return;
+            const elapsed = Date.now() - sessionStartedAt;
+            if (!forget) activeCourseTimer.sessionStartedAt = null;
+            if (elapsed <= 0) return;
+            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            // Args explícitos: currentTrainingId/currentThemeId podem já
+            // apontar para outro curso neste momento (ex.: loadTraining seta
+            // o novo curso antes de pausar o anterior via resumeActiveCourseTimer).
+            syncCourseProgressToCloud(subjectId, themeId);
+        }
+
+        // Abre (ou retoma) a sessão do curso informado — chamado sempre que um
+        // módulo é carregado dentro dele. Se já havia sessão ativa para outro
+        // curso, fecha antes. Não reabre se o curso já foi aprovado (contador
+        // final, não deve voltar a contar).
+        function resumeActiveCourseTimer(subjectId, themeId) {
+            if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId && activeCourseTimer.sessionStartedAt) return;
+            pauseActiveCourseTimer();
+            if (assessmentResults[subjectId]?.[themeId] !== undefined && assessmentResults[subjectId][themeId] >= 8) return;
+            activeCourseTimer = { subjectId, themeId, sessionStartedAt: Date.now() };
+        }
+
+        // Encerra de vez o contador do curso aprovado — soma a sessão corrente
+        // e impede que ele volte a contar (aluno pode reabrir o curso depois
+        // só para revisar módulos, isso não deve inflar o tempo registrado).
+        function finishActiveCourseTimer(subjectId, themeId) {
+            if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId) {
+                pauseActiveCourseTimer();
+            }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) pauseActiveCourseTimer();
+            else if (activeCourseTimer.subjectId && activeCourseTimer.themeId && !activeCourseTimer.sessionStartedAt) {
+                resumeActiveCourseTimer(activeCourseTimer.subjectId, activeCourseTimer.themeId);
+            }
+        });
+        window.addEventListener('beforeunload', () => pauseActiveCourseTimer());
+        window.addEventListener('pagehide', () => pauseActiveCourseTimer());
+
         function loadProgression() {
             const savedCompletion = localStorage.getItem('completionStatus');
             const savedAssessments = localStorage.getItem('assessmentResults');
@@ -192,31 +256,40 @@
             return `/${U.dbRoot}/progress/byUser/${userId}/${currentCategorySlug}`;
         }
 
-        // Sincroniza só o curso atualmente aberto (o que acabou de mudar) —
-        // evita reescrever a árvore inteira a cada módulo concluído.
-        function syncCourseProgressToCloud() {
-            if (!isProgressSyncEligible() || !currentTrainingId || !currentThemeId) return;
+        // Sincroniza só o curso informado (por padrão, o atualmente aberto) —
+        // evita reescrever a árvore inteira a cada módulo concluído. Aceita
+        // subjectId/themeId explícitos porque pauseActiveCourseTimer pode
+        // precisar sincronizar um curso que acabou de deixar de ser o atual
+        // (ex.: trocando de curso ou saindo para a galeria).
+        function syncCourseProgressToCloud(subjectId = currentTrainingId, themeId = currentThemeId) {
+            if (!isProgressSyncEligible() || !subjectId || !themeId) return;
             const U = window.UniAdmin;
             const session = U.StudentAuth.getSession();
-            const theme = trainingData[currentTrainingId]?.themes?.[currentThemeId];
+            const theme = trainingData[subjectId]?.themes?.[themeId];
             if (!theme) return;
-            const { total, done, pct } = courseProgress(currentTrainingId, theme);
-            const approved = assessmentResults[currentTrainingId]?.[currentThemeId];
+            const { total, done, pct } = courseProgress(subjectId, theme);
+            const approved = assessmentResults[subjectId]?.[themeId];
             // startedAt é gravado só na primeira sync do curso e preservado
-            // depois — marca (aproximadamente) o início do 1º módulo, usado
+            // depois — marca (aproximadamente) o início do 1º módulo. activeMs
+            // é o tempo ativo acumulado (contador oculto, ver
+            // resumeActiveCourseTimer/pauseActiveCourseTimer) — ambos usados
             // no gráfico "Tempo para Conclusão" do dashboard (Config >
-            // Dashboard > curso > Gráficos).
-            const existingStartedAt = remoteProgressStartedAt[currentTrainingId]?.[currentThemeId];
+            // Dashboard > curso > Gráficos), que exibe o activeMs.
+            const existingStartedAt = remoteProgressStartedAt[subjectId]?.[themeId];
             const startedAt = existingStartedAt || Date.now();
+            const activeMs = remoteProgressActiveMs[subjectId]?.[themeId] || 0;
             const record = {
                 total, done, pct,
                 approved: approved !== undefined ? approved : null,
                 startedAt,
+                activeMs,
                 updatedAt: Date.now()
             };
-            if (!remoteProgressStartedAt[currentTrainingId]) remoteProgressStartedAt[currentTrainingId] = {};
-            remoteProgressStartedAt[currentTrainingId][currentThemeId] = startedAt;
-            const path = `${progressPathFor(session.userId)}/${currentTrainingId}/${currentThemeId}`;
+            if (!remoteProgressStartedAt[subjectId]) remoteProgressStartedAt[subjectId] = {};
+            remoteProgressStartedAt[subjectId][themeId] = startedAt;
+            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+            remoteProgressActiveMs[subjectId][themeId] = activeMs;
+            const path = `${progressPathFor(session.userId)}/${subjectId}/${themeId}`;
             U.ref(U.db, path).set(record).catch(error => {
                 console.error('Erro ao sincronizar progressão do curso:', error);
             });
@@ -243,6 +316,10 @@
                         if (entry?.startedAt) {
                             if (!remoteProgressStartedAt[subjectId]) remoteProgressStartedAt[subjectId] = {};
                             remoteProgressStartedAt[subjectId][themeId] = entry.startedAt;
+                        }
+                        if (Number.isFinite(entry?.activeMs)) {
+                            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+                            remoteProgressActiveMs[subjectId][themeId] = entry.activeMs;
                         }
                         const localDone = (completionStatus[subjectId]?.[themeId] || []).filter(Boolean).length;
                         const remoteDone = entry?.done || 0;
@@ -735,6 +812,7 @@
         }
 
         function showCourseGallery(subjectId) {
+            pauseActiveCourseTimer(true);
             currentTrainingId = subjectId;
             currentThemeId = null;
             courseGrid.innerHTML = '';
@@ -940,6 +1018,7 @@
             currentThemeId = themeId;
             const theme = trainingData[subjectId].themes[themeId];
             if (!theme || !theme.modules || theme.modules.length === 0) return;
+            resumeActiveCourseTimer(subjectId, themeId);
 
             document.getElementById('welcome-screen').style.display = 'none';
             courseGallery.style.display = 'none';
@@ -1746,6 +1825,11 @@
 
                 if (!assessmentResults[currentTrainingId]) assessmentResults[currentTrainingId] = {};
                 assessmentResults[currentTrainingId][currentThemeId] = score;
+                // Aprovado: encerra de vez o contador de tempo do curso antes
+                // de sincronizar, para o activeMs final já incluir esta
+                // última sessão e não voltar a contar se o aluno reabrir o
+                // curso só para revisar módulos.
+                finishActiveCourseTimer(currentTrainingId, currentThemeId);
                 saveProgression();
 
                 const assessmentModule = document.getElementById('assessment-module');
