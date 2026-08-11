@@ -207,7 +207,7 @@
         #cfg-root .panel-header {
             padding: 16px 20px 14px;
             border-bottom: 1px solid var(--cfg-border);
-            display: flex; align-items: center; gap: 11px;
+            display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
         }
 
         #cfg-root .panel-icon {
@@ -220,7 +220,27 @@
         #cfg-root .panel-icon.green { background: var(--cfg-success-light); color: var(--cfg-success); }
         #cfg-root .panel-icon.purple { background: var(--purple-light); color: var(--purple); }
 
-        #cfg-root .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+        #cfg-root .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); flex-shrink: 0; }
+
+        /* Balãozinho discreto à direita do título, indicando que o gráfico
+           responde a clique (ex.: "Principais Erros", "Taxa de Conclusão").
+           margin-left:auto empurra ele (e o que vier depois, como
+           panel-header-actions) pro fim do header flex. */
+        #cfg-root .panel-header-hint {
+            margin-left: auto;
+            flex-shrink: 1;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #6366f1;
+            font-size: 10px; font-weight: 500;
+            white-space: normal;
+            line-height: 1.3;
+            max-width: 130px;
+        }
+        #cfg-root .panel-header-hint i { font-size: 8px; opacity: 0.85; flex-shrink: 0; }
+        #cfg-root .panel-header-hint + .panel-header-actions { margin-left: 10px; }
 
         #cfg-root .panel-body { padding: 18px 20px; }
 
@@ -2436,6 +2456,21 @@
         #cfg-dash-mistake-modal .hist-score.is-high { background: var(--cfg-success-light); color: var(--cfg-success); }
         #cfg-dash-mistake-modal .hist-score.is-mid { background: #fef3c7; color: #b45309; }
         #cfg-dash-mistake-modal .hist-score.is-low { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+
+        /* Barra de progresso (%) — reaproveitada pelo modal de progresso
+           "Taxa de Conclusão por Unidade" (mesmo visual de "Faltam realizar"). */
+        #cfg-dash-mistake-modal .missing-progress { display: flex; align-items: center; gap: 8px; min-width: 120px; flex-shrink: 0; }
+        #cfg-dash-mistake-modal .missing-progress-bar {
+            flex: 1; height: 7px; border-radius: 999px; background: var(--cfg-border); overflow: hidden;
+        }
+        #cfg-dash-mistake-modal .missing-progress-bar span {
+            display: block; height: 100%; border-radius: 999px;
+            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #cfg-dash-mistake-modal .missing-progress-bar span.is-low { background: linear-gradient(90deg, #ef4444, #f87171); }
+        #cfg-dash-mistake-modal .missing-progress-bar span.is-mid { background: linear-gradient(90deg, var(--cfg-warning), #fbbf24); }
+        #cfg-dash-mistake-modal .missing-progress-bar span.is-high { background: linear-gradient(90deg, #22c55e, var(--cfg-success)); }
+        #cfg-dash-mistake-modal .missing-progress-pct { font-size: 11.5px; font-weight: 700; color: var(--text-2); width: 34px; text-align: right; }
 
         /* === MODAL DE CONFIRMACAO === */
         /* Compartilhado entre #cfg-confirm-modal e #cfg-reset-password-modal

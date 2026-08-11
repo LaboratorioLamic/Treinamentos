@@ -998,17 +998,17 @@
                             <div class="panel-body"><canvas id="cfg-dash-course-retries-chart"></canvas></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Principais Erros</h2></div>
+                            <div class="panel-header"><h2>Principais Erros</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-mistakes-chart"></canvas></div>
                         </div>
                     </div>
                     <div class="dashboard-chart-row">
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Notas</h2></div>
+                            <div class="panel-header"><h2>Notas</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-scores-chart"></canvas></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Notas por Unidade</h2></div>
+                            <div class="panel-header"><h2>Notas por Unidade</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-scores-byunit-chart"></canvas></div>
                             <div class="dash-comments-pagination" id="cfg-dash-course-scores-byunit-pagination"></div>
                         </div>
@@ -1062,6 +1062,7 @@
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header">
                                 <h2>Taxa de Conclusão do Curso</h2>
+                                <span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span>
                                 <div class="panel-header-actions">
                                     <div class="hfilter-chip dash-unit-chip" id="cfg-dash-course-unit-chip">
                                         <button type="button" class="hfilter-chip-btn" title="Filtrar por unidade">
@@ -1077,7 +1078,7 @@
                             <div class="panel-body"><canvas id="cfg-dash-course-completion-trend-chart"></canvas></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Taxa de Conclusão por Unidade</h2></div>
+                            <div class="panel-header"><h2>Taxa de Conclusão por Unidade</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
                             <div class="panel-body"><canvas id="cfg-dash-course-unit-completion-chart"></canvas></div>
                             <div class="dash-comments-pagination" id="cfg-dash-course-unit-completion-pagination"></div>
                         </div>
@@ -1941,11 +1942,11 @@
                 <!-- Dashboard Tab -->
                 <div class="tab-content active" id="cfg-dashboard-tab">
                     <div class="dashboard-mode-toggle">
-                        <button type="button" class="deadline-mode-btn active" id="cfg-dash-mode-user" data-mode="user">
-                            <i class="fas fa-user"></i> Por colaborador
-                        </button>
-                        <button type="button" class="deadline-mode-btn" id="cfg-dash-mode-course" data-mode="course">
+                        <button type="button" class="deadline-mode-btn active" id="cfg-dash-mode-course" data-mode="course">
                             <i class="fas fa-book"></i> Por curso
+                        </button>
+                        <button type="button" class="deadline-mode-btn" id="cfg-dash-mode-user" data-mode="user">
+                            <i class="fas fa-user"></i> Por colaborador
                         </button>
                     </div>
 

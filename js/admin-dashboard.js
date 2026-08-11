@@ -747,6 +747,12 @@
         return Object.keys(allColaboradores)
             .map(id => ({ id, ...allColaboradores[id] }))
             .filter(colab => colab.fullName)
+            // Inativo (colab.active === false, mesmo critério da aba
+            // Colaboradores) ou desvinculado da planilha (inSheet === false,
+            // "inválido" — saiu da base oficial) não conta como público-alvo:
+            // infla o denominador dos gráficos de conclusão com gente que já
+            // não deveria mais fazer o curso.
+            .filter(colab => colab.active !== false && colab.inSheet !== false)
             .filter(colab => roleKeys.size === 0 || roleKeys.has(normalizeName(colab.role || '')));
     }
 
@@ -1502,6 +1508,8 @@
     // selecionada no topo do painel, não pra do curso aberto, que pode ser
     // outra).
     let courseChartSlugCache = null;
+    let courseChartSubjectIdCache = null;
+    let courseChartThemeIdCache = null;
     const courseChartYearChip = createYearFilterChip('cfg-dash-course-year-chip', 'cfg-dash-course-year-list', () => renderCourseCharts(courseChartRowsCache));
 
     // Popover de seleção múltipla (checkbox) — mesmo visual do chip de ano,
@@ -2040,36 +2048,72 @@
             : audience;
         const total = scopedAudience.length || 1;
 
-        const last = lastAttemptByPerson(scopedRows)
-            .filter(r => r.submittedAt)
-            .sort((a, b) => a.submittedAt - b.submittedAt);
+        // Só conta quem está no público-alvo válido do curso (mesmo critério
+        // de courseAudience: ativo, vinculado à planilha, cargo compatível).
+        // Sem esse filtro, gente inativa/inválida/de outro cargo que apareceu
+        // no histórico inflava o acumulado além do denominador e passava de
+        // 100% no gráfico.
+        const audienceKeys = new Set();
+        scopedAudience.forEach(colab => personKeysOfColaborador(colab).forEach(key => audienceKeys.add(key)));
 
-        // Agrupa por dia (data local, sem hora) e acumula.
+        // "Concluiu" = data da 1ª tentativa APROVADA de cada pessoa, não a
+        // última tentativa registrada — lastAttemptByPerson pegava a tentativa
+        // mais recente mesmo quando era uma reprovação depois de já ter
+        // passado, ou quando a pessoa refez o curso bem depois de concluído;
+        // isso empurrava a data de conclusão pra frente (ou fazia sumir do
+        // dia certo) e sub-contava o dia real de aprovação no gráfico.
+        const byPerson = new Map();
+        scopedRows.forEach(row => {
+            if (!row.approved || !row.submittedAt) return;
+            const keys = personKeysOfRow(row);
+            const key = keys[0];
+            if (!key) return;
+            if (!keys.some(k => audienceKeys.has(k))) return;
+            const current = byPerson.get(key);
+            if (!current || row.submittedAt < current.submittedAt) byPerson.set(key, row);
+        });
+        const last = [...byPerson.values()].sort((a, b) => a.submittedAt - b.submittedAt);
+
+        // Agrupa por dia (data local, sem hora) e acumula. Guarda também
+        // quem concluiu em cada dia (nome/unidade/nota) pro clique no ponto.
         const byDay = new Map();
         last.forEach(r => {
             const day = new Date(r.submittedAt).toLocaleDateString('pt-BR');
-            byDay.set(day, (byDay.get(day) || 0) + 1);
+            if (!byDay.has(day)) byDay.set(day, []);
+            byDay.get(day).push({ fullName: r.fullName || 'Sem nome', unit: r.unit || 'Sem unidade', score: Number(r.score) });
         });
 
-        // Eixo X em dias corridos desde o primeiro dia com dado (dia 1), em
-        // vez da data — mais legível para comparar a velocidade de adesão
-        // entre cursos com janelas de tempo diferentes.
+        // Eixo X em dias corridos desde o dia 1. Curso com prazo definido:
+        // dia 1 é o início do prazo, não o dia da 1ª conclusão — se ninguém
+        // concluiu nos primeiros dias, o gráfico começa "achatado" em vez de
+        // já pular pra quando alguém passou, refletindo a adesão real dentro
+        // da janela de prazo. Sem prazo definido: cai de volta pro 1º dia
+        // com dado, como antes.
+        const theme = allTrainingData[courseChartSlugCache]?.[courseChartSubjectIdCache]?.themes?.[courseChartThemeIdCache];
+        const deadline = theme?.deadline;
         const dayKeys = [...byDay.keys()];
-        const firstDay = dayKeys.length ? parseBrDate(dayKeys[0]) : null;
+        // Zera a hora do início do prazo (mesmo critério de parseBrDate) —
+        // senão um prazo começando às 14h deslocava a diferença em dias por
+        // causa da fração de horas entre ele e a meia-noite das conclusões.
+        const firstDay = (deadline?.mode === 'prazo' && deadline.startAt)
+            ? parseBrDate(new Date(deadline.startAt).toLocaleDateString('pt-BR'))
+            : (dayKeys.length ? parseBrDate(dayKeys[0]) : null);
 
         let running = 0;
         const labels = [];
         const dateLabels = [];
         const data = [];
         const runningCounts = [];
+        const peopleByDay = [];
         dayKeys.forEach(day => {
-            const count = byDay.get(day);
-            running += count;
+            const people = byDay.get(day);
+            running += people.length;
             const dayNum = firstDay ? Math.round((parseBrDate(day) - firstDay) / 86400000) + 1 : 1;
             labels.push(`${dayNum}º dia`);
             dateLabels.push(day);
-            data.push(Math.round((running / total) * 100));
+            data.push(Math.min(100, Math.round((running / total) * 100)));
             runningCounts.push(running);
+            peopleByDay.push(people);
         });
 
         renderChart('courseCompletionTrend', 'cfg-dash-course-completion-trend-chart', {
@@ -2084,6 +2128,15 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const i = elements[0].index;
+                    openPeopleModal(`Conclusões — ${labels[i]}`, `Data: ${dateLabels[i]}`, peopleByDay[i],
+                        `${peopleByDay[i].length} concluíram neste dia (${runningCounts[i]} de ${total} no acumulado, ${data[i]}%)`);
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: {
@@ -2118,6 +2171,14 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (!elements.length) return;
+                    const u = pageUnits[elements[0].index];
+                    openProgressModal(u.unit, '', u.people, `${u.done} de ${u.total} concluíram (${u.pct}%)`);
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (ctx) => {
@@ -2150,14 +2211,22 @@
         const byUnit = new Map();
         audience.forEach(colab => {
             const unit = colab.unit || 'Sem unidade';
-            if (!byUnit.has(unit)) byUnit.set(unit, { total: 0, done: 0 });
+            if (!byUnit.has(unit)) byUnit.set(unit, { total: 0, done: 0, people: [] });
             const entry = byUnit.get(unit);
             entry.total++;
             if (personKeysOfColaborador(colab).some(key => doneKeys.has(key))) entry.done++;
+            // Progresso (% de módulos assistidos) de cada colaborador —
+            // mesmo dado usado pela tabela "Faltam realizar", só que aqui
+            // pra unidade inteira (concluídos entram com 100%).
+            entry.people.push({
+                fullName: colab.fullName,
+                unit,
+                pct: progressPctFor(colab, courseChartSlugCache, courseChartSubjectIdCache, courseChartThemeIdCache)
+            });
         });
 
         unitCompletionDataCache = [...byUnit.entries()]
-            .map(([unit, e]) => ({ unit, total: e.total, done: e.done, pct: e.total ? Math.round((e.done / e.total) * 100) : 0 }))
+            .map(([unit, e]) => ({ unit, total: e.total, done: e.done, pct: e.total ? Math.round((e.done / e.total) * 100) : 0, people: e.people }))
             .sort((a, b) => b.pct - a.pct);
         unitCompletionPage = 1;
         paintUnitCompletionPage();
@@ -2532,6 +2601,46 @@
             `${entry.wrong} de ${entry.total} colaboradores erraram (${pct}%)`);
     }
 
+    // Modal de PROGRESSO por unidade — mesma estrutura do modal de pessoas,
+    // mas cada linha mostra a barra de % assistido em vez da nota (usado
+    // pelo clique nas barras de "Taxa de Conclusão por Unidade", mesmo
+    // visual da tabela "Faltam realizar").
+    // `people`: array de {fullName, unit, pct}.
+    function openProgressModal(title, subtitle, people, countLabel) {
+        if (!mistakeModal) return;
+        if (mistakeModalTitle) mistakeModalTitle.textContent = title;
+        if (mistakeModalSubtitle) mistakeModalSubtitle.textContent = subtitle || '';
+        if (mistakeModalBody) {
+            const byUnit = new Map();
+            people
+                .slice()
+                .sort((a, b) => b.pct - a.pct || a.fullName.localeCompare(b.fullName, 'pt-BR'))
+                .forEach(p => {
+                    const unit = p.unit || 'Sem unidade';
+                    if (!byUnit.has(unit)) byUnit.set(unit, []);
+                    byUnit.get(unit).push(p);
+                });
+            const units = Array.from(byUnit.entries()).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+            mistakeModalBody.innerHTML = (countLabel ? `<p class="dash-mistake-modal-count">${countLabel}</p>` : '') +
+                (units.length === 0 ? emptyStateHtml('fa-users', 'Nenhum colaborador encontrado.') :
+                units.map(([unit, unitPeople]) => `
+                    <div class="dash-mistake-unit-group">
+                        <h3><i class="fas fa-building"></i> ${escapeHtml(unit)} <span class="tab-count">${unitPeople.length}</span></h3>
+                        <ul class="dash-mistake-name-list">${unitPeople.map(p => `
+                            <li>
+                                <span class="row-name">${avatarHtml(p.fullName)} ${escapeHtml(p.fullName)}</span>
+                                <div class="missing-progress" title="${p.pct}% assistido">
+                                    <div class="missing-progress-bar"><span class="${progressToneClass(p.pct)}" style="width:${p.pct}%"></span></div>
+                                    <span class="missing-progress-pct">${p.pct}%</span>
+                                </div>
+                            </li>
+                        `).join('')}</ul>
+                    </div>
+                `).join(''));
+        }
+        mistakeModal.style.display = 'flex';
+    }
+
     mistakeModalClose?.addEventListener('click', closeMistakeModal);
     mistakeModal?.addEventListener('click', (event) => { if (event.target === mistakeModal) closeMistakeModal(); });
     document.addEventListener('keydown', (event) => {
@@ -2541,6 +2650,8 @@
     async function renderCourseDashboard(slug, courseKey) {
         const [subjectId, themeId] = courseKey.split('_');
         courseChartSlugCache = slug;
+        courseChartSubjectIdCache = subjectId;
+        courseChartThemeIdCache = themeId;
 
         const rows = await fetchCourseResults(slug, subjectId, themeId);
 
@@ -2564,7 +2675,9 @@
             const totalUsers = Object.keys(allUsers).length;
             realizou = rows.filter(r => r.userId).length;
             faltaram = Math.max(0, totalUsers - realizou);
-            courseChartAudienceCache = Object.keys(allColaboradores).map(id => ({ id, ...allColaboradores[id] })).filter(c => c.fullName);
+            courseChartAudienceCache = Object.keys(allColaboradores)
+                .map(id => ({ id, ...allColaboradores[id] }))
+                .filter(c => c.fullName && c.active !== false && c.inSheet !== false);
         }
         renderChart('courseCompletion', 'cfg-dash-course-completion-chart', {
             type: 'pie',
@@ -2581,7 +2694,7 @@
         courseChartYearChip.setYears(yearsFromRows(rows));
         renderCourseCharts(rows);
 
-        renderCourseHero(rows, theme);
+        renderCourseHero(rows, theme, realizou);
         updateTabCounts(rows);
     }
 
@@ -2675,7 +2788,7 @@
     // Resumo rápido no topo do modal: concluídos, pendentes, média, tempo
     // médio de prova, tempo médio de conclusão (do início ao aprovado) e o
     // prazo do curso (quando configurado) — panorama sem trocar de aba.
-    function renderCourseHero(rows, theme) {
+    function renderCourseHero(rows, theme, realizou) {
         if (!courseHeroStats) return;
         const scores = rows.map(r => Number(r.score) || 0);
         const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1).replace('.', ',') : '—';
@@ -2692,8 +2805,14 @@
             ? `${formatShortDate(deadline.startAt)} - ${formatShortDate(deadline.endAt)}`
             : null;
 
+        // "Concluídos" = pessoas únicas, não rows.length — rows.length conta
+        // cada tentativa, então quem se reavalia depois de já ter passado
+        // inflava o número além da quantidade real de gente (destoando do
+        // gráfico "Taxa de Conclusão do Curso", que já dedupa por pessoa).
+        const concluidos = realizou ?? new Set(rows.flatMap(r => personKeysOfRow(r))).size;
+
         courseHeroStats.innerHTML = `
-            <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${rows.length} ${rows.length === 1 ? 'concluído' : 'concluídos'}</span>
+            <span class="hero-stat is-ok"><i class="fas fa-circle-check"></i> ${concluidos} ${concluidos === 1 ? 'concluído' : 'concluídos'}</span>
             <span class="hero-stat is-warn"><i class="fas fa-hourglass-half"></i> ${pendentes} ${pendentes === 1 ? 'pendente' : 'pendentes'}</span>
             <span class="hero-stat"><i class="fas fa-star"></i> Média ${avg}</span>
             <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
@@ -2856,7 +2975,7 @@
     async function initDashboard() {
         if (!initialized) {
             initialized = true;
-            setDashMode('user');
+            setDashMode('course');
         }
         try {
             await loadBaseData();
