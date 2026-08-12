@@ -51,6 +51,30 @@
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
+    // Mesmo valor de formatHHMMSS, mas para preencher o <input> do formulário
+    // de edição — string vazia (não "—") quando não há valor.
+    function toHHMMSSInputValue(ms) {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        const totalSeconds = Math.round(n / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // Aceita "HH:MM:SS" e converte para milissegundos (activeMs). Vazio/
+    // inválido vira null, não 0 — evita gravar "00:00:00" para quem nunca
+    // teve essa métrica.
+    function parseHHMMSSValue(raw) {
+        const text = String(raw ?? '').trim();
+        if (!text) return null;
+        const match = text.match(/^(\d{1,3}):([0-5]?\d):([0-5]?\d)$/);
+        if (!match) return null;
+        const hours = Number(match[1]), minutes = Number(match[2]), seconds = Number(match[3]);
+        return ((hours * 3600) + (minutes * 60) + seconds) * 1000;
+    }
+
     const CATEGORY_LABELS = { treinamentos: 'Treinamentos', educacao_continuada: 'Educação Continuada', estagios: 'Estágios' };
 
     let allRows = [];
@@ -1232,6 +1256,8 @@
     const formRole = document.getElementById('cfg-history-form-role');
     const formDate = document.getElementById('cfg-history-form-date');
     const formScore = document.getElementById('cfg-history-form-score');
+    const formDuration = document.getElementById('cfg-history-form-duration');
+    const formConclusion = document.getElementById('cfg-history-form-conclusion');
     const formApproved = document.getElementById('cfg-history-form-approved');
     const formRating = document.getElementById('cfg-history-form-rating');
     // Prazo: gravado congelado no envio (deadlineStatus). Editável aqui porque
@@ -1313,6 +1339,8 @@
             formRole.value = '';
             formDate.value = toDateInputValue(null);
             formScore.value = '10';
+            formDuration.value = '';
+            formConclusion.value = '';
             formApproved.value = 'auto';
             formRating.value = '';
             if (formDeadline) formDeadline.value = 'livre';
@@ -1342,6 +1370,8 @@
             formRole.value = row.role || '';
             formDate.value = toDateInputValue(row.submittedAt);
             formScore.value = Number.isFinite(Number(row.score)) ? String(row.score) : '';
+            formDuration.value = Number.isFinite(Number(row.durationSeconds)) ? formatDuration(row.durationSeconds) : '';
+            formConclusion.value = toHHMMSSInputValue(row.activeMs);
             formApproved.value = row.approved ? '1' : '0';
             formRating.value = row.rating ? String(row.rating) : '';
             if (formDeadline) formDeadline.value = row.deadlineStatus || 'livre';
@@ -1390,6 +1420,14 @@
         if (!parsedDate || Number.isNaN(parsedDate.getTime())) { showWarning('Informe uma data/hora válida.'); return; }
         const submittedAt = parsedDate.getTime();
 
+        const durationText = formDuration.value.trim();
+        if (durationText && parseDurationValue(durationText) === null) { showWarning('Informe o tempo no formato MM:SS.'); return; }
+        const durationSeconds = durationText ? parseDurationValue(durationText) : null;
+
+        const conclusionText = formConclusion.value.trim();
+        if (conclusionText && parseHHMMSSValue(conclusionText) === null) { showWarning('Informe a conclusão no formato HH:MM:SS.'); return; }
+        const activeMs = conclusionText ? parseHHMMSSValue(conclusionText) : null;
+
         const approved = formApproved.value === 'auto' ? score >= 8 : formApproved.value === '1';
         const rating = formRating.value ? Number(formRating.value) : null;
         const deadlineStatus = formDeadline?.value || 'livre';
@@ -1413,6 +1451,8 @@
                     subject: course.subject,
                     theme: course.theme,
                     score, approved,
+                    durationSeconds,
+                    activeMs,
                     rating,
                     errorsText,
                     answers: buildAnswersFromErrorsText(errorsText, course.questions),
@@ -1446,7 +1486,7 @@
             } else {
                 const target = recordTarget(formRow);
                 if (!target) throw new Error('Registro não localizado no banco.');
-                const patch = { score, approved, rating, comment, submittedAt, deadlineStatus };
+                const patch = { score, approved, durationSeconds, activeMs, rating, comment, submittedAt, deadlineStatus };
                 if (target.kind === 'estagiosLivre') {
                     if (!name) { showWarning('Informe o nome.'); return; }
                     patch.name = name;
@@ -1455,6 +1495,12 @@
                 target.paths.forEach(path => {
                     Object.entries(patch).forEach(([field, value]) => { updates[`${path}/${field}`] = value; });
                 });
+                // "Conclusão" (activeMs) de linhas byUser não vem de results,
+                // e sim de progress/byUser (ver flatten) — sem isso a edição
+                // gravava em results e a tela continuava lendo o valor antigo.
+                if (target.kind === 'byUser') {
+                    updates[`/${dbRoot}/progress/byUser/${formRow.userId}/${formRow.slug}/${formRow.subjectId}/${formRow.themeId}/activeMs`] = activeMs;
+                }
                 await db.ref().update(updates);
                 showWarning('Registro atualizado com sucesso.');
             }
@@ -1635,6 +1681,7 @@
             <div class="history-detail-summary-item"><span class="label">Nota</span><span class="value">${formatScore(row.score)}/10</span></div>
             <div class="history-detail-summary-item"><span class="label">Situação</span><span class="value">${row.approved ? 'Aprovado' : 'Reprovado'}</span></div>
             <div class="history-detail-summary-item"><span class="label">Tempo</span><span class="value">${formatDuration(row.durationSeconds)}</span></div>
+            <div class="history-detail-summary-item"><span class="label">Conclusão</span><span class="value">${formatHHMMSS(row.activeMs)}</span></div>
             <div class="history-detail-summary-item"><span class="label">Data</span><span class="value">${dateLabel}</span></div>
             ${(row.deadlineStatus && row.deadlineStatus !== 'livre' && row.deadlineStatus !== 'on_time' && row.deadlineStatus !== 'not_started') ? `<div class="history-detail-summary-item"><span class="label">Prazo</span><span class="value">${escapeHtml(U.Deadlines?.STATUS_LABELS?.[row.deadlineStatus] || row.deadlineStatus)}</span></div>` : ''}
             ${row.unit ? `<div class="history-detail-summary-item"><span class="label">Unidade</span><span class="value">${escapeHtml(row.unit)}</span></div>` : ''}

@@ -937,7 +937,7 @@
                     </div>
                     <div class="panel-card">
                         <div class="panel-header">
-                            <h2><i class="fas fa-hourglass-half" style="color:var(--cfg-warning);margin-right:6px;"></i>Faltam realizar</h2>
+                            <h2><i class="fas fa-hourglass-half" style="color:var(--cfg-warning);margin-right:6px;"></i>Faltam concluir a avaliação</h2>
                             <div class="panel-header-actions">
                                 <div class="panel-search"><i class="fas fa-search"></i><input type="text" id="cfg-dash-course-missing-search" placeholder="Buscar nome..."></div>
                                 <button type="button" class="dash-copy-missing-btn" id="cfg-dash-course-copy-missing" title="Copiar lista de quem falta, por unidade">
@@ -1014,7 +1014,7 @@
                         </div>
                     </div>
                     <div class="dashboard-chart-row">
-                        <div class="panel-card dashboard-chart-card">
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
                             <div class="panel-header">
                                 <h2>Tempo para Conclusão da Avaliação</h2>
                                 <div class="panel-header-actions">
@@ -1035,7 +1035,7 @@
                                 <div class="dash-comments-pagination" id="cfg-dash-course-evaltime-pagination"></div>
                             </div>
                         </div>
-                        <div class="panel-card dashboard-chart-card">
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
                             <div class="panel-header">
                                 <h2>Tempo para Conclusão</h2>
                                 <div class="panel-header-actions">
@@ -1336,6 +1336,16 @@
                             <option value="closed">Encerrado</option>
                             <option value="forgiven">Atraso desconsiderado</option>
                         </select>
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-duration">Tempo (MM:SS)</label>
+                        <input type="text" id="cfg-history-form-duration" placeholder="Ex.: 04:56" pattern="\d{1,3}:\d{2}">
+                        <small class="history-form-lock"></small>
+                    </div>
+                    <div class="history-form-field">
+                        <label for="cfg-history-form-conclusion">Conclusão (HH:MM:SS)</label>
+                        <input type="text" id="cfg-history-form-conclusion" placeholder="Ex.: 01:40:49" pattern="\d{1,3}:\d{2}:\d{2}">
                         <small class="history-form-lock"></small>
                     </div>
                     <div class="history-form-field is-wide">

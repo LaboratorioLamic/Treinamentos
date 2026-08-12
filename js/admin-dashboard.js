@@ -157,6 +157,22 @@
         chartInstances[key] = new Chart(canvas, config);
     }
 
+    // Charts desenhados enquanto a aba deles ainda está display:none (ex.:
+    // abas "Gráficos" dos modais de curso/usuário, que não são a aba ativa
+    // por padrão) nascem medindo altura 0 e o Chart.js congela um layout
+    // achatado — as coordenadas internas (ex.: as usadas pelo
+    // stddevWhiskerPlugin pra desenhar a barra de erro) ficam fora de
+    // sincronia com o tamanho real que a barra passa a ter quando a aba
+    // fica visível. Chamado ao entrar na aba: resize() força o Chart.js a
+    // remedir o canvas agora visível e realinha tudo.
+    function resizeChartsIn(container) {
+        if (!container) return;
+        container.querySelectorAll('canvas').forEach(canvas => {
+            const instance = Object.values(chartInstances).find(c => c.canvas === canvas);
+            instance?.resize();
+        });
+    }
+
     // Tooltip padrão "valor (xx%)" para gráficos de pizza — % sobre o total
     // do dataset.
     function pieTooltipLabel(ctx) {
@@ -440,6 +456,9 @@
             userModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach(tab => {
                 tab.classList.toggle('active', tab.id === `cfg-dash-user-tab-${target}`);
             });
+            // Ver comentário de resizeChartsIn: aba "charts" some no
+            // primeiro paint, gráficos nascem achatados.
+            if (target === 'charts') resizeChartsIn(userModal);
         });
     });
     userModalClose?.addEventListener('click', closeUserModal);
@@ -1123,7 +1142,7 @@
         if (summaryEl) {
             const dateLabel = row.submittedAt ? new Date(row.submittedAt).toLocaleString('pt-BR') : '—';
             const activeMs = row.userId ? allProgress[row.userId]?.[row.slug]?.[row.subjectId]?.[row.themeId]?.activeMs : null;
-            const completionLabel = Number.isFinite(activeMs) && activeMs > 0 ? formatHHMM(activeMs) : '—';
+            const completionLabel = formatHHMMSS(activeMs);
             summaryEl.innerHTML = `
                 <div class="dash-review-summary-item">${scoreBadgeHtml(row.score)}<span>Nota da prova</span></div>
                 <div class="dash-review-summary-item">${starsHtml(row.rating)}<span>Avaliação do curso</span></div>
@@ -1217,6 +1236,7 @@
         const situationOk = !!r.approved;
         const { slug, subjectId, themeId } = conclusionsCourseIds;
         const canForgive = !situationOk && r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
+        const activeMs = r.userId ? allProgress[r.userId]?.[r.slug]?.[r.subjectId]?.[r.themeId]?.activeMs : null;
         return `<tr style="--row-i:${i}" class="is-clickable" data-row-i="${i}" title="Ver detalhes">
             <td>${dateLabel}</td>
             <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
@@ -1225,6 +1245,7 @@
             <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
             <td>${scoreBadgeHtml(r.score)}</td>
             <td>${formatDuration(r.durationSeconds)}</td>
+            <td>${formatHHMMSS(activeMs)}</td>
             <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
             <td>${canForgive ? `<button class="dash-forgive-btn" data-user-id="${escapeHtml(r.userId)}" data-slug="${slug}" data-subject-id="${subjectId}" data-theme-id="${themeId}">Desconsiderar atraso</button>` : ''}</td>
         </tr>`;
@@ -1247,7 +1268,7 @@
         }
 
         container.innerHTML = `<table class="is-sticky">
-            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Tempo</th><th>Situação</th><th></th></tr></thead>
+            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Tempo</th><th>Conclusão</th><th>Situação</th><th></th></tr></thead>
             <tbody>${filtered.map((r, i) => conclusionRowHtml(r, i)).join('')}</tbody>
         </table>`;
 
@@ -1735,6 +1756,18 @@
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
 
+    // HH:MM:SS a partir de ms — mesmo formato da coluna "Conclusão" do
+    // histórico (ver formatHHMMSS em admin-history.js), HH sem teto.
+    function formatHHMMSS(ms) {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n <= 0) return '—';
+        const totalSeconds = Math.round(n / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
     // Mesmo formato MM:SS da coluna "Tempo" do histórico (ver formatDuration),
     // mas a partir de ms — usado no gráfico "Tempo para Conclusão da
     // Avaliação", que mede duração de prova (curta, minutos), não dias.
@@ -1751,7 +1784,7 @@
     // "por unidade".
     // 5 (+ "Geral" fixo = 6 barras no canvas) — 7 deixava as barras achatadas
     // no card de altura fixa (260px).
-    const COMPLETION_TIME_PAGE_SIZE = 5;
+    const COMPLETION_TIME_PAGE_SIZE = 9;
     let completionTimePage = 1;
     let completionTimeDataCache = [];
 
@@ -1790,7 +1823,16 @@
                 datasets: [{
                     data: pageRows.map(r => r.avgMs),
                     backgroundColor: pageRows.map(r => r.isGeneral ? CHART_COLORS.muted : CHART_COLORS.accent),
-                    borderRadius: 4
+                    borderRadius: 4,
+                    // Sem isso o Chart.js reparte a altura toda entre poucas
+                    // barras mas deixa cada uma fina (categoryPercentage
+                    // baixo por padrão) — resultado "achatado" mesmo com
+                    // canvas alto. Sem maxBarThickness (o cap de 34px travava
+                    // a barra fina mesmo sobrando espaço) — deixa
+                    // barPercentage/categoryPercentage engordarem livre até
+                    // preencher o canvas, igual ao gráfico "Taxa de Conclusão
+                    // por Unidade" que nunca teve esse problema.
+                    barPercentage: 0.9, categoryPercentage: 0.85
                 }]
             },
             options: {
@@ -1799,8 +1841,8 @@
                     legend: { display: false },
                     tooltip: { callbacks: { label: (ctx) => {
                         const r = pageRows[ctx.dataIndex];
-                        const base = `Média: ${formatHHMM(r.avgMs)}`;
-                        return r.n > 1 ? `${base} (±${formatHHMM(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
+                        const base = `Média: ${formatHHMMSS(r.avgMs)}`;
+                        return r.n > 1 ? `${base} (±${formatHHMMSS(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
                     } } }
                 },
                 scales: { x: { ticks: { callback: (v) => formatHHMM(v) } } }
@@ -1808,19 +1850,34 @@
             plugins: [stddevWhiskerPlugin]
         });
         chartInstances.courseCompletionTime.$stddevs = [pageRows.map(r => r.stddevMs)];
-        chartInstances.courseCompletionTime.update('none');
 
-        if (!pager) return;
-        if (totalPages <= 1) { pager.innerHTML = ''; return; }
-        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${completionTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
-            `<span class="comments-page-info">Página ${completionTimePage} de ${totalPages}</span>` +
-            `<button type="button" class="comments-page-btn" data-page="next" ${completionTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
-        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                completionTimePage += btn.dataset.page === 'prev' ? -1 : 1;
-                paintCompletionTimePage();
-            });
-        });
+        // O pager é montado ANTES do resize() de propósito: ele fica no mesmo
+        // flex column do canvas, então injetá-lo encolhe o canvas. Se o
+        // Chart.js medisse antes disso, as coordenadas internas ficariam
+        // referentes ao canvas alto e a hitbox de hover/click sairia
+        // deslocada pra baixo (hover na última barra acusava a anterior).
+        if (pager) {
+            if (totalPages <= 1) {
+                pager.innerHTML = '';
+            } else {
+                pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${completionTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+                    `<span class="comments-page-info">Página ${completionTimePage} de ${totalPages}</span>` +
+                    `<button type="button" class="comments-page-btn" data-page="next" ${completionTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+                pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        completionTimePage += btn.dataset.page === 'prev' ? -1 : 1;
+                        paintCompletionTimePage();
+                    });
+                });
+            }
+        }
+
+        // resize() depois do pager e antes do update: o card ganhou altura
+        // maior (ver .dashboard-chart-card-tall) mas o Chart.js mede o canvas
+        // só na construção — sem isso a hitbox de hover/click das barras fica
+        // travada no tamanho antigo, descolada da barra desenhada visualmente.
+        chartInstances.courseCompletionTime.resize();
+        chartInstances.courseCompletionTime.update('none');
     }
 
     function renderCourseCompletionTimeChart(data) {
@@ -1921,7 +1978,7 @@
     // outros gráficos "por unidade".
     // 5 (+ "Geral" fixo = 6 barras no canvas) — 7 deixava as barras achatadas
     // no card de altura fixa (260px).
-    const EVALTIME_PAGE_SIZE = 5;
+    const EVALTIME_PAGE_SIZE = 9;
     let evalTimePage = 1;
     let evalTimeDataCache = [];
 
@@ -1957,7 +2014,9 @@
                 datasets: [{
                     data: pageRows.map(r => r.avgMs),
                     backgroundColor: pageRows.map(r => r.isGeneral ? CHART_COLORS.muted : CHART_COLORS.accent),
-                    borderRadius: 4
+                    borderRadius: 4,
+                    // Ver comentário equivalente em renderCourseCompletionTimeChart.
+                    barPercentage: 0.9, categoryPercentage: 0.85
                 }]
             },
             options: {
@@ -1975,19 +2034,27 @@
             plugins: [stddevWhiskerPlugin]
         });
         chartInstances.courseEvalTime.$stddevs = [pageRows.map(r => r.stddevMs)];
-        chartInstances.courseEvalTime.update('none');
 
-        if (!pager) return;
-        if (totalPages <= 1) { pager.innerHTML = ''; return; }
-        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${evalTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
-            `<span class="comments-page-info">Página ${evalTimePage} de ${totalPages}</span>` +
-            `<button type="button" class="comments-page-btn" data-page="next" ${evalTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
-        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                evalTimePage += btn.dataset.page === 'prev' ? -1 : 1;
-                paintEvalTimePage();
-            });
-        });
+        // Pager antes do resize — ver comentário equivalente em
+        // paintCompletionTimePage.
+        if (pager) {
+            if (totalPages <= 1) {
+                pager.innerHTML = '';
+            } else {
+                pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${evalTimePage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+                    `<span class="comments-page-info">Página ${evalTimePage} de ${totalPages}</span>` +
+                    `<button type="button" class="comments-page-btn" data-page="next" ${evalTimePage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+                pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        evalTimePage += btn.dataset.page === 'prev' ? -1 : 1;
+                        paintEvalTimePage();
+                    });
+                });
+            }
+        }
+
+        chartInstances.courseEvalTime.resize();
+        chartInstances.courseEvalTime.update('none');
     }
 
     function renderCourseEvalTimeChart(data) {
@@ -2416,7 +2483,7 @@
         // respondeu aquela questão específica, senão quem pulou/não chegou
         // nela infla a taxa de erro artificialmente.
         const totalPeople = new Set();
-        const stats = new Map(); // enunciado -> { number, question, wrongPeople: Map<personKey, {fullName, unit}> }
+        const stats = new Map(); // enunciado -> { number, question, options, correct, wrongPeople: Map<personKey, {fullName, unit, selected}> }
         rows.forEach(r => {
             const personKey = personKeysOfRow(r)[0];
             if (!personKey) return;
@@ -2424,14 +2491,21 @@
             (r.answers || []).forEach((a, index) => {
                 if (!a || !a.question) return;
                 const key = a.question;
-                const entry = stats.get(key) || { number: index + 1, question: a.question, wrongPeople: new Map() };
-                if (a.selected !== a.correct) entry.wrongPeople.set(personKey, { fullName: r.fullName || 'Sem nome', unit: r.unit || 'Sem unidade' });
+                const entry = stats.get(key) || {
+                    number: index + 1, question: a.question,
+                    options: Array.isArray(a.options) ? a.options : [], correct: a.correct,
+                    wrongPeople: new Map()
+                };
+                if (a.selected !== a.correct) entry.wrongPeople.set(personKey, { fullName: r.fullName || 'Sem nome', unit: r.unit || 'Sem unidade', selected: a.selected });
                 stats.set(key, entry);
             });
         });
 
         const ranked = Array.from(stats.values())
-            .map(e => ({ number: e.number, question: e.question, wrong: e.wrongPeople.size, total: totalPeople.size, wrongPeople: Array.from(e.wrongPeople.values()) }))
+            .map(e => ({
+                number: e.number, question: e.question, options: e.options, correct: e.correct,
+                wrong: e.wrongPeople.size, total: totalPeople.size, wrongPeople: Array.from(e.wrongPeople.values())
+            }))
             .filter(e => e.wrong > 0)
             .sort((a, b) => b.wrong - a.wrong)
             .slice(0, MISTAKES_TOP_N);
@@ -2595,10 +2669,75 @@
         mistakeModal.style.display = 'flex';
     }
 
+    // Letra da alternativa (0 -> a, 1 -> b, ...) usada no Gabarito e no balão
+    // ao lado do nome de quem errou (mostra qual alternativa a pessoa marcou).
+    function optionLetter(index) {
+        return String.fromCharCode(97 + index);
+    }
+
+    // Modal "Questão N": mostra o gabarito completo (todas as alternativas,
+    // correta destacada em verde) com uma barra de volume por alternativa —
+    // só contando quem ERROU (a base de dados só guarda quem errou cada
+    // questão, ver renderCourseMistakesChart; a alternativa correta nunca
+    // aparece na barra pois por definição ninguém que a marcou está em
+    // wrongPeople) — seguida da lista de colaboradores que erraram, por
+    // unidade, como já era.
     function openMistakeModal(entry) {
         const pct = entry.total > 0 ? Math.round((entry.wrong / entry.total) * 100) : 0;
-        openPeopleModal(`Questão ${entry.number}`, entry.question, entry.wrongPeople,
-            `${entry.wrong} de ${entry.total} colaboradores erraram (${pct}%)`);
+        if (!mistakeModal) return;
+        if (mistakeModalTitle) mistakeModalTitle.textContent = `Questão ${entry.number}`;
+        if (mistakeModalSubtitle) mistakeModalSubtitle.textContent = entry.question || '';
+
+        // Volume de erros por alternativa escolhida (índice -> contagem).
+        const countsByOption = new Map();
+        entry.wrongPeople.forEach(p => {
+            if (!Number.isFinite(p.selected)) return;
+            countsByOption.set(p.selected, (countsByOption.get(p.selected) || 0) + 1);
+        });
+        const maxCount = Math.max(1, ...countsByOption.values());
+
+        const answerKeyHtml = (entry.options || []).length === 0 ? '' : `
+            <div class="dash-mistake-answerkey">
+                <h3>Gabarito</h3>
+                ${entry.options.map((opt, i) => {
+                    const isCorrect = i === entry.correct;
+                    const count = countsByOption.get(i) || 0;
+                    const barPct = isCorrect ? 0 : Math.round((count / maxCount) * 100);
+                    return `
+                        <div class="dash-mistake-option ${isCorrect ? 'is-correct' : ''}">
+                            <div class="dash-mistake-option-row">
+                                <span class="dash-mistake-option-text">${isCorrect ? '<i class="fas fa-check-circle"></i> ' : ''}<b class="dash-mistake-option-letter">${optionLetter(i)}.</b> ${escapeHtml(opt)}</span>
+                                <span class="dash-mistake-option-count">${isCorrect ? 'Correta' : `${count} ${count === 1 ? 'pessoa' : 'pessoas'}`}</span>
+                            </div>
+                            ${isCorrect ? '' : `<div class="dash-mistake-option-bar"><span style="width:${count > 0 ? Math.max(barPct, 4) : 0}%"></span></div>`}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        if (mistakeModalBody) {
+            const byUnit = new Map();
+            entry.wrongPeople
+                .slice()
+                .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'))
+                .forEach(p => {
+                    const unit = p.unit || 'Sem unidade';
+                    if (!byUnit.has(unit)) byUnit.set(unit, []);
+                    byUnit.get(unit).push(p);
+                });
+            const units = Array.from(byUnit.entries()).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+            mistakeModalBody.innerHTML = answerKeyHtml +
+                `<p class="dash-mistake-modal-count">${entry.wrong} de ${entry.total} colaboradores erraram (${pct}%)</p>` +
+                (units.length === 0 ? emptyStateHtml('fa-users', 'Nenhum colaborador encontrado.') :
+                units.map(([unit, unitPeople]) => `
+                    <div class="dash-mistake-unit-group">
+                        <h3><i class="fas fa-building"></i> ${escapeHtml(unit)} <span class="tab-count">${unitPeople.length}</span></h3>
+                        <ul class="dash-mistake-name-list">${unitPeople.map(p => `<li><span class="row-name">${avatarHtml(p.fullName)} ${escapeHtml(p.fullName)}</span>${Number.isFinite(p.selected) ? `<span class="dash-mistake-option-chip">${optionLetter(p.selected)}</span>` : ''}</li>`).join('')}</ul>
+                    </div>
+                `).join(''));
+        }
+        mistakeModal.style.display = 'flex';
     }
 
     // Modal de PROGRESSO por unidade — mesma estrutura do modal de pessoas,
@@ -2797,7 +2936,7 @@
 
         const completionTimes = buildCompletionTimeData(rows, courseChartSlugCache);
         const avgCompletionLabel = completionTimes.length
-            ? formatHHMM(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
+            ? formatHHMMSS(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
             : '—';
 
         const deadline = theme?.deadline;
@@ -2874,6 +3013,16 @@
             courseModal.querySelectorAll('.dash-course-modal-body .tab-content').forEach(tab => {
                 tab.classList.toggle('active', tab.id === `cfg-dash-course-tab-${target}`);
             });
+            // Os gráficos da aba "Gráficos" (incl. "Tempo para Conclusão" e
+            // "...da Avaliação") são desenhados enquanto essa aba ainda está
+            // display:none (tab não ativa por padrão) — o Chart.js mede
+            // altura 0 nesse momento e congela um layout achatado, cujas
+            // coordenadas internas (usadas pelo stddevWhiskerPlugin pra
+            // posicionar a barra de erro) ficam fora de sincronia com o que
+            // a barra aparenta ocupar depois que a aba fica visível. Forçar
+            // resize() ao entrar na aba corrige a medida real e realinha o
+            // whisker com a barra.
+            if (target === 'charts') resizeChartsIn(courseModal);
         });
     });
 
