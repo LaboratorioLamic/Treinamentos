@@ -221,6 +221,96 @@
             flushActiveCourseTimer();
         }, ACTIVE_TIMER_AUTOSAVE_MS);
 
+        // ─── Painel "Tempo mínimo projetado" (sidebar do curso) ───
+        // Espelha o contador de tempo ativo: barra de progresso contra o
+        // expectedCompletionMs do curso e cronômetro que segue correndo mesmo
+        // depois de 100% (o objetivo é registrar dedicação real, não parar no
+        // alvo). Só aparece em curso com tempo esperado configurado.
+        const expectedTimeCard = document.getElementById('expected-time-card');
+        const expectedTimeTargetEl = document.getElementById('expected-time-target');
+        const expectedTimeElapsedEl = document.getElementById('expected-time-elapsed');
+        const expectedTimePctEl = document.getElementById('expected-time-pct');
+        const expectedTimeFillEl = document.getElementById('expected-time-fill');
+        const expectedTimeNoteEl = document.getElementById('expected-time-note');
+        let expectedTimeTicker = null;
+
+        function formatElapsedHHMMSS(ms) {
+            const totalSeconds = Math.max(0, Math.floor(Number(ms) / 1000));
+            const pad = v => String(v).padStart(2, '0');
+            return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`;
+        }
+
+        // Tempo total do curso agora: o que já foi gravado na nuvem mais a
+        // sessão em andamento (que ainda não foi somada ao acumulado).
+        function currentActiveMsOf(subjectId, themeId) {
+            const stored = remoteProgressActiveMs[subjectId]?.[themeId] || 0;
+            const isRunning = activeCourseTimer.subjectId === subjectId
+                && activeCourseTimer.themeId === themeId
+                && activeCourseTimer.sessionStartedAt;
+            return isRunning ? stored + (Date.now() - activeCourseTimer.sessionStartedAt) : stored;
+        }
+
+        function expectedMsOfCourse(subjectId, themeId) {
+            const ms = Number(trainingData[subjectId]?.themes?.[themeId]?.expectedCompletionMs);
+            return Number.isFinite(ms) && ms > 0 ? ms : null;
+        }
+
+        function paintExpectedTimePanel() {
+            if (!expectedTimeCard) return;
+            const subjectId = currentTrainingId;
+            const themeId = currentThemeId;
+            const expectedMs = (subjectId && themeId != null) ? expectedMsOfCourse(subjectId, themeId) : null;
+            if (!expectedMs) { expectedTimeCard.style.display = 'none'; return; }
+
+            expectedTimeCard.style.display = '';
+            const elapsedMs = currentActiveMsOf(subjectId, themeId);
+            const rawPct = (elapsedMs / expectedMs) * 100;
+            const isComplete = rawPct >= 100;
+
+            expectedTimeTargetEl.textContent = `Meta ${formatElapsedHHMMSS(expectedMs)}`;
+            expectedTimeElapsedEl.textContent = formatElapsedHHMMSS(elapsedMs);
+            // O texto passa de 100% (mostra a dedicação real), mas a barra
+            // satura em 100% para não transbordar do trilho.
+            expectedTimePctEl.textContent = `${Math.floor(rawPct)}%`;
+            expectedTimeFillEl.style.width = `${Math.min(100, rawPct)}%`;
+            expectedTimeCard.classList.toggle('is-complete', isComplete);
+
+            const finished = isCourseTimerFinished(subjectId, themeId);
+            const running = !!activeCourseTimer.sessionStartedAt
+                && activeCourseTimer.subjectId === subjectId
+                && activeCourseTimer.themeId === themeId;
+            expectedTimeCard.classList.toggle('is-paused', !running);
+
+            if (finished) {
+                expectedTimeNoteEl.textContent = 'Curso concluído — contagem encerrada.';
+            } else if (!running) {
+                expectedTimeNoteEl.textContent = 'Pausado — a contagem volta ao retomar o curso.';
+            } else if (isComplete) {
+                expectedTimeNoteEl.textContent = 'Tempo projetado atingido — a contagem continua.';
+            } else {
+                expectedTimeNoteEl.textContent = 'Contando enquanto o curso está aberto.';
+            }
+        }
+
+        // Tick de 1s só para a interface — o valor real vem sempre de
+        // timestamps (currentActiveMsOf), então um tick perdido com a aba em
+        // segundo plano não desalinha a contagem.
+        function startExpectedTimeTicker() {
+            if (expectedTimeTicker) return;
+            expectedTimeTicker = setInterval(paintExpectedTimePanel, 1000);
+        }
+
+        function stopExpectedTimeTicker() {
+            if (!expectedTimeTicker) return;
+            clearInterval(expectedTimeTicker);
+            expectedTimeTicker = null;
+        }
+
+        function hideExpectedTimePanel() {
+            stopExpectedTimeTicker();
+            if (expectedTimeCard) expectedTimeCard.style.display = 'none';
+        }
+
         // Fecha a sessão corrente (se houver) somando o tempo decorrido ao
         // acumulado em nuvem e sincronizando. Chamado ao trocar de curso, sair
         // para a galeria, esconder a aba ou aprovar na avaliação. `forget`
@@ -230,16 +320,19 @@
         function pauseActiveCourseTimer(forget = false) {
             const { subjectId, themeId, sessionStartedAt } = activeCourseTimer;
             if (forget) { activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null }; }
-            if (!subjectId || !themeId || !sessionStartedAt) return;
+            if (!subjectId || !themeId || !sessionStartedAt) { paintExpectedTimePanel(); return; }
             const elapsed = Date.now() - sessionStartedAt;
             if (!forget) activeCourseTimer.sessionStartedAt = null;
-            if (elapsed <= 0) return;
+            if (elapsed <= 0) { paintExpectedTimePanel(); return; }
             if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
             remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
             // Args explícitos: currentTrainingId/currentThemeId podem já
             // apontar para outro curso neste momento (ex.: loadTraining seta
             // o novo curso antes de pausar o anterior via resumeActiveCourseTimer).
             syncCourseProgressToCloud(subjectId, themeId);
+            // Repinta já com o acumulado atualizado — o cronômetro precisa
+            // congelar no valor certo ao pausar, sem esperar o próximo tick.
+            paintExpectedTimePanel();
         }
 
         // Abre (ou retoma) a sessão do curso informado — chamado sempre que um
@@ -249,8 +342,9 @@
         function resumeActiveCourseTimer(subjectId, themeId) {
             if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId && activeCourseTimer.sessionStartedAt) return;
             pauseActiveCourseTimer();
-            if (isCourseTimerFinished(subjectId, themeId)) return;
+            if (isCourseTimerFinished(subjectId, themeId)) { paintExpectedTimePanel(); return; }
             activeCourseTimer = { subjectId, themeId, sessionStartedAt: Date.now() };
+            paintExpectedTimePanel();
         }
 
         // Curso já aprovado (nesta sessão ou em qualquer uma anterior, via
@@ -271,6 +365,9 @@
                 // ao restaurar a aba reabriria a sessão do curso recém-aprovado.
                 pauseActiveCourseTimer(true);
             }
+            // Congela o painel no total final, com a nota de encerrado.
+            stopExpectedTimeTicker();
+            paintExpectedTimePanel();
         }
 
         document.addEventListener('visibilitychange', () => {
@@ -278,6 +375,7 @@
             else if (activeCourseTimer.subjectId && activeCourseTimer.themeId && !activeCourseTimer.sessionStartedAt) {
                 resumeActiveCourseTimer(activeCourseTimer.subjectId, activeCourseTimer.themeId);
             }
+            paintExpectedTimePanel();
         });
         // Saída da página: tenta o sendBeacon primeiro (única forma de a
         // gravação sobreviver ao fechamento da aba). Se ele não estiver
@@ -451,6 +549,10 @@
                     localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
                     if (currentTrainingId && courseGallery.style.display === 'block') showCourseGallery(currentTrainingId);
                 }
+                // O acumulado da nuvem chega depois da abertura do curso —
+                // repinta para o cronômetro sair de 00:00:00 e mostrar o
+                // tempo real já dedicado.
+                paintExpectedTimePanel();
             }).catch(error => console.error('Erro ao carregar progressão da nuvem:', error));
         }
 
@@ -910,6 +1012,7 @@
 
         function showCourseGallery(subjectId) {
             pauseActiveCourseTimer(true);
+            hideExpectedTimePanel();
             currentTrainingId = subjectId;
             currentThemeId = null;
             courseGrid.innerHTML = '';
@@ -1119,6 +1222,10 @@
             // de conteúdo — curso ainda sem módulos cadastrados também conta o
             // tempo em que ficou aberto na tela.
             resumeActiveCourseTimer(subjectId, themeId);
+            // Painel de tempo projetado acompanha o curso aberto (some sozinho
+            // se este não tiver expectedCompletionMs configurado).
+            startExpectedTimeTicker();
+            paintExpectedTimePanel();
             if (!theme.modules || theme.modules.length === 0) return;
 
             document.getElementById('welcome-screen').style.display = 'none';

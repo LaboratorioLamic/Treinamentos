@@ -301,6 +301,29 @@
                 </div>
 
                 <!-- Sidebar column -->
+                <div class="sidebar-column">
+                <!-- Tempo mínimo projetado: só aparece em cursos com
+                     expectedCompletionMs configurado (Config > Cursos). O
+                     cronômetro reflete o mesmo contador de tempo ativo gravado
+                     em progress/byUser (ver activeCourseTimer em js/main.js) e
+                     continua correndo depois dos 100%. -->
+                <div class="expected-time-card" id="expected-time-card" style="display:none;">
+                    <div class="expected-time-head">
+                        <span class="expected-time-title">
+                            <i class="fas fa-gauge-high"></i> Tempo mínimo projetado
+                        </span>
+                        <span class="expected-time-target" id="expected-time-target">—</span>
+                    </div>
+                    <div class="expected-time-clock">
+                        <span class="expected-time-elapsed" id="expected-time-elapsed">00:00:00</span>
+                        <span class="expected-time-pct" id="expected-time-pct">0%</span>
+                    </div>
+                    <div class="expected-time-track">
+                        <div class="expected-time-fill" id="expected-time-fill"></div>
+                    </div>
+                    <p class="expected-time-note" id="expected-time-note">Contando enquanto o curso está aberto.</p>
+                </div>
+
                 <div class="sidebar-card">
                     <div class="sidebar-header">
                         <h3>Conteúdo do Curso</h3>
@@ -314,6 +337,7 @@
                             </div>
                         </div>
                     </div>
+                </div>
                 </div>
 
             </div>
