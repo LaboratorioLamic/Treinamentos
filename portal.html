@@ -1594,6 +1594,42 @@
                         <small class="form-hint" id="cfg-theme-deadline-error" style="display:none;color:var(--danger);"></small>
                     </div>
                 </div>
+                <!-- Tempo de conclusão esperado: quanto tempo ATIVO no curso se
+                     espera até a aprovação. Vira chip no resumo do dashboard e
+                     linha de referência no gráfico "Tempo para Conclusão". -->
+                <div class="form-group">
+                    <label class="form-label" id="cfg-theme-expected-time-label">Tempo de conclusão esperado <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
+                    <!-- Campo de duração em partes (h/min/s) em vez de um
+                         type="time": o nativo trava em 23:59 e um curso pode
+                         esperar mais de 24h de dedicação. -->
+                    <div class="duration-input" role="group" aria-labelledby="cfg-theme-expected-time-label">
+                        <div class="duration-input-part">
+                            <input class="form-control" type="number" id="cfg-theme-expected-hours"
+                                   min="0" max="999" step="1" placeholder="00" inputmode="numeric"
+                                   autocomplete="off" aria-label="Horas">
+                            <span class="duration-input-unit">h</span>
+                        </div>
+                        <span class="duration-input-sep">:</span>
+                        <div class="duration-input-part">
+                            <input class="form-control" type="number" id="cfg-theme-expected-minutes"
+                                   min="0" max="59" step="1" placeholder="00" inputmode="numeric"
+                                   autocomplete="off" aria-label="Minutos">
+                            <span class="duration-input-unit">min</span>
+                        </div>
+                        <span class="duration-input-sep">:</span>
+                        <div class="duration-input-part">
+                            <input class="form-control" type="number" id="cfg-theme-expected-seconds"
+                                   min="0" max="59" step="1" placeholder="00" inputmode="numeric"
+                                   autocomplete="off" aria-label="Segundos">
+                            <span class="duration-input-unit">s</span>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" id="cfg-theme-expected-clear">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                    </div>
+                    <small class="form-hint" id="cfg-theme-expected-time-hint">Tempo esperado de dedicação ao curso até a aprovação. Deixe vazio para não definir.</small>
+                    <small class="form-hint" id="cfg-theme-expected-time-error" style="display:none;color:var(--danger);"></small>
+                </div>
                 <!-- Funções (cargos) que enxergam o curso. Vazio = todas.
                      A lista vem dos cargos das contas cadastradas. -->
                 <div class="form-group">

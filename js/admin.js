@@ -598,6 +598,71 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             return { mode: 'prazo', startAt, endAt, closeAt };
         }
 
+        // ─── Tempo de conclusão esperado (HH:MM:SS) ───
+        // Guardado em ms (expectedCompletionMs) para bater direto com o
+        // activeMs de progress/byUser usado pelo gráfico "Tempo para
+        // Conclusão" do dashboard. HH sem teto (curso de 100h é válido).
+        // Campo de duração em três partes (horas/minutos/segundos) — o
+        // type="time" nativo não serve porque trava em 23:59.
+        const expectedHoursInput = document.getElementById('cfg-theme-expected-hours');
+        const expectedMinutesInput = document.getElementById('cfg-theme-expected-minutes');
+        const expectedSecondsInput = document.getElementById('cfg-theme-expected-seconds');
+        const expectedClearBtn = document.getElementById('cfg-theme-expected-clear');
+        const expectedTimeErrorEl = document.getElementById('cfg-theme-expected-time-error');
+        const expectedTimeInputs = [expectedHoursInput, expectedMinutesInput, expectedSecondsInput];
+
+        function clearExpectedTimeFields() {
+            expectedTimeInputs.forEach(input => { input.value = ''; });
+            expectedTimeErrorEl.style.display = 'none';
+        }
+
+        // ms → preenche os três campos. 0/vazio deixa tudo em branco (curso
+        // sem tempo esperado), em vez de mostrar um "00:00:00" que parece
+        // configurado.
+        function loadExpectedTimeFields(ms) {
+            const n = Number(ms);
+            if (!Number.isFinite(n) || n <= 0) { clearExpectedTimeFields(); return; }
+            const totalSeconds = Math.round(n / 1000);
+            expectedHoursInput.value = String(Math.floor(totalSeconds / 3600));
+            expectedMinutesInput.value = String(Math.floor((totalSeconds % 3600) / 60));
+            expectedSecondsInput.value = String(totalSeconds % 60);
+            expectedTimeErrorEl.style.display = 'none';
+        }
+
+        // Lê os três campos e devolve ms. Tudo vazio = sem tempo esperado
+        // (null). Lança erro de validação exibido no próprio card.
+        function buildExpectedTimeFromForm() {
+            const raw = expectedTimeInputs.map(input => input.value.trim());
+            if (raw.every(value => value === '')) return null;
+
+            const [hours, minutes, seconds] = raw.map(value => (value === '' ? 0 : Number(value)));
+            if ([hours, minutes, seconds].some(v => !Number.isInteger(v) || v < 0)) {
+                throw new Error('Informe apenas números inteiros positivos.');
+            }
+            if (minutes > 59 || seconds > 59) {
+                throw new Error('Minutos e segundos devem ser menores que 60.');
+            }
+            const ms = ((hours * 3600) + (minutes * 60) + seconds) * 1000;
+            if (ms <= 0) throw new Error('O tempo esperado deve ser maior que zero.');
+            return ms;
+        }
+
+        expectedTimeInputs.forEach(input => {
+            input.addEventListener('input', () => { expectedTimeErrorEl.style.display = 'none'; });
+            // Digitar "90" em minutos vira 1h30 ao sair do campo, em vez de
+            // barrar o admin com erro de validação por algo que dá pra
+            // normalizar sozinho.
+            input.addEventListener('blur', () => {
+                if (expectedTimeInputs.every(el => el.value.trim() === '')) return;
+                const total = (Number(expectedHoursInput.value || 0) * 3600)
+                    + (Number(expectedMinutesInput.value || 0) * 60)
+                    + Number(expectedSecondsInput.value || 0);
+                if (!Number.isFinite(total) || total <= 0) return;
+                loadExpectedTimeFields(total * 1000);
+            });
+        });
+        expectedClearBtn?.addEventListener('click', clearExpectedTimeFields);
+
         // ─── Funções (cargos) que enxergam o assunto ───
         // Lista vinda dos cargos de /colaboradores (planilha, mesma fonte da
         // aba Colaboradores) somada aos das contas (/users). Seleção vazia =
@@ -909,6 +974,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             renderThemeImagePreview(null, 'Sem imagem — o card mostra as iniciais.');
             setThemeActive(true);
             resetDeadlineFields();
+            clearExpectedTimeFields();
             resetRolesConfig();
             resetCertConfig();
             themeDeleteBtn.style.display = 'none';
@@ -1021,6 +1087,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     );
                     setThemeActive(editing.active !== false);
                     loadDeadlineFields(editing.deadline);
+                    loadExpectedTimeFields(editing.expectedCompletionMs);
                     loadRolesConfig(editing);
                     loadCertConfig(editing);
                     themeDeleteBtn.style.display = 'flex';
@@ -1159,6 +1226,16 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 return;
             }
 
+            let expectedCompletionMs;
+            try {
+                expectedCompletionMs = buildExpectedTimeFromForm();
+            } catch (error) {
+                expectedTimeErrorEl.textContent = error.message;
+                expectedTimeErrorEl.style.display = 'block';
+                expectedHoursInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
             showSpinner('cfg-theme-loading', true);
             const id = currentThemeId || getNextId(data.trainingData[subjectId].themes);
             const isNew = !currentThemeId;
@@ -1179,6 +1256,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 ...(description && { description }),
                 ...(image && { image, imageVersion }),
                 ...(deadline && { deadline }),
+                ...(expectedCompletionMs && { expectedCompletionMs }),
                 // Sem funções escolhidas o campo nem é gravado — assunto sem
                 // `roles` é visível para todos (comportamento dos já existentes).
                 ...(selectedRoles.size > 0 && { roles: [...selectedRoles] }),

@@ -292,6 +292,29 @@
         }
         #cfg-root .deadline-fields .form-group:last-of-type { margin-bottom: 0; }
 
+        /* === CAMPO DE DURAÇÃO (h : min : s) === */
+        /* Usado no "Tempo de conclusão esperado" do curso. Três campos
+           numéricos em vez de um type="time", que trava em 23:59. */
+        #cfg-root .duration-input { display: flex; align-items: center; gap: 6px; }
+        #cfg-root .duration-input-part { position: relative; flex: 1; min-width: 0; }
+        /* Espaço à direita reservado para o sufixo (h/min/s) sobreposto. */
+        #cfg-root .duration-input-part .form-control { padding-right: 34px; text-align: center; }
+        #cfg-root .duration-input-unit {
+            position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+            font-size: 11px; font-weight: 600; color: var(--text-3); pointer-events: none;
+        }
+        #cfg-root .duration-input-sep {
+            font-size: 14px; font-weight: 700; color: var(--text-3); user-select: none;
+        }
+        /* As setas de incremento roubam a largura útil de um campo estreito e
+           não ajudam a digitar uma duração — o teclado numérico basta. */
+        #cfg-root .duration-input input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+        #cfg-root .duration-input input[type="number"]::-webkit-outer-spin-button,
+        #cfg-root .duration-input input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+        #cfg-root .duration-input .btn { flex: none; white-space: nowrap; }
+
         #cfg-root .deadline-badge {
             display: inline-block; padding: 2px 8px; border-radius: 999px;
             font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;

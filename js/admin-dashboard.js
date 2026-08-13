@@ -1531,6 +1531,15 @@
     let courseChartSlugCache = null;
     let courseChartSubjectIdCache = null;
     let courseChartThemeIdCache = null;
+    // Tempo de conclusão esperado do curso aberto (ms), gravado no assunto
+    // como `expectedCompletionMs`. Vira a linha vermelha de referência no
+    // gráfico "Tempo para Conclusão". null = curso sem tempo esperado.
+    let courseChartExpectedMsCache = null;
+
+    function expectedCompletionMsOf(theme) {
+        const ms = Number(theme?.expectedCompletionMs);
+        return Number.isFinite(ms) && ms > 0 ? ms : null;
+    }
     const courseChartYearChip = createYearFilterChip('cfg-dash-course-year-chip', 'cfg-dash-course-year-list', () => renderCourseCharts(courseChartRowsCache));
 
     // Popover de seleção múltipla (checkbox) — mesmo visual do chip de ano,
@@ -1839,17 +1848,47 @@
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: (ctx) => {
-                        const r = pageRows[ctx.dataIndex];
-                        const base = `Média: ${formatHHMMSS(r.avgMs)}`;
-                        return r.n > 1 ? `${base} (±${formatHHMMSS(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
-                    } } }
+                    tooltip: { callbacks: {
+                        label: (ctx) => {
+                            const r = pageRows[ctx.dataIndex];
+                            const base = `Média: ${formatHHMMSS(r.avgMs)}`;
+                            return r.n > 1 ? `${base} (±${formatHHMMSS(r.stddevMs)}, ${r.n} pessoas)` : `${base} (1 pessoa)`;
+                        },
+                        // Linha extra comparando o tempo real com o esperado
+                        // configurado no curso. Só aparece quando há tempo
+                        // esperado definido (mesma condição da linha vermelha).
+                        afterBody: (items) => {
+                            const expectedMs = courseChartExpectedMsCache;
+                            if (!expectedMs) return [];
+                            const r = pageRows[items[0]?.dataIndex];
+                            if (!r) return [];
+                            const pct = Math.round((r.avgMs / expectedMs) * 100);
+                            const delta = r.avgMs - expectedMs;
+                            // >100% = levou MAIS tempo que o previsto.
+                            const situation = delta > 0
+                                ? `${formatHHMMSS(delta)} acima do esperado`
+                                : `${formatHHMMSS(Math.abs(delta))} abaixo do esperado`;
+                            return [
+                                `${pct}% do tempo esperado (${formatHHMMSS(expectedMs)})`,
+                                delta === 0 ? 'exatamente no tempo esperado' : situation
+                            ];
+                        }
+                    } }
                 },
-                scales: { x: { ticks: { callback: (v) => formatHHMM(v) } } }
+                scales: {
+                    x: {
+                        ticks: { callback: (v) => formatHHMM(v) },
+                        // Garante que a linha do tempo esperado caiba no eixo
+                        // mesmo quando todo mundo terminou bem antes dela —
+                        // senão a referência ficaria fora da área desenhada.
+                        ...(courseChartExpectedMsCache && { suggestedMax: courseChartExpectedMsCache * 1.05 })
+                    }
+                }
             },
-            plugins: [stddevWhiskerPlugin]
+            plugins: [stddevWhiskerPlugin, expectedTimeLinePlugin]
         });
         chartInstances.courseCompletionTime.$stddevs = [pageRows.map(r => r.stddevMs)];
+        chartInstances.courseCompletionTime.$expectedMs = courseChartExpectedMsCache;
 
         // O pager é montado ANTES do resize() de propósito: ele fica no mesmo
         // flex column do canvas, então injetá-lo encolhe o canvas. Se o
@@ -1958,6 +1997,46 @@
                     ctx.restore();
                 });
             });
+        }
+    };
+
+    // Linha vertical vermelha no "Tempo para Conclusão", marcando o tempo de
+    // conclusão esperado do curso (`expectedCompletionMs` do assunto): barra
+    // que passa dela levou mais tempo que o previsto. Desenhada depois das
+    // barras (afterDatasetsDraw) pra ficar por cima, com o valor escrito no
+    // topo. `chart.$expectedMs` é setado por quem monta o gráfico.
+    const expectedTimeLinePlugin = {
+        id: 'expectedTimeLine',
+        afterDatasetsDraw(chart) {
+            const expectedMs = chart.$expectedMs;
+            if (!Number.isFinite(expectedMs) || expectedMs <= 0) return;
+            const { ctx, chartArea, scales: { x: xScale } } = chart;
+            if (!chartArea) return;
+            const x = xScale.getPixelForValue(expectedMs);
+            // Fora da área desenhada (tempo esperado além do maior valor do
+            // eixo, mesmo com o suggestedMax) — não desenha nada solto.
+            if (x < chartArea.left || x > chartArea.right) return;
+
+            ctx.save();
+            ctx.strokeStyle = CHART_COLORS.danger;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Rótulo encostado na linha; vira para a esquerda quando a linha
+            // está perto da borda direita, pra não sair do canvas.
+            const label = `Esperado ${formatHHMMSS(expectedMs)}`;
+            ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+            ctx.fillStyle = CHART_COLORS.danger;
+            ctx.textBaseline = 'top';
+            const flip = x + ctx.measureText(label).width + 8 > chartArea.right;
+            ctx.textAlign = flip ? 'right' : 'left';
+            ctx.fillText(label, flip ? x - 4 : x + 4, chartArea.top + 2);
+            ctx.restore();
         }
     };
 
@@ -2800,6 +2879,7 @@
         // quando boa parte das conclusões vem de colaboradores sem conta
         // própria (estágio livre, importados).
         const theme = allTrainingData[slug]?.[subjectId]?.themes?.[themeId];
+        courseChartExpectedMsCache = expectedCompletionMsOf(theme);
         let realizou, faltaram;
         if (theme && !AUDIENCE_EXEMPT_SLUGS.includes(slug)) {
             const doneKeys = new Set();
@@ -2939,6 +3019,10 @@
             ? formatHHMMSS(completionTimes.reduce((sum, d) => sum + d.durationMs, 0) / completionTimes.length)
             : '—';
 
+        // Tempo de conclusão esperado configurado no curso (Config > Cursos >
+        // Editar Curso). Chip só aparece quando definido.
+        const expectedMs = expectedCompletionMsOf(theme);
+
         const deadline = theme?.deadline;
         const deadlineLabel = deadline?.mode === 'prazo' && (deadline.startAt || deadline.endAt)
             ? `${formatShortDate(deadline.startAt)} - ${formatShortDate(deadline.endAt)}`
@@ -2957,6 +3041,7 @@
             <span class="hero-stat"><i class="fas fa-clock"></i> Tempo médio de prova ${durationLabel}</span>
             <span class="hero-stat"><i class="fas fa-hourglass-end"></i> Tempo médio de conclusão ${avgCompletionLabel}</span>
             ${deadlineLabel ? `<span class="hero-stat"><i class="fas fa-calendar-days"></i> Prazo: ${deadlineLabel}</span>` : ''}
+            ${expectedMs ? `<span class="hero-stat"><i class="fas fa-stopwatch"></i> Tempo esperado: ${formatHHMMSS(expectedMs)}</span>` : ''}
         `;
     }
 

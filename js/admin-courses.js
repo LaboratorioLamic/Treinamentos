@@ -71,6 +71,14 @@ function themeInitials(name) {
     return clean ? clean.slice(0, 2).toUpperCase() : '?';
 }
 
+// ms → HH:MM:SS (HH sem teto), mesmo formato usado no formulário de assunto
+// e no chip "Tempo esperado" do dashboard.
+function formatMsAsHHMMSS(ms) {
+    const totalSeconds = Math.round(Number(ms) / 1000);
+    const pad = v => String(v).padStart(2, '0');
+    return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`;
+}
+
 function validKeys(collection) {
     if (!collection || typeof collection !== 'object') return [];
     return Object.keys(collection).filter(key => collection[key] && typeof collection[key] === 'object');
@@ -301,6 +309,13 @@ function renderCourseInfo(subjectId, themeId, theme) {
         <div class="course-info-subrow"><span>Encerramento</span><strong>${fmtDate(theme.deadline.closeAt)}</strong></div>`
         : '';
 
+    // Tempo de conclusão esperado (ms → HH:MM:SS). Independe do prazo: vale
+    // também para curso em modo "Livre".
+    const expectedMs = Number(theme.expectedCompletionMs);
+    const expectedRow = Number.isFinite(expectedMs) && expectedMs > 0
+        ? `<div class="course-info-subrow"><span>Tempo esperado</span><strong>${formatMsAsHHMMSS(expectedMs)}</strong></div>`
+        : '';
+
     // Funções com acesso
     const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
     const rolesHtml = roles.length
@@ -337,6 +352,7 @@ function renderCourseInfo(subjectId, themeId, theme) {
                 <span class="deadline-badge deadline-${deadlineStatus}">${deadlineLabel}</span>
             </div>
             ${deadlineRows}
+            ${expectedRow}
         </div>
 
         <div class="course-info-card">

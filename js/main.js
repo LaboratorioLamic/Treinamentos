@@ -85,9 +85,15 @@
             }).sort((a, b) => a.order - b.order);
         }
 
+        // Endpoint REST do Realtime Database — usado no carregamento dos cursos
+        // e na gravação de saída da página via sendBeacon (flushProgressBeacon),
+        // que não pode passar pelo SDK. Os caminhos montados por
+        // progressPathFor já começam com "/", então a base não leva barra final.
+        const PROGRESS_REST_BASE = 'https://uniadmin-708f5-default-rtdb.firebaseio.com';
+
         async function fetchFirebaseData() {
             try {
-                const response = await fetch(`https://uniadmin-708f5-default-rtdb.firebaseio.com/uniadmin/${currentCategorySlug}.json`);
+                const response = await fetch(`${PROGRESS_REST_BASE}/uniadmin/${currentCategorySlug}.json`);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 // Categoria ainda sem conteudo no banco: o Firebase devolve null.
                 const data = (await response.json()) || {};
@@ -178,6 +184,43 @@
         // perder tempo em caso de recarregar a página no meio de uma sessão.
         let activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null };
 
+        // Cursos já aprovados nesta carga da página — o contador não volta a
+        // rodar neles (aluno pode reabrir só para revisar). Só isso trava a
+        // recontagem: antes ela dependia de reler assessmentResults com a nota
+        // de corte 8 repetida aqui, que saía de sincronia com a regra real da
+        // avaliação se o corte mudasse.
+        const finishedCourseTimers = new Set();
+        const courseTimerKey = (subjectId, themeId) => `${subjectId}_${themeId}`;
+
+        // Nota mínima de aprovação — mesma regra exibida na intro da avaliação
+        // (ver loadQuiz) e usada para decidir se o contador já foi encerrado.
+        const PASSING_SCORE = 8;
+
+        // Grava o parcial da sessão em andamento sem fechá-la: o tempo até
+        // agora entra no acumulado e o marco da sessão anda para frente, então
+        // nada é contado duas vezes. Usado pelo autosave periódico, que evita
+        // perder uma sessão longa inteira em queda de conexão/crash.
+        function flushActiveCourseTimer() {
+            const { subjectId, themeId, sessionStartedAt } = activeCourseTimer;
+            if (!subjectId || !themeId || !sessionStartedAt) return;
+            const now = Date.now();
+            const elapsed = now - sessionStartedAt;
+            if (elapsed <= 0) return;
+            activeCourseTimer.sessionStartedAt = now;
+            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            syncCourseProgressToCloud(subjectId, themeId);
+        }
+
+        // Autosave a cada minuto enquanto há sessão aberta. Só roda com a aba
+        // visível (aba escondida já pausou o contador via visibilitychange, e
+        // o navegador estrangula timers em segundo plano de qualquer forma).
+        const ACTIVE_TIMER_AUTOSAVE_MS = 60000;
+        setInterval(() => {
+            if (document.hidden) return;
+            flushActiveCourseTimer();
+        }, ACTIVE_TIMER_AUTOSAVE_MS);
+
         // Fecha a sessão corrente (se houver) somando o tempo decorrido ao
         // acumulado em nuvem e sincronizando. Chamado ao trocar de curso, sair
         // para a galeria, esconder a aba ou aprovar na avaliação. `forget`
@@ -206,16 +249,27 @@
         function resumeActiveCourseTimer(subjectId, themeId) {
             if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId && activeCourseTimer.sessionStartedAt) return;
             pauseActiveCourseTimer();
-            if (assessmentResults[subjectId]?.[themeId] !== undefined && assessmentResults[subjectId][themeId] >= 8) return;
+            if (isCourseTimerFinished(subjectId, themeId)) return;
             activeCourseTimer = { subjectId, themeId, sessionStartedAt: Date.now() };
+        }
+
+        // Curso já aprovado (nesta sessão ou em qualquer uma anterior, via
+        // assessmentResults sincronizado da nuvem) não volta a contar.
+        function isCourseTimerFinished(subjectId, themeId) {
+            if (finishedCourseTimers.has(courseTimerKey(subjectId, themeId))) return true;
+            const score = assessmentResults[subjectId]?.[themeId];
+            return score !== undefined && score !== null && score >= PASSING_SCORE;
         }
 
         // Encerra de vez o contador do curso aprovado — soma a sessão corrente
         // e impede que ele volte a contar (aluno pode reabrir o curso depois
         // só para revisar módulos, isso não deve inflar o tempo registrado).
         function finishActiveCourseTimer(subjectId, themeId) {
+            finishedCourseTimers.add(courseTimerKey(subjectId, themeId));
             if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId) {
-                pauseActiveCourseTimer();
+                // `forget` limpa subjectId/themeId: sem isso o visibilitychange
+                // ao restaurar a aba reabriria a sessão do curso recém-aprovado.
+                pauseActiveCourseTimer(true);
             }
         }
 
@@ -225,8 +279,14 @@
                 resumeActiveCourseTimer(activeCourseTimer.subjectId, activeCourseTimer.themeId);
             }
         });
-        window.addEventListener('beforeunload', () => pauseActiveCourseTimer());
-        window.addEventListener('pagehide', () => pauseActiveCourseTimer());
+        // Saída da página: tenta o sendBeacon primeiro (única forma de a
+        // gravação sobreviver ao fechamento da aba). Se ele não estiver
+        // disponível ou não houver sessão aberta, cai no pause normal.
+        function flushOnPageExit() {
+            if (!flushProgressBeacon()) pauseActiveCourseTimer();
+        }
+        window.addEventListener('beforeunload', flushOnPageExit);
+        window.addEventListener('pagehide', flushOnPageExit);
 
         function loadProgression() {
             const savedCompletion = localStorage.getItem('completionStatus');
@@ -261,20 +321,18 @@
         // subjectId/themeId explícitos porque pauseActiveCourseTimer pode
         // precisar sincronizar um curso que acabou de deixar de ser o atual
         // (ex.: trocando de curso ou saindo para a galeria).
-        function syncCourseProgressToCloud(subjectId = currentTrainingId, themeId = currentThemeId) {
-            if (!isProgressSyncEligible() || !subjectId || !themeId) return;
+        // Monta o registro de progressão a gravar e o caminho no banco, sem
+        // enviar nada — separado de syncCourseProgressToCloud porque a
+        // gravação de saída da página (sendBeacon, ver flushProgressBeacon)
+        // precisa do mesmo payload por outro transporte.
+        function buildCourseProgressRecord(subjectId, themeId) {
+            if (!isProgressSyncEligible() || !subjectId || !themeId) return null;
             const U = window.UniAdmin;
             const session = U.StudentAuth.getSession();
             const theme = trainingData[subjectId]?.themes?.[themeId];
-            if (!theme) return;
+            if (!theme) return null;
             const { total, done, pct } = courseProgress(subjectId, theme);
             const approved = assessmentResults[subjectId]?.[themeId];
-            // startedAt é gravado só na primeira sync do curso e preservado
-            // depois — marca (aproximadamente) o início do 1º módulo. activeMs
-            // é o tempo ativo acumulado (contador oculto, ver
-            // resumeActiveCourseTimer/pauseActiveCourseTimer) — ambos usados
-            // no gráfico "Tempo para Conclusão" do dashboard (Config >
-            // Dashboard > curso > Gráficos), que exibe o activeMs.
             const existingStartedAt = remoteProgressStartedAt[subjectId]?.[themeId];
             const startedAt = existingStartedAt || Date.now();
             const activeMs = remoteProgressActiveMs[subjectId]?.[themeId] || 0;
@@ -289,7 +347,46 @@
             remoteProgressStartedAt[subjectId][themeId] = startedAt;
             if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
             remoteProgressActiveMs[subjectId][themeId] = activeMs;
-            const path = `${progressPathFor(session.userId)}/${subjectId}/${themeId}`;
+            return { record, path: `${progressPathFor(session.userId)}/${subjectId}/${themeId}` };
+        }
+
+        // Gravação de última chance ao sair da página: o .set() do SDK é
+        // assíncrono e o navegador mata a requisição ao fechar a aba, então o
+        // tempo da sessão em andamento se perdia. sendBeacon é entregue pelo
+        // navegador mesmo depois da página morrer. PUT via REST do Realtime
+        // Database (mesmo endpoint já usado no carregamento dos cursos), com
+        // o método forçado por query string porque sendBeacon só faz POST.
+        function flushProgressBeacon() {
+            const { subjectId, themeId, sessionStartedAt } = activeCourseTimer;
+            if (!subjectId || !themeId || !sessionStartedAt) return false;
+            if (!navigator.sendBeacon) return false;
+            const elapsed = Date.now() - sessionStartedAt;
+            if (elapsed <= 0) return false;
+
+            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            activeCourseTimer.sessionStartedAt = null;
+
+            const built = buildCourseProgressRecord(subjectId, themeId);
+            if (!built) return false;
+            const url = `${PROGRESS_REST_BASE}${built.path}.json?x-http-method-override=PUT`;
+            // text/plain evita o preflight CORS, que o sendBeacon não faz.
+            const blob = new Blob([JSON.stringify(built.record)], { type: 'text/plain;charset=UTF-8' });
+            return navigator.sendBeacon(url, blob);
+        }
+
+        function syncCourseProgressToCloud(subjectId = currentTrainingId, themeId = currentThemeId) {
+            if (!isProgressSyncEligible() || !subjectId || !themeId) return;
+            const U = window.UniAdmin;
+            // startedAt é gravado só na primeira sync do curso e preservado
+            // depois — marca (aproximadamente) o início do 1º módulo. activeMs
+            // é o tempo ativo acumulado (contador oculto, ver
+            // resumeActiveCourseTimer/pauseActiveCourseTimer) — ambos usados
+            // no gráfico "Tempo para Conclusão" do dashboard (Config >
+            // Dashboard > curso > Gráficos), que exibe o activeMs.
+            const built = buildCourseProgressRecord(subjectId, themeId);
+            if (!built) return;
+            const { record, path } = built;
             U.ref(U.db, path).set(record).catch(error => {
                 console.error('Erro ao sincronizar progressão do curso:', error);
             });
@@ -1017,8 +1114,12 @@
             currentTrainingId = subjectId;
             currentThemeId = themeId;
             const theme = trainingData[subjectId].themes[themeId];
-            if (!theme || !theme.modules || theme.modules.length === 0) return;
+            if (!theme) return;
+            // Contador começa na ABERTURA do curso, antes de qualquer checagem
+            // de conteúdo — curso ainda sem módulos cadastrados também conta o
+            // tempo em que ficou aberto na tela.
             resumeActiveCourseTimer(subjectId, themeId);
+            if (!theme.modules || theme.modules.length === 0) return;
 
             document.getElementById('welcome-screen').style.display = 'none';
             courseGallery.style.display = 'none';
@@ -1296,6 +1397,12 @@
 
         function loadModule(mod, modules, moduleIndex) {
             resetContent();
+            // Retoma o contador ao voltar para o conteúdo — cobre tanto o
+            // primeiro módulo quanto a volta depois de uma prova (loadQuiz
+            // pausa e esquece o curso).
+            if (currentTrainingId && currentThemeId != null) {
+                resumeActiveCourseTimer(currentTrainingId, currentThemeId);
+            }
             if (playerCard) playerCard.style.display = '';
             currentModuleIndex = moduleIndex;
             if (mod.pdfUrl) {
@@ -1332,6 +1439,12 @@
 
         function loadQuiz(subjectId, themeId) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            // A avaliação tem cronômetro próprio (durationSeconds, gráfico
+            // "Tempo para Conclusão da Avaliação"), então o contador de tempo
+            // de ESTUDO pausa aqui e só volta ao retornar para os módulos
+            // (ver loadModule). `forget` para que restaurar a aba durante a
+            // prova não retome a contagem pelo visibilitychange.
+            pauseActiveCourseTimer(true);
             resetContent();
             const quizKey = `${subjectId}_${themeId}`;
             if (quizStatus[quizKey] === false) { showWarning('Avaliação indisponível no momento.'); return; }
