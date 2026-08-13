@@ -382,6 +382,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 btn.classList.add('active');
                 const targetTab = document.getElementById(`cfg-${btn.dataset.tab}-tab`);
                 if (targetTab) targetTab.classList.add('active');
+                // Os listeners ao vivo do Dashboard só fazem sentido com a aba
+                // aberta; sair dela desliga as assinaturas do RTDB.
+                if (btn.dataset.tab !== 'dashboard') window.UniAdmin.stopDashboardLiveSync?.();
                 if (btn.dataset.tab === 'courses') window.UniAdminCourses?.refresh?.();
                 if (btn.dataset.tab === 'colaboradores') window.UniAdmin.populateColaboradores?.();
                 if (btn.dataset.tab === 'users') window.UniAdmin.populateUsers?.();
@@ -1663,6 +1666,9 @@ function closeAdminPanel() {
     document.body.classList.remove('admin-mode');
     hideModal();
     document.getElementById('cfg-backup-modal').style.display = 'none';
+    // Fora do painel não há nada para redesenhar: as assinaturas ao vivo do
+    // Dashboard seriam tráfego sem destino.
+    U.stopDashboardLiveSync?.();
     // Volta a exigir a senha na próxima vez que abrirem as configurações.
     U.lock();
 }

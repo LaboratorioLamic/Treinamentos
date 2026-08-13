@@ -573,15 +573,36 @@
     // elas era trabalho jogado fora. A promessa em voo é compartilhada para
     // que chamadas simultâneas não baixem /results duas vezes.
     let rowsPromise = null;
+    // Idade máxima do cache. Antes ele valia para sempre: uma vez carregado,
+    // abas como Usuários e Dashboard reusavam as mesmas linhas pelo resto da
+    // sessão, e uma conclusão de curso feita nesse meio-tempo simplesmente não
+    // aparecia. O TTL é a rede de segurança; a invalidação por evento (abaixo)
+    // é o caminho normal.
+    const ROWS_TTL_MS = 30000;
+    let rowsLoadedAt = 0;
+
+    function invalidateRows() {
+        rowsLoadedAt = 0;
+    }
+    U.invalidateHistoryRows = invalidateRows;
+
     function loadRows(force = false) {
-        if (!force && allRows.length > 0) return Promise.resolve(allRows);
+        const isFresh = allRows.length > 0 && (Date.now() - rowsLoadedAt) < ROWS_TTL_MS;
+        if (!force && isFresh) return Promise.resolve(allRows);
         if (!rowsPromise) {
             rowsPromise = fetchAllData()
-                .then(data => { allRows = flatten(data); return allRows; })
+                .then(data => { allRows = flatten(data); rowsLoadedAt = Date.now(); return allRows; })
                 .finally(() => { rowsPromise = null; });
         }
         return rowsPromise;
     }
+
+    // Qualquer gravação de resultado/progresso derruba o cache na hora, para
+    // que a próxima leitura de qualquer aba já venha do servidor.
+    document.addEventListener('uniadmin:results-changed', invalidateRows);
+    // Depois de uma queda de rede o cache é suspeito por definição: foi
+    // montado antes da janela em que não houve como saber o que mudou.
+    document.addEventListener('uniadmin:connection-restored', invalidateRows);
 
     async function populateHistory() {
         showSpinner(true);

@@ -1699,15 +1699,25 @@
                 updateAttemptsCounter().then(attemptsState => showResult(score, attemptsState));
             };
 
-            const saveResult = freeName
-                ? saveEstagioResult({ name: name.value, email: email.value, ...resultPayload })
-                : saveLoggedResult({ session, ...resultPayload });
-
-            saveResult
+            // Promise.resolve().then(...) para que a checagem de conexão, que
+            // lança de forma síncrona, caia no mesmo .catch() dos erros de
+            // gravação em vez de escapar da função.
+            Promise.resolve()
+                .then(() => (freeName
+                    ? saveEstagioResult({ name: name.value, email: email.value, ...resultPayload })
+                    : saveLoggedResult({ session, ...resultPayload })))
+                .then(() => {
+                    // Avisa as Configurações (cache do Histórico) de que há
+                    // resultado novo — relevante quando aluno e administrador
+                    // usam a mesma aba do navegador.
+                    document.dispatchEvent(new CustomEvent('uniadmin:results-changed'));
+                })
                 .then(finishSubmit)
                 .catch((error) => {
                     console.error('Erro ao salvar resultado:', error);
-                    showWarning('Não foi possível registrar sua avaliação. Tente novamente.');
+                    showWarning(error?.message?.includes('Sem conexão')
+                        ? error.message
+                        : 'Não foi possível registrar sua avaliação. Tente novamente.');
                     loadingSpinner.style.display = 'none';
                     submitButton.disabled = false;
                     submitButton.style.opacity = '1';
@@ -1719,6 +1729,11 @@
         // js/student-auth.js e o plano de dados em Configurações > Usuários.
         function saveLoggedResult({ session, ...result }) {
             const U = window.UniAdmin;
+            // Sem rede, o SDK aceitaria a escrita e a resolveria contra o cache
+            // local: o aluno veria "avaliação registrada" para algo que ainda
+            // não saiu do navegador. Falhar aqui devolve o erro ao fluxo de
+            // submissão, que reabilita o botão e pede para tentar de novo.
+            U.Connection?.assertOnline();
             const attemptCount = ((assessmentResults[currentTrainingId]?.[currentThemeId] !== undefined) ? 2 : 1);
             const record = { ...result, attempt: attemptCount };
             const basePath = `results/byUser/${session.userId}/${currentCategorySlug}/${currentTrainingId}/${currentThemeId}`;

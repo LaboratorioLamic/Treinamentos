@@ -202,7 +202,7 @@
         return `${value} (${pct}%)`;
     }
 
-    // ─── Carga inicial (uma vez por sessão do painel) ───
+    // ─── Carga inicial + sincronização ao vivo ───
     async function loadBaseData() {
         const slugs = Object.keys(CATEGORY_LABELS);
         const [usersSnap, colabsSnap, progressSnap, rows, ...snaps] = await Promise.all([
@@ -3121,6 +3121,114 @@
     modeUserBtn?.addEventListener('click', () => setDashMode('user'));
     modeCourseBtn?.addEventListener('click', () => setDashMode('course'));
 
+    // Redesenha tudo que está na tela a partir do estado já carregado. Isolado
+    // de loadBaseData() para que uma atualização vinda de listener não precise
+    // rebaixar tudo de novo — o listener já trouxe o dado novo.
+    function renderEverything() {
+        updateCategoryChip();
+        if (selectedSubjectId && selectedSubjectId !== ALL_SUBJECTS_ID && !currentTrainingData()[selectedSubjectId]) {
+            selectedSubjectId = ALL_SUBJECTS_ID; selectedCourseKey = null;
+            subjectLabel.textContent = 'Todos os temas';
+        }
+        renderCourseCards();
+        if (selectedCourseKey) renderCourseDashboard(currentSlug(), selectedCourseKey);
+        renderUserCards();
+        if (selectedUserId && allColaboradores[selectedUserId]) {
+            renderUserDashboard(allColaboradores[selectedUserId], userHeroStats);
+        }
+    }
+
+    // ─── Sincronização ao vivo ───
+    // Sem isto, o painel só relia os dados ao trocar de aba: um administrador
+    // com as Configurações abertas via os números do momento em que entrou,
+    // enquanto alunos concluíam cursos do outro lado. Números velhos numa tela
+    // que parece atual é a pior forma de errar — daí os listeners.
+    //
+    // Ficam ligados apenas enquanto a aba Dashboard está aberta (ver
+    // stopLiveSync): cada listener é uma assinatura permanente no RTDB e
+    // manter todas ligadas o tempo todo custaria banda e quota à toa.
+    let liveRefs = [];
+    let liveRenderTimer = null;
+
+    // As atualizações chegam em rajada (uma escrita de resultado dispara
+    // vários caminhos). Redesenhar a cada evento piscaria os gráficos várias
+    // vezes seguidas, então as mudanças são agrupadas numa janela curta.
+    function scheduleLiveRender() {
+        clearTimeout(liveRenderTimer);
+        liveRenderTimer = setTimeout(() => {
+            liveRenderTimer = null;
+            try { renderEverything(); }
+            catch (error) { console.error('Erro ao atualizar o dashboard ao vivo:', error); }
+        }, 300);
+    }
+
+    // Resultados vivem fora do estado local do dashboard (as linhas vêm do
+    // Histórico, que tem o próprio cache). Ao ver mudança em /results, o cache
+    // do Histórico é invalidado e refeito antes de redesenhar — caso contrário
+    // os cards mostrariam a conclusão nova com as notas antigas.
+    let historyReloadPending = false;
+    async function reloadHistoryThenRender() {
+        if (historyReloadPending) return;
+        historyReloadPending = true;
+        try {
+            historyRows = await U.refreshHistoryRows();
+            scheduleLiveRender();
+        } catch (error) {
+            console.error('Erro ao recarregar o histórico ao vivo:', error);
+        } finally {
+            historyReloadPending = false;
+        }
+    }
+
+    function watch(path, handler) {
+        const reference = ref(db, path);
+        const callback = reference.on('value', handler, error => {
+            console.error(`Listener de ${path} interrompido:`, error.message);
+        });
+        liveRefs.push({ reference, callback });
+    }
+
+    function startLiveSync() {
+        if (liveRefs.length) return;
+        // O primeiro disparo de cada listener chega logo após o attach e traz
+        // o mesmo dado que loadBaseData() acabou de ler; o render agrupado
+        // absorve essa repetição sem custo visível.
+        watch(`/${dbRoot}/progress/byUser`, snapshot => {
+            allProgress = snapshot.exists() ? snapshot.val() : {};
+            scheduleLiveRender();
+        });
+        watch(`/${dbRoot}/colaboradores`, snapshot => {
+            allColaboradores = snapshot.exists() ? snapshot.val() : {};
+            refreshUserFilterChips();
+            scheduleLiveRender();
+        });
+        watch(`/${dbRoot}/users`, snapshot => {
+            allUsers = snapshot.exists() ? snapshot.val() : {};
+            scheduleLiveRender();
+        });
+        // Só a raiz de /results — assinar cada categoria separadamente daria os
+        // mesmos eventos com mais assinaturas para administrar.
+        watch(`/${dbRoot}/results`, () => { reloadHistoryThenRender(); });
+        Object.keys(CATEGORY_LABELS).forEach(slug => {
+            watch(`/${dbRoot}/${slug}/trainingData`, snapshot => {
+                allTrainingData[slug] = snapshot.exists() ? snapshot.val() : {};
+                scheduleLiveRender();
+            });
+            watch(`/${dbRoot}/${slug}/quizData`, snapshot => {
+                allQuizData[slug] = snapshot.exists() ? snapshot.val() : {};
+                scheduleLiveRender();
+            });
+        });
+    }
+
+    function stopLiveSync() {
+        liveRefs.forEach(({ reference, callback }) => reference.off('value', callback));
+        liveRefs = [];
+        clearTimeout(liveRenderTimer);
+        liveRenderTimer = null;
+    }
+    U.stopDashboardLiveSync = stopLiveSync;
+
     async function initDashboard() {
         if (!initialized) {
             initialized = true;
@@ -3131,20 +3239,21 @@
             // Os cards leem allTrainingData/allQuizData, só disponíveis depois
             // de loadBaseData() — renderizar antes deixava a lista vazia no
             // primeiro carregamento (nada para escolher, dashboard em branco).
-            updateCategoryChip();
-            if (selectedSubjectId && selectedSubjectId !== ALL_SUBJECTS_ID && !currentTrainingData()[selectedSubjectId]) {
-                selectedSubjectId = ALL_SUBJECTS_ID; selectedCourseKey = null;
-                subjectLabel.textContent = 'Todos os temas';
-            }
-            renderCourseCards();
-            if (selectedCourseKey) renderCourseDashboard(currentSlug(), selectedCourseKey);
-            renderUserCards();
-            if (selectedUserId && allColaboradores[selectedUserId]) {
-                renderUserDashboard(allColaboradores[selectedUserId], userHeroStats);
-            }
+            renderEverything();
+            startLiveSync();
         } catch (error) {
             showWarning('Erro ao carregar dados do dashboard: ' + error.message);
         }
     }
     U.initDashboard = initDashboard;
+
+    // Volta da rede: o que estava na tela é anterior à queda, e os listeners
+    // ficaram sem receber eventos. Recarrega do zero em vez de confiar no que
+    // sobrou em memória.
+    document.addEventListener('uniadmin:connection-restored', () => {
+        if (!liveRefs.length) return;
+        loadBaseData()
+            .then(renderEverything)
+            .catch(error => console.error('Erro ao ressincronizar o dashboard:', error));
+    });
 })();
