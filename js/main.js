@@ -196,6 +196,28 @@
         // (ver loadQuiz) e usada para decidir se o contador já foi encerrado.
         const PASSING_SCORE = 8;
 
+        // Trava por vídeo: em módulo de vídeo o tempo só corre com o vídeo
+        // tocando (deixar a aula aberta sem assistir não conta). Em módulo sem
+        // vídeo (PDF/slide) não há como medir consumo, então a contagem é
+        // livre enquanto a aba estiver visível.
+        // 'free'    — módulo sem vídeo, conta livremente.
+        // 'playing' — módulo de vídeo com o vídeo rodando, conta.
+        // 'waiting' — módulo de vídeo parado/pausado, NÃO conta.
+        let moduleTimerGate = 'free';
+
+        function setModuleTimerGate(gate) {
+            if (moduleTimerGate === gate) return;
+            moduleTimerGate = gate;
+            if (gate === 'waiting') {
+                // Fecha a sessão somando o que já correu, sem esquecer o curso
+                // — o play retoma de onde parou.
+                pauseActiveCourseTimer();
+            } else if (currentTrainingId && currentThemeId != null) {
+                resumeActiveCourseTimer(currentTrainingId, currentThemeId);
+            }
+            paintExpectedTimePanel();
+        }
+
         // Grava o parcial da sessão em andamento sem fechá-la: o tempo até
         // agora entra no acumulado e o marco da sessão anda para frente, então
         // nada é contado duas vezes. Usado pelo autosave periódico, que evita
@@ -281,15 +303,27 @@
                 && activeCourseTimer.themeId === themeId;
             expectedTimeCard.classList.toggle('is-paused', !running);
 
+            // Ícone + texto explicando por que está (ou não) contando. O ícone
+            // de pausa é o sinal mais rápido de "seu tempo não está correndo".
+            let icon, note;
             if (finished) {
-                expectedTimeNoteEl.textContent = 'Curso concluído — contagem encerrada.';
+                icon = 'fa-circle-check';
+                note = 'Curso concluído — contagem encerrada.';
+            } else if (!running && moduleTimerGate === 'waiting') {
+                // Caso mais comum da trava por vídeo: aula aberta, vídeo parado.
+                icon = 'fa-circle-pause';
+                note = 'Pausado — dê play no vídeo para contar o tempo.';
             } else if (!running) {
-                expectedTimeNoteEl.textContent = 'Pausado — a contagem volta ao retomar o curso.';
+                icon = 'fa-circle-pause';
+                note = 'Pausado — a contagem volta ao retomar o curso.';
             } else if (isComplete) {
-                expectedTimeNoteEl.textContent = 'Tempo projetado atingido — a contagem continua.';
+                icon = 'fa-circle-play';
+                note = 'Tempo projetado atingido — a contagem continua.';
             } else {
-                expectedTimeNoteEl.textContent = 'Contando enquanto o curso está aberto.';
+                icon = 'fa-circle-play';
+                note = 'Contando o tempo de estudo.';
             }
+            expectedTimeNoteEl.innerHTML = `<i class="fas ${icon}"></i> ${note}`;
         }
 
         // Tick de 1s só para a interface — o valor real vem sempre de
@@ -343,6 +377,14 @@
             if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId && activeCourseTimer.sessionStartedAt) return;
             pauseActiveCourseTimer();
             if (isCourseTimerFinished(subjectId, themeId)) { paintExpectedTimePanel(); return; }
+            // Vídeo parado segura a contagem: o timer fica "armado" no curso
+            // (subjectId/themeId setados) mas sem sessão aberta, então o play
+            // é o que efetivamente inicia a contagem.
+            if (moduleTimerGate === 'waiting') {
+                activeCourseTimer = { subjectId, themeId, sessionStartedAt: null };
+                paintExpectedTimePanel();
+                return;
+            }
             activeCourseTimer = { subjectId, themeId, sessionStartedAt: Date.now() };
             paintExpectedTimePanel();
         }
@@ -632,9 +674,13 @@
             if (event.data === YT_STATE.PLAYING) {
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
                 startProgressTimer();
+                // Play libera a contagem do tempo de curso (ver moduleTimerGate).
+                setModuleTimerGate('playing');
             } else if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
                 stopProgressTimer();
+                // Pausou/terminou: para de contar até o próximo play.
+                setModuleTimerGate('waiting');
                 if (event.data === YT_STATE.ENDED) {
                     progressRange.value = 100;
                     updateTimeUI();
@@ -1504,6 +1550,11 @@
 
         function loadModule(mod, modules, moduleIndex) {
             resetContent();
+            // Define a trava ANTES de retomar: módulo de vídeo entra em
+            // 'waiting' (só conta ao dar play), módulo de PDF/slide conta
+            // livremente. Sem isso, abrir uma aula de vídeo já contaria tempo
+            // antes do primeiro play.
+            moduleTimerGate = mod.pdfUrl ? 'free' : 'waiting';
             // Retoma o contador ao voltar para o conteúdo — cobre tanto o
             // primeiro módulo quanto a volta depois de uma prova (loadQuiz
             // pausa e esquece o curso).

@@ -829,35 +829,41 @@
             font-weight: 500;
             line-height: 1.45;
             color: rgba(255,255,255,0.5);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        /* Pontinho pulsante indicando que o cronômetro está correndo agora.
-           Some quando pausado (aba oculta/prova), sinalizando que parou. */
-        .expected-time-note::before {
-            content: '';
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--success);
-            margin-right: 6px;
-            vertical-align: middle;
+        /* Ícone de estado: play pulsante enquanto conta, pausa fixa quando
+           parado — sinal imediato de que o tempo não está correndo. */
+        .expected-time-note i {
+            font-size: 1.05em;
+            color: var(--success);
             animation: expected-time-pulse 1.8s ease-in-out infinite;
         }
 
-        .expected-time-card.is-paused .expected-time-note::before {
-            background: var(--text-muted);
+        /* Pausado (inclusive por vídeo parado): ícone de pausa em âmbar e
+           estático, mais legível que um verde apagado. */
+        .expected-time-card.is-paused .expected-time-note {
+            color: rgba(255,255,255,0.68);
+        }
+
+        .expected-time-card.is-paused .expected-time-note i {
+            color: var(--warning);
             animation: none;
         }
 
+        /* Barra esmaecida enquanto pausado, reforçando que nada avança. */
+        .expected-time-card.is-paused .expected-time-fill { opacity: 0.55; }
+
         @keyframes expected-time-pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.45); }
-            50% { opacity: 0.55; box-shadow: 0 0 0 4px rgba(16,185,129,0); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             .expected-time-fill { transition: none; }
-            .expected-time-note::before { animation: none; }
+            .expected-time-note i { animation: none; }
         }
 
         .sidebar-header {
