@@ -412,9 +412,32 @@
             paintExpectedTimePanel();
         }
 
+        // Pausa o vídeo se ele estiver rodando — usado ao minimizar/trocar de
+        // aba, para o aluno não "assistir" com a página escondida (o YouTube
+        // continua tocando o áudio em segundo plano). Silencioso quando não há
+        // player ou a API ainda não carregou.
+        function pauseVideoIfPlaying() {
+            if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+            const YT_STATE = window.YT?.PlayerState;
+            if (!YT_STATE) return;
+            let state;
+            // getPlayerState lança se o iframe já foi destruído no meio de uma
+            // troca de módulo — nesse caso não há vídeo a pausar.
+            try { state = ytPlayer.getPlayerState(); } catch { return; }
+            // BUFFERING entra junto: o vídeo está em reprodução, só carregando.
+            if (state === YT_STATE.PLAYING || state === YT_STATE.BUFFERING) {
+                try { ytPlayer.pauseVideo(); } catch { /* player indisponível */ }
+            }
+        }
+
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) pauseActiveCourseTimer();
-            else if (activeCourseTimer.subjectId && activeCourseTimer.themeId && !activeCourseTimer.sessionStartedAt) {
+            // Pausar o vídeo dispara onPlayerStateChange → gate 'waiting', que
+            // já fecha a sessão do contador. O pause explícito abaixo continua
+            // necessário para módulos sem vídeo (contagem livre).
+            if (document.hidden) {
+                pauseVideoIfPlaying();
+                pauseActiveCourseTimer();
+            } else if (activeCourseTimer.subjectId && activeCourseTimer.themeId && !activeCourseTimer.sessionStartedAt) {
                 resumeActiveCourseTimer(activeCourseTimer.subjectId, activeCourseTimer.themeId);
             }
             paintExpectedTimePanel();
