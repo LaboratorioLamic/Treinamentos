@@ -205,6 +205,51 @@
         // 'waiting' — módulo de vídeo parado/pausado, NÃO conta.
         let moduleTimerGate = 'free';
 
+        // Trava por inatividade: 10 min sem interação de estudo (play de vídeo
+        // ou virada de página do PDF) param a contagem. Fica separada de
+        // moduleTimerGate porque as duas travas somam — o tempo só corre com o
+        // gate liberado E sem inatividade. Só as duas interações acima soltam a
+        // trava: mexer o mouse ou voltar para a aba não conta como estudo.
+        const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+        let idlePaused = false;
+        let idleTimer = null;
+
+        function clearIdleTimer() {
+            if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+        }
+
+        // Rearma a contagem regressiva de inatividade. Só faz sentido com uma
+        // sessão aberta — sem sessão não há o que pausar, e o próximo evento de
+        // estudo rearma de qualquer forma.
+        function armIdleTimer() {
+            clearIdleTimer();
+            if (!activeCourseTimer.sessionStartedAt) return;
+            idleTimer = setTimeout(onIdleTimeout, IDLE_TIMEOUT_MS);
+        }
+
+        // Estourou o tempo ocioso: fecha a sessão (o tempo já corrido é somado)
+        // e pausa o vídeo, para o aluno não seguir "assistindo" sem contar.
+        function onIdleTimeout() {
+            idleTimer = null;
+            if (!activeCourseTimer.sessionStartedAt) return;
+            idlePaused = true;
+            pauseVideoIfPlaying();
+            pauseActiveCourseTimer();
+            paintExpectedTimePanel();
+        }
+
+        // Chamado pelas interações que caracterizam estudo ativo: play do vídeo
+        // e troca de página do PDF. Solta a trava de inatividade e retoma a
+        // sessão (respeitando a trava de vídeo, que segue valendo).
+        function registerStudyActivity() {
+            const wasIdle = idlePaused;
+            idlePaused = false;
+            if (wasIdle && currentTrainingId && currentThemeId != null) {
+                resumeActiveCourseTimer(currentTrainingId, currentThemeId);
+            }
+            armIdleTimer();
+        }
+
         function setModuleTimerGate(gate) {
             if (moduleTimerGate === gate) return;
             moduleTimerGate = gate;
@@ -309,6 +354,9 @@
             if (finished) {
                 icon = 'fa-circle-check';
                 note = 'Curso concluído — contagem encerrada.';
+            } else if (!running && idlePaused) {
+                icon = 'fa-circle-pause';
+                note = 'Pausado por inatividade — dê play no vídeo ou passe uma página para retomar.';
             } else if (!running && moduleTimerGate === 'waiting') {
                 // Caso mais comum da trava por vídeo: aula aberta, vídeo parado.
                 icon = 'fa-circle-pause';
@@ -352,6 +400,7 @@
         // sem isso, um simples minimizar/restaurar a aba na galeria faria o
         // visibilitychange achar que ainda há curso aberto e retomar a conta.
         function pauseActiveCourseTimer(forget = false) {
+            clearIdleTimer();
             const { subjectId, themeId, sessionStartedAt } = activeCourseTimer;
             if (forget) { activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null }; }
             if (!subjectId || !themeId || !sessionStartedAt) { paintExpectedTimePanel(); return; }
@@ -380,12 +429,15 @@
             // Vídeo parado segura a contagem: o timer fica "armado" no curso
             // (subjectId/themeId setados) mas sem sessão aberta, então o play
             // é o que efetivamente inicia a contagem.
-            if (moduleTimerGate === 'waiting') {
+            // Idem para a trava de inatividade: timer armado no curso, mas sem
+            // sessão até a próxima interação de estudo (ver registerStudyActivity).
+            if (moduleTimerGate === 'waiting' || idlePaused) {
                 activeCourseTimer = { subjectId, themeId, sessionStartedAt: null };
                 paintExpectedTimePanel();
                 return;
             }
             activeCourseTimer = { subjectId, themeId, sessionStartedAt: Date.now() };
+            armIdleTimer();
             paintExpectedTimePanel();
         }
 
@@ -697,7 +749,9 @@
             if (event.data === YT_STATE.PLAYING) {
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
                 startProgressTimer();
-                // Play libera a contagem do tempo de curso (ver moduleTimerGate).
+                // Play libera a contagem do tempo de curso (ver moduleTimerGate)
+                // e conta como interação, soltando a trava de inatividade.
+                registerStudyActivity();
                 setModuleTimerGate('playing');
             } else if (event.data === YT_STATE.PAUSED || event.data === YT_STATE.ENDED) {
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
@@ -1187,6 +1241,9 @@
         }
 
         function renderPage(pageNum) {
+            // Virar página é a interação de estudo do módulo de PDF: rearma (ou
+            // solta) a trava de inatividade de 10 min.
+            registerStudyActivity();
             pdfDoc.getPage(pageNum).then(page => {
                 const viewport = page.getViewport({ scale: 1.5 });
                 pdfCanvas.height = viewport.height;
@@ -1578,6 +1635,9 @@
             // livremente. Sem isso, abrir uma aula de vídeo já contaria tempo
             // antes do primeiro play.
             moduleTimerGate = mod.pdfUrl ? 'free' : 'waiting';
+            // Abrir um módulo é interação: nunca cair num módulo novo já
+            // pausado por inatividade anterior.
+            idlePaused = false;
             // Retoma o contador ao voltar para o conteúdo — cobre tanto o
             // primeiro módulo quanto a volta depois de uma prova (loadQuiz
             // pausa e esquece o curso).
