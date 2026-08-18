@@ -205,12 +205,12 @@
         // 'waiting' — módulo de vídeo parado/pausado, NÃO conta.
         let moduleTimerGate = 'free';
 
-        // Trava por inatividade: 10 min sem interação de estudo (play de vídeo
+        // Trava por inatividade: 5 min sem interação de estudo (play de vídeo
         // ou virada de página do PDF) param a contagem. Fica separada de
         // moduleTimerGate porque as duas travas somam — o tempo só corre com o
         // gate liberado E sem inatividade. Só as duas interações acima soltam a
         // trava: mexer o mouse ou voltar para a aba não conta como estudo.
-        const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+        const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
         let idlePaused = false;
         let idleTimer = null;
 
