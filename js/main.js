@@ -1829,7 +1829,11 @@
             stopQuizTimer();
             const attempt = loadQuizAttempt(subjectId, themeId);
             const startedAt = attempt?.startedAt || Date.now();
-            selectedAnswers = attempt?.selectedAnswers ? { ...attempt.selectedAnswers } : selectedAnswers;
+            // Mescla (storage primeiro, memória por último): o clique mais
+            // recente pode não ter chegado ao localStorage (write falhou em
+            // silêncio, ou o attempt foi limpo em outra aba) — sobrescrever
+            // pelo storage descartaria a resposta que o aluno vê marcada.
+            selectedAnswers = { ...(attempt?.selectedAnswers || {}), ...selectedAnswers };
 
             let correctCount = 0;
             questions.forEach((q, index) => { if (selectedAnswers[index] === q.correct) correctCount++; });
@@ -1883,7 +1887,10 @@
                 question: q.question,
                 options: q.options,
                 correct: q.correct,
-                selected: index in selectedAnswers ? selectedAnswers[index] : null
+                // -1 (e não null) para não respondida: o Realtime Database
+                // apaga chaves com null, e o detalhe do Histórico leria
+                // `selected` como undefined.
+                selected: index in selectedAnswers ? selectedAnswers[index] : -1
             }));
         }
 

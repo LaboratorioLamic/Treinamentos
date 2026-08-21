@@ -1549,6 +1549,7 @@
         .history-detail-question .q-option.was-selected.is-right { background: var(--cfg-success-light); color: var(--cfg-success); font-weight: 600; }
         .history-detail-question .q-option.was-selected.is-wrong { background: var(--cfg-danger-light); color: var(--cfg-danger); font-weight: 600; }
         .history-detail-question .q-option.is-answer-key { background: var(--cfg-success-light); color: var(--cfg-success); font-weight: 600; }
+        .history-detail-question .q-option-unanswered { font-style: italic; opacity: .8; }
 
         /* === MODAL: detalhe da avaliação (clique num comentário) === */
         #cfg-root .comment-card.is-clickable { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }

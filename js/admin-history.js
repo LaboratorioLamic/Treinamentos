@@ -897,8 +897,13 @@
         const blocks = text.split(/(?=^\s*\d+\)\s)/m).map(b => b.trim()).filter(Boolean);
         return blocks.map(block => {
             const numMatch = block.match(/^(\d+)\)/);
-            const respostaMatch = block.match(/Resposta:\s*([\s\S]*?)(?:\n\s*Gabarito:|$)/i);
-            const gabaritoMatch = block.match(/Gabarito:\s*([\s\S]*)$/i);
+            // O ";" antes de "Gabarito:" vem do texto que o próprio sistema
+            // gera (getDetailedIncorrectAnswers, em js/main.js). Sem aceitá-lo
+            // o delimitador não casa e a "Resposta" engolia o gabarito inteiro
+            // — aí o match de opção apontava para a alternativa correta e a
+            // questão errada aparecia como acerto.
+            const respostaMatch = block.match(/Resposta:\s*([\s\S]*?)(?:\n\s*;?\s*Gabarito:|$)/i);
+            const gabaritoMatch = block.match(/Gabarito:\s*([\s\S]*?)(?:\n\s*-{3,}\s*$|$)/i);
             return {
                 num: numMatch ? Number(numMatch[1]) : null,
                 userAnswerText: respostaMatch ? respostaMatch[1].trim() : '',
@@ -1590,7 +1595,14 @@
         }
 
         questionsBox.innerHTML = visible.map((a, idx) => {
-            const isCorrect = a.selected === a.correct;
+            // Registros antigos podem não ter `selected` (o Realtime Database
+            // apaga chaves gravadas como null, caso das questões deixadas em
+            // branco no envio automático por tempo) — normaliza para -1 e
+            // avisa na tela, em vez de exibir a questão como errada "muda",
+            // sem nenhuma alternativa marcada.
+            const selected = Number.isFinite(a.selected) ? a.selected : -1;
+            const unanswered = selected < 0;
+            const isCorrect = selected === a.correct;
             const originalIndex = answers.indexOf(a);
             return `
             <div class="history-detail-question ${isCorrect ? 'is-correct' : 'is-wrong'}">
@@ -1598,8 +1610,9 @@
                     <i class="fas ${isCorrect ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
                     <span>${originalIndex + 1}. ${escapeHtml(a.question)}</span>
                 </div>
+                ${unanswered ? '<div class="q-option q-option-unanswered">Sem resposta registrada</div>' : ''}
                 ${(a.options || []).map((opt, optIdx) => {
-                    const wasSelected = optIdx === a.selected;
+                    const wasSelected = optIdx === selected;
                     const isKey = optIdx === a.correct;
                     let cls = 'q-option';
                     if (wasSelected && isKey) cls += ' was-selected is-right';
