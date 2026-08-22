@@ -330,6 +330,13 @@
                 closeUsersPopovers({ keepSearch: true });
                 if (isOpen) { closeUsersSearchChip(); return; }
                 chip.classList.add('is-open');
+                // O autofill do navegador pode preencher o campo sem que o
+                // usuário digite nada: abre sempre vazio.
+                if (search && search.value) {
+                    search.value = '';
+                    renderList(currentFilterTerm());
+                    refreshUsersFilterChips();
+                }
                 search?.focus();
                 return;
             }

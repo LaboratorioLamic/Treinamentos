@@ -344,7 +344,18 @@
             closeUserFilterPopovers();
             if (isOpen) return;
             chip.classList.add('is-open');
-            if (isSearchChip) { search?.focus(); return; }
+            if (isSearchChip) {
+                // O autofill do navegador pode preencher o campo sem que o
+                // usuário digite nada: abre sempre vazio.
+                if (search && search.value) {
+                    search.value = '';
+                    userSearchTerm = '';
+                    renderUserCards();
+                    refreshUserFilterChips();
+                }
+                search?.focus();
+                return;
+            }
             if (search) search.value = '';
             renderUserFilterList(field, '');
             search?.focus();
@@ -477,18 +488,18 @@
             return;
         }
         const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
-        container.innerHTML = `<table class="is-sticky">
+        container.innerHTML = `<table class="is-sticky dash-cards">
             <thead><tr><th>Data</th><th>Curso</th><th>Nota</th><th>Tempo</th><th>Prazo</th><th>Situação</th></tr></thead>
             <tbody>${sorted.map((r, i) => {
                 const dateLabel = r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '—';
                 const situationOk = !!r.approved;
                 return `<tr style="--row-i:${i}">
-                    <td>${dateLabel}</td>
-                    <td>${escapeHtml(r.theme || r.subject || '—')}</td>
-                    <td>${scoreBadgeHtml(r.score)}</td>
-                    <td>${formatDuration(r.durationSeconds)}</td>
-                    <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
-                    <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
+                    <td data-label="Data/Hora">${dateLabel}</td>
+                    <td data-label="Curso">${escapeHtml(r.theme || r.subject || '—')}</td>
+                    <td data-label="Nota">${scoreBadgeHtml(r.score)}</td>
+                    <td data-label="Tempo">${formatDuration(r.durationSeconds)}</td>
+                    <td data-label="Prazo">${deadlineBadgeHtml(r.deadlineStatus)}</td>
+                    <td data-label="Situação"><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
                 </tr>`;
             }).join('')}</tbody>
         </table>`;
@@ -1237,16 +1248,19 @@
         const { slug, subjectId, themeId } = conclusionsCourseIds;
         const canForgive = !situationOk && r.userId && (r.deadlineStatus === 'late' || r.deadlineStatus === 'closed');
         const activeMs = r.userId ? allProgress[r.userId]?.[r.slug]?.[r.subjectId]?.[r.themeId]?.activeMs : null;
+        // `data-label` alimenta o modo card do mobile (css/mobile.css secao 8.1),
+        // onde a tabela perde o cabecalho e cada celula precisa se apresentar
+        // sozinha. No desktop o atributo nao tem efeito visual.
         return `<tr style="--row-i:${i}" class="is-clickable" data-row-i="${i}" title="Ver detalhes">
-            <td>${dateLabel}</td>
-            <td><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
-            <td>${escapeHtml(r.unit || '—')}</td>
-            <td>${escapeHtml(r.role || '—')}</td>
-            <td>${deadlineBadgeHtml(r.deadlineStatus)}</td>
-            <td>${scoreBadgeHtml(r.score)}</td>
-            <td>${formatDuration(r.durationSeconds)}</td>
-            <td>${formatHHMMSS(activeMs)}</td>
-            <td><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
+            <td data-label="Data/Hora">${dateLabel}</td>
+            <td data-label="Nome"><span class="row-name">${avatarHtml(r.fullName)} ${escapeHtml(r.fullName)}</span></td>
+            <td data-label="Unidade">${escapeHtml(r.unit || '—')}</td>
+            <td data-label="Cargo">${escapeHtml(r.role || '—')}</td>
+            <td data-label="Prazo">${deadlineBadgeHtml(r.deadlineStatus)}</td>
+            <td data-label="Nota">${scoreBadgeHtml(r.score)}</td>
+            <td data-label="Tempo">${formatDuration(r.durationSeconds)}</td>
+            <td data-label="Conclusão">${formatHHMMSS(activeMs)}</td>
+            <td data-label="Situação"><span class="conclusion-situation ${situationOk ? 'is-ok' : 'is-bad'}"><i class="fas ${situationOk ? 'fa-circle-check' : 'fa-circle-xmark'}"></i> ${situationOk ? 'Aprovado' : 'Reprovado'}</span></td>
             <td>${canForgive ? `<button class="dash-forgive-btn" data-user-id="${escapeHtml(r.userId)}" data-slug="${slug}" data-subject-id="${subjectId}" data-theme-id="${themeId}">Desconsiderar atraso</button>` : ''}</td>
         </tr>`;
     }
@@ -1267,7 +1281,7 @@
             return;
         }
 
-        container.innerHTML = `<table class="is-sticky">
+        container.innerHTML = `<table class="is-sticky dash-cards">
             <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Tempo</th><th>Conclusão</th><th>Situação</th><th></th></tr></thead>
             <tbody>${filtered.map((r, i) => conclusionRowHtml(r, i)).join('')}</tbody>
         </table>`;
@@ -1357,13 +1371,13 @@
             return;
         }
 
-        container.innerHTML = `<table class="is-sticky">
+        container.innerHTML = `<table class="is-sticky dash-cards">
             <thead><tr><th>Nome</th><th>Unidade</th><th>Progresso</th></tr></thead>
             <tbody>${filtered.map((m, i) => `
                 <tr style="--row-i:${i}">
-                    <td><span class="row-name">${avatarHtml(m.fullName)} ${escapeHtml(m.fullName)}</span></td>
-                    <td>${escapeHtml(m.unit)}</td>
-                    <td>
+                    <td data-label="Nome"><span class="row-name">${avatarHtml(m.fullName)} ${escapeHtml(m.fullName)}</span></td>
+                    <td data-label="Unidade">${escapeHtml(m.unit)}</td>
+                    <td data-label="Progresso">
                         <div class="missing-progress" title="${m.pct}% assistido">
                             <div class="missing-progress-bar"><span class="${progressToneClass(m.pct)}" style="width:${m.pct}%"></span></div>
                             <span class="missing-progress-pct">${m.pct}%</span>

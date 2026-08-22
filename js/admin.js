@@ -33,6 +33,53 @@ function initializeTabs() {
     if (dashboardTab) dashboardTab.classList.add('active');
 }
 
+// ─── Drawer da sidebar (mobile) ───
+// Abaixo de 720px a sidebar sai da tela (css/admin.css) e o unico caminho de
+// volta e o hamburguer da topbar. Todo o visual vem de css/mobile.css a partir
+// da classe #cfg-root.sidebar-open; aqui so alternamos o estado.
+function initSidebarDrawer() {
+    const root = document.getElementById('cfg-root');
+    const toggle = document.getElementById('cfg-sidebar-toggle');
+    const overlay = document.getElementById('cfg-sidebar-overlay');
+    if (!root || !toggle || !overlay) return;
+
+    const isOpen = () => root.classList.contains('sidebar-open');
+
+    function setOpen(open) {
+        root.classList.toggle('sidebar-open', open);
+        document.body.classList.toggle('cfg-drawer-lock', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+        // `inert` no conteudo resolve foco e leitura por leitor de tela de uma
+        // vez: com o drawer aberto o resto do painel sai da ordem de tabulacao.
+        const mainArea = root.querySelector('.main-area');
+        if (mainArea) mainArea.inert = open;
+        if (open) root.querySelector('#cfg-sidebar .sidebar-nav .tab-btn')?.focus();
+        else toggle.focus();
+    }
+
+    toggle.addEventListener('click', () => setOpen(!isOpen()));
+    overlay.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isOpen()) setOpen(false);
+    });
+
+    // Os botoes do rodape (Trocar Categoria / Backup / Voltar) navegam para
+    // fora da aba atual — delegacao, para nao mexer nos handlers originais.
+    root.querySelector('#cfg-sidebar .sidebar-footer')?.addEventListener('click', (event) => {
+        if (event.target.closest('button')) setOpen(false);
+    });
+
+    // Voltando para desktop com o drawer aberto, a sidebar reaparece fixa e o
+    // overlay/trava de scroll ficariam orfaos.
+    const mq = window.matchMedia('(max-width: 720px)');
+    const onChange = (event) => { if (!event.matches) setOpen(false); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+
+    U.closeSidebarDrawer = () => setOpen(false);
+}
+
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
@@ -377,6 +424,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             btn.addEventListener('click', () => {
                 const isCategoryIndependent = CATEGORY_INDEPENDENT_TABS.includes(btn.dataset.tab);
                 if (!currentDbPath && !isCategoryIndependent) { showWarning('Selecione uma categoria antes de continuar.'); return; }
+                // No mobile a aba foi escolhida dentro do drawer; so fecha
+                // depois da guarda acima, para o usuario poder escolher outra.
+                U.closeSidebarDrawer?.();
                 tabButtons.forEach(b => b.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
                 btn.classList.add('active');
@@ -1756,6 +1806,10 @@ document.getElementById('cfg-back-to-portal')?.addEventListener('click', closeAd
 // Ponte usada por js/portal-auth.js para abrir o painel apos validar a senha.
 window.__openAdmin = openAdminPanel;
 window.__closeAdmin = closeAdminPanel;
+
+// Ligado uma unica vez: os elementos do drawer existem no HTML estatico desde
+// o load, mesmo com #cfg-root ainda oculto.
+initSidebarDrawer();
 
 // ─── Ponte de dados/lógica usada pela camada de apresentação da aba
 // "Cursos" (js/admin-courses.js). Expõe leitura do estado e as mesmas

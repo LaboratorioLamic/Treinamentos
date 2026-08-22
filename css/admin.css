@@ -171,6 +171,13 @@
         }
         #cfg-root .category-badge.inactive { background: #f1f5f9; color: var(--text-3); }
 
+        /* Hamburguer da topbar e fundo do drawer: existem so no mobile.
+           O layout ligado fica em css/mobile.css (secao 6) — aqui apenas o
+           estado base, para nao mudar o `justify-content: space-between` da
+           topbar no desktop. */
+        #cfg-root .cfg-sidebar-toggle,
+        #cfg-root .cfg-sidebar-overlay { display: none; }
+
         /* === CONTENT === */
         #cfg-root .content-area { flex: 1; padding: 28px; }
 
