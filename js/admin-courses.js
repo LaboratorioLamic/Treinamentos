@@ -254,7 +254,7 @@ function openThemeFormModal({ subjectId, themeId } = {}) {
     });
 }
 document.getElementById('cfg-theme-form-close')?.addEventListener('click', () => ModalStack.closeTop());
-themeFormModal?.addEventListener('click', (event) => { if (event.target === themeFormModal) ModalStack.closeTop(); });
+// Clique no backdrop nao fecha o formulario de curso — apenas o X (evita perda de dados).
 
 document.getElementById('cfg-courses-add-btn')?.addEventListener('click', () => {
     const data = C().getData();
@@ -434,7 +434,7 @@ document.getElementById('cfg-course-detail-add-module')?.addEventListener('click
     ModalStack.open(moduleFormModal, { onClose: () => { C().resetModuleForm(); refreshDetailTabCounts(); } });
 });
 document.getElementById('cfg-module-form-close')?.addEventListener('click', () => ModalStack.closeTop());
-moduleFormModal?.addEventListener('click', (event) => { if (event.target === moduleFormModal) ModalStack.closeTop(); });
+// Clique no backdrop nao fecha o formulario de modulo — apenas o X (evita perda de dados).
 
 // Delegação: os botões "Editar" dos module-cards (renderizados pela função
 // legada populateModules()) continuam existindo; aqui só interceptamos o
@@ -477,7 +477,7 @@ document.getElementById('cfg-course-detail-add-quiz')?.addEventListener('click',
     ModalStack.open(quizFormModal, { onClose: () => { C().resetQuizForm(); refreshDetailTabCounts(); } });
 });
 document.getElementById('cfg-quiz-form-close')?.addEventListener('click', () => ModalStack.closeTop());
-quizFormModal?.addEventListener('click', (event) => { if (event.target === quizFormModal) ModalStack.closeTop(); });
+// Clique no backdrop nao fecha o formulario de questao — apenas o X (evita perda de dados).
 
 document.getElementById('cfg-quizzes-container')?.addEventListener('click', (event) => {
     if (event.target.closest('.edit-quiz')) {
