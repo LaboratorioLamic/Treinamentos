@@ -686,7 +686,7 @@
     function orderedThemes(subjectId) {
         const themes = currentTrainingData()[subjectId]?.themes || {};
         return Object.keys(themes)
-            .map(themeId => ({ id: themeId, ...themes[themeId] }))
+            .map(themeId => ({ ...themes[themeId], id: themeId }))
             .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id, 'pt-BR'));
     }
 
@@ -2921,7 +2921,7 @@
         renderCommentsTable(rows);
 
         renderCompletedTable(rows, slug, subjectId, themeId);
-        if (theme) renderMissingTable(rows, slug, subjectId, { id: themeId, ...theme });
+        if (theme) renderMissingTable(rows, slug, subjectId, { ...theme, id: themeId });
 
         courseChartRowsCache = rows;
         courseChartYearChip.setYears(yearsFromRows(rows));

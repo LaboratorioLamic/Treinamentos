@@ -915,7 +915,7 @@
             dropdownList.innerHTML = '';
             const subjects = Object.keys(trainingData)
                 .filter(id => trainingData[id] && trainingData[id].name && trainingData[id].name.trim() !== '')
-                .map(id => ({ id, ...trainingData[id] }));
+                .map(id => ({ ...trainingData[id], id }));
             const sortedSubjects = sortItems(subjects, orderData.subjects, 'id');
             sortedSubjects.forEach(({item: subject}) => {
                 const courseCount = Object.keys(subject.themes || {})
@@ -1016,7 +1016,7 @@
                 .filter(id => themes[id] && themes[id].name && themes[id].name.trim() !== '')
                 .filter(id => themes[id].active !== false)
                 .filter(id => themeVisibleForSession(themes[id]))
-                .map(id => ({ id, ...themes[id] }));
+                .map(id => ({ ...themes[id], id }));
             return sortItems(themeArray, orderData.themes?.[subjectId], 'id').map(({ item }) => item);
         }
 

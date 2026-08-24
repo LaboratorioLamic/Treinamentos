@@ -307,6 +307,10 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const themeIds = validKeys(themes);
                 if (!data.order.themes[subjectId]) { data.order.themes[subjectId] = themeIds; }
                 themeIds.forEach(themeId => {
+                    // Conserta o `id` interno de cursos migrados antes da
+                    // correção do migrateTheme: a chave do mapa é a verdade,
+                    // um id divergente aponta para outro curso do tema.
+                    if (themes[themeId].id !== themeId) { themes[themeId].id = themeId; }
                     if (!data.order.modules[subjectId]) { data.order.modules[subjectId] = {}; }
                     if (!data.order.modules[subjectId][themeId]) {
                         const moduleCount = themes[themeId].modules?.length || 0;
@@ -1228,7 +1232,13 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 showSpinner('cfg-theme-loading', true);
                 try {
                     const themeData = { ...data.trainingData[oldSubjectId].themes[themeId] };
+                    // O `id` gravado dentro do objeto tem que acompanhar a nova
+                    // chave: quem lê o tema usa theme.id para montar
+                    // `subjectId_themeId` (quiz, histórico, imagem). Deixar o id
+                    // antigo faz o curso migrado apontar para o curso que já
+                    // ocupa esse id no tema de destino.
                     const newThemeId = getNextId(data.trainingData[newSubjectId].themes);
+                    themeData.id = newThemeId;
                     data.trainingData[newSubjectId].themes[newThemeId] = themeData;
                     if (!data.order) data.order = { subjects: [], themes: {}, modules: {} };
                     if (!data.order.themes[newSubjectId]) data.order.themes[newSubjectId] = [];
