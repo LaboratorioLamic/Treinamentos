@@ -91,24 +91,82 @@
         // progressPathFor já começam com "/", então a base não leva barra final.
         const PROGRESS_REST_BASE = 'https://uniadmin-708f5-default-rtdb.firebaseio.com';
 
-        async function fetchFirebaseData() {
-            try {
-                const response = await fetch(`${PROGRESS_REST_BASE}/uniadmin/${currentCategorySlug}.json`);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                // Categoria ainda sem conteudo no banco: o Firebase devolve null.
-                const data = (await response.json()) || {};
-                orderData = data.order || {};
-                quizData = data.quizData || {};
-                quizStatus = data.quizStatus || {};
-                trainingData = data.trainingData || {};
-                populateDropdown();
-                loadProgression();
+        let initialContentLoaded = false;
+        let stopContentLive = null;
+
+        function applyCategoryContent(payload) {
+            // Categoria ainda sem conteudo no banco: o Firebase devolve null.
+            const data = payload || {};
+            orderData = data.order || {};
+            quizData = data.quizData || {};
+            quizStatus = data.quizStatus || {};
+            trainingData = data.trainingData || {};
+        }
+
+        // Redesenha o que já está na tela depois de uma alteração publicada
+        // pelo administrador. A galeria pode ser refeita à vontade; um curso
+        // aberto, não — arrancar o vídeo ou a avaliação de quem está no meio
+        // dela para mostrar conteúdo novo troca um problema por outro pior. Os
+        // dados novos já estão em memória e valem na próxima navegação.
+        function refreshOpenContent() {
+            const quizOpen = quizContainer && quizContainer.style.display !== 'none';
+            const courseOpen = contentDiv && contentDiv.style.display !== 'none';
+            if (quizOpen || courseOpen) return;
+            if (courseGallery && courseGallery.style.display !== 'none' && currentTrainingId) {
+                showCourseGallery(currentTrainingId);
+            }
+        }
+
+        // Escuta ao vivo em vez de leitura única.
+        //
+        // Com a leitura única, o portal servia pelo resto da sessão o conteúdo
+        // do instante em que a página abriu: um curso publicado, corrigido ou
+        // desativado no painel só aparecia para quem recarregasse. Aluno com a
+        // aba aberta o dia todo fazia avaliação de uma versão que já não era a
+        // vigente. Agora cada alteração chega sozinha.
+        function fetchFirebaseData() {
+            const U = window.UniAdmin;
+            const path = `/uniadmin/${currentCategorySlug}`;
+
+            function finishInitialLoad() {
                 document.getElementById('loading-overlay').style.display = 'none';
-            } catch (error) {
+                if (initialContentLoaded) return;
+                initialContentLoaded = true;
+                // Progressão é lida uma vez por sessão: ela reflete o que o
+                // aluno fez, não o que o administrador publicou, e reaplicá-la
+                // a cada evento sobrescreveria o avanço da tela atual.
+                loadProgression();
+            }
+
+            // Sem o SDK (ex.: página aberta de um contexto onde firebase-config
+            // não carregou), o caminho REST antigo ainda serve o primeiro paint.
+            if (!U || !U.live) {
+                fetch(`${PROGRESS_REST_BASE}/uniadmin/${currentCategorySlug}.json`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(payload => { applyCategoryContent(payload); populateDropdown(); finishInitialLoad(); })
+                    .catch(error => {
+                        console.error('Erro ao carregar dados do Firebase:', error);
+                        showWarning('Não foi possível carregar os dados. Tente novamente.');
+                        document.getElementById('loading-overlay').style.display = 'none';
+                    });
+                return;
+            }
+
+            if (stopContentLive) stopContentLive();
+            stopContentLive = U.live(path, snapshot => {
+                applyCategoryContent(snapshot.exists() ? snapshot.val() : {});
+                populateDropdown();
+                const wasFirst = !initialContentLoaded;
+                finishInitialLoad();
+                if (!wasFirst) refreshOpenContent();
+            }, error => {
                 console.error('Erro ao carregar dados do Firebase:', error);
                 showWarning('Não foi possível carregar os dados. Tente novamente.');
                 document.getElementById('loading-overlay').style.display = 'none';
-            }
+            });
         }
 
         const btn = document.getElementById('dropdownBtn');
@@ -609,7 +667,28 @@
             const built = buildCourseProgressRecord(subjectId, themeId);
             if (!built) return;
             const { record, path } = built;
-            U.ref(U.db, path).set(record).catch(error => {
+            // Transação, não `set`: o mesmo aluno pode estar com o curso aberto
+            // em duas abas ou dois aparelhos, e cada um carrega o activeMs de
+            // quando entrou. Com `set`, quem gravasse por último devolvia o
+            // contador ao valor dele e o tempo assistido no outro sumia —
+            // junto com os módulos concluídos lá. A transação lê o valor no
+            // servidor no momento da escrita e nunca deixa a progressão andar
+            // para trás; só um reset do administrador (que apaga o nó) zera.
+            U.ref(U.db, path).transaction(current => {
+                if (!current) return record;
+                return {
+                    ...record,
+                    total: record.total,
+                    done: Math.max(record.done || 0, current.done || 0),
+                    pct: Math.max(record.pct || 0, current.pct || 0),
+                    approved: record.approved !== null && record.approved !== undefined
+                        ? record.approved
+                        : (current.approved !== undefined ? current.approved : null),
+                    startedAt: Math.min(record.startedAt || Date.now(), current.startedAt || record.startedAt || Date.now()),
+                    activeMs: Math.max(record.activeMs || 0, current.activeMs || 0),
+                    updatedAt: Date.now()
+                };
+            }).catch(error => {
                 console.error('Erro ao sincronizar progressão do curso:', error);
             });
         }

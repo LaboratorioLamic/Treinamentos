@@ -114,6 +114,15 @@
         evaluate();
     });
 
+    // Se o socket nunca chegar a abrir, /.info/connected não emite `false` —
+    // simplesmente não emite nada, e dbConnected fica em `null` para sempre.
+    // Sem este prazo a página seguiria liberada, sem dado e sem aviso, que é
+    // exatamente o estado que esta guarda existe para não deixar acontecer.
+    var FIRST_CONNECT_DEADLINE_MS = 8000;
+    setTimeout(function () {
+        if (dbConnected === null) { dbConnected = false; evaluate(); }
+    }, FIRST_CONNECT_DEADLINE_MS);
+
     window.addEventListener('online', evaluate);
     window.addEventListener('offline', evaluate);
 

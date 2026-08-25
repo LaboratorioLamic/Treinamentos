@@ -75,7 +75,68 @@
         }
     }
 
-    U.StudentAuth = { getSession, clearSession, refreshSession };
+    // Acompanha a conta enquanto a aba estiver aberta.
+    //
+    // refreshSession() sozinha só valia no instante do carregamento: quem
+    // deixasse o portal aberto seguia com setor, função e nome de quando
+    // entrou, e — pior — uma conta desativada pelo administrador continuava
+    // navegando e gravando resultados até fechar a aba. Aqui a conta é a
+    // fonte, e a sessão local segue o que ela diz enquanto ela existir.
+    let stopSessionWatch = null;
+    let watchedSessionUserId = null;
+
+    function stopWatchingSession() {
+        if (stopSessionWatch) { stopSessionWatch(); stopSessionWatch = null; }
+        watchedSessionUserId = null;
+    }
+
+    function endSession(reason) {
+        stopWatchingSession();
+        clearSession();
+        document.dispatchEvent(new CustomEvent('uniadmin:session-updated'));
+        document.dispatchEvent(new CustomEvent('uniadmin:session-revoked', { detail: { reason } }));
+    }
+
+    function watchSession() {
+        const session = getSession();
+        if (!session?.userId || !U.live) { stopWatchingSession(); return; }
+        // Já assinado nesta conta: reatacar a cada evento de sessão só
+        // trocaria a assinatura por outra idêntica e ressincronizaria à toa.
+        if (watchedSessionUserId === session.userId && stopSessionWatch) return;
+        stopWatchingSession();
+        const watchedUserId = session.userId;
+        watchedSessionUserId = watchedUserId;
+        stopSessionWatch = U.live(`${USERS_PATH}/${watchedUserId}`, snapshot => {
+            const active = getSession();
+            // A sessão pode ter trocado (logout e login com outra conta) entre
+            // o attach e este evento; ignorar o que não é mais a conta atual.
+            if (!active || active.userId !== watchedUserId) return;
+            if (!snapshot.exists()) { endSession('removed'); return; }
+            const user = snapshot.val();
+            if (user.disabled) { endSession('disabled'); return; }
+            const changed = (active.role || null) !== (user.role || null)
+                || (active.unit || null) !== (user.unit || null)
+                || (active.isManager || false) !== (user.isManager || false)
+                || active.fullName !== user.fullName;
+            if (!changed) return;
+            updateSession({
+                fullName: user.fullName || active.fullName,
+                unit: user.unit || null,
+                role: user.role || null,
+                isManager: !!user.isManager
+            });
+            document.dispatchEvent(new CustomEvent('uniadmin:session-updated'));
+        });
+    }
+
+    U.StudentAuth = { getSession, clearSession, refreshSession, watchSession, stopWatchingSession };
+
+    // Login, logout e troca de conta passam todos por `session-updated`, então
+    // é aí que a assinatura é (re)apontada para a conta certa.
+    document.addEventListener('uniadmin:session-updated', () => {
+        if (getSession()) watchSession();
+        else stopWatchingSession();
+    });
 
     // ─── Progressão do curso (% de módulos assistidos) ───
     // Gravada por js/main.js em uniadmin/progress/byUser/{userId}/{slug}/{subjectId}/{themeId}
@@ -487,7 +548,28 @@
 
     // Revalida setor/função da sessão a cada carregamento: se o cargo mudou na
     // planilha, a galeria de cursos por função reflete isso sem novo login.
+    // Daí em diante quem mantém a sessão em dia é watchSession().
     refreshSession();
+    watchSession();
+
+    // Conta desativada ou removida enquanto a aba estava aberta. Continuar
+    // navegando com a sessão derrubada só produziria erros de gravação mais
+    // adiante — e resultados registrados por alguém que já não tem acesso.
+    document.addEventListener('uniadmin:session-revoked', (event) => {
+        const removed = event.detail?.reason === 'removed';
+        const notice = document.createElement('div');
+        notice.id = 'session-revoked-overlay';
+        notice.setAttribute('role', 'alertdialog');
+        notice.setAttribute('aria-modal', 'true');
+        notice.innerHTML = ''
+            + '<div class="connection-overlay-card">'
+            + '  <h2>Sessão encerrada</h2>'
+            + `  <p>${removed ? 'Sua conta foi removida.' : 'Sua conta foi desativada pelo administrador.'}</p>`
+            + '  <p class="connection-overlay-hint">A página será recarregada.</p>'
+            + '</div>';
+        document.body.appendChild(notice);
+        setTimeout(() => window.location.reload(), 2500);
+    });
 
     window.UniAdmin = U;
 })();

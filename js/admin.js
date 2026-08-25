@@ -14,6 +14,16 @@ const normalizeName = U.normalizeName; // js/crypto-utils.js
 let currentDbPath = null;
 let currentCategory = null;
 let data = { trainingData: {}, quizData: {} };
+// Espelho do que o servidor tinha na última leitura confirmada. `data` é o que
+// está na tela; a diferença entre os dois é exatamente o que precisa ser
+// gravado. Sem esta referência o painel só sabia regravar a árvore inteira, e
+// regravar a árvore inteira apaga o que outra sessão escreveu no intervalo.
+let baseline = { trainingData: {}, quizData: {} };
+// Contador de gravações em voo. Enquanto houver uma, o listener ignora o que
+// chega: o evento pode ser o eco da nossa própria escrita (ou um estado
+// intermediário dela) e reaplicá-lo faria a tela piscar para trás.
+let pendingSaves = 0;
+let stopCategoryLive = null;
 let currentSubjectId = null;
 let currentThemeId = null;
 let currentModuleIndex = null;
@@ -257,12 +267,17 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             try {
                 // Grava a estrutura vazia no caminho da categoria; as outras ficam intactas.
                 const emptyData = { trainingData: {}, quizData: {}, quizStatus: {}, order: { subjects: [], themes: {}, modules: {} } };
-                await set(ref(db, currentDbPath), emptyData);
-                data = emptyData;
+                pendingSaves += 1;
+                try { await set(ref(db, currentDbPath), emptyData); }
+                finally { pendingSaves -= 1; }
                 currentSubjectId = null;
                 currentThemeId = null;
-                initializeOrderFields();
-                populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
+                // Apagar é a única escrita que continua sendo um `set` da
+                // árvore inteira — é justamente o que a ação quer dizer. O
+                // baseline acompanha, senão o próximo save veria a categoria
+                // vazia como "tudo removido localmente" e tentaria apagá-la
+                // de novo, agora sobre o que outra sessão tivesse recriado.
+                applyRemoteState(emptyData);
                 document.getElementById('cfg-backup-modal').style.display = 'none';
                 showWarning(`Dados da categoria ${currentCategory} apagados.`);
             } catch (error) {
@@ -320,14 +335,82 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             });
         }
 
+        // Redesenha os seletores e listas a partir do `data` atual. Isolado
+        // porque agora existem duas origens para um redesenho: o carregamento
+        // da categoria e uma alteração feita por outra sessão.
+        function repopulateAll() {
+            populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
+            window.UniAdminCourses?.refresh?.();
+        }
+
+        // Redesenhar com um formulário aberto apagaria o que o administrador
+        // acabou de digitar. O dado novo é adotado do mesmo jeito — o que fica
+        // para depois é só o redesenho.
+        let repopulateDeferred = false;
+
+        function hasOpenModal() {
+            return [...document.querySelectorAll('#cfg-root .modal, #cfg-root .cfg-modal')]
+                .some(modal => !modal.hidden && getComputedStyle(modal).display !== 'none');
+        }
+
+        function repopulateWhenIdle() {
+            if (hasOpenModal()) { repopulateDeferred = true; return; }
+            repopulateDeferred = false;
+            repopulateAll();
+        }
+
+        // Ao fechar o último modal o redesenho adiado entra. Delegado no
+        // documento porque os modais são fechados por muitos caminhos
+        // diferentes (botão, backdrop, Esc) e não há um evento único de fecho.
+        ['click', 'keyup'].forEach(type => {
+            document.addEventListener(type, () => {
+                if (repopulateDeferred && !hasOpenModal()) repopulateWhenIdle();
+            });
+        });
+
+        // Adota um estado vindo do servidor como verdade. `baseline` guarda o
+        // valor cru; `data` recebe os campos de ordenação preenchidos por
+        // initializeOrderFields(), que passam a contar como alteração local e
+        // são persistidos no próximo save.
+        function applyRemoteState(remote, options) {
+            baseline = U.deepClone(remote) ?? { trainingData: {}, quizData: {} };
+            data = U.deepClone(remote) ?? { trainingData: {}, quizData: {} };
+            initializeOrderFields();
+            if (options && options.deferRender) repopulateWhenIdle();
+            else repopulateAll();
+        }
+
+        function stopCategoryLiveSync() {
+            if (stopCategoryLive) { stopCategoryLive(); stopCategoryLive = null; }
+        }
+        U.stopCategoryLiveSync = stopCategoryLiveSync;
+
+        // Enquanto a categoria está aberta, qualquer alteração feita em outra
+        // sessão chega aqui. Sem isto, um administrador com o painel aberto
+        // seguia editando a versão do conteúdo do momento em que entrou — e ao
+        // salvar levava essa versão de volta ao banco, desfazendo o trabalho do
+        // outro. O listener é o que impede o painel de operar sobre passado.
+        function startCategoryLiveSync() {
+            stopCategoryLiveSync();
+            const watchedPath = currentDbPath;
+            stopCategoryLive = U.live(watchedPath, snapshot => {
+                if (watchedPath !== currentDbPath) return;
+                if (pendingSaves > 0) return;
+                const remote = snapshot.exists() ? snapshot.val() : { trainingData: {}, quizData: {} };
+                // Eco da nossa própria escrita: `baseline` já foi adiantado
+                // para este valor no fim do save, então não há o que reaplicar.
+                if (U.deepEqual(remote, baseline)) return;
+                applyRemoteState(remote, { deferRender: true });
+                showWarning('O conteúdo foi atualizado por outra sessão.');
+            });
+        }
+
         async function fetchData() {
             if (!currentDbPath) { console.error('currentDbPath não definido'); return; }
             try {
                 const snapshot = await get(ref(db, currentDbPath));
-                data = snapshot.exists() ? snapshot.val() : { trainingData: {}, quizData: {} };
-                initializeOrderFields();
-                populateSubjectSelects(); populateSubjects(); populateThemes(); populateModules(); populateQuizzes();
-                window.UniAdminCourses?.refresh?.();
+                applyRemoteState(snapshot.exists() ? snapshot.val() : { trainingData: {}, quizData: {} });
+                startCategoryLiveSync();
                 // Não força mais a aba "Cursos" aqui — isso sobrescrevia a
                 // aba padrão do HTML (Dashboard) toda vez que uma categoria
                 // era carregada, fazendo o painel sempre abrir em Cursos em
@@ -342,10 +425,25 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             }
         }
 
+        // Grava só o que mudou desde a última leitura confirmada.
+        //
+        // Antes isto era `set(currentDbPath, data)`: a categoria inteira, a
+        // partir de uma cópia em memória que podia ter minutos de idade. Bastava
+        // um segundo administrador cadastrar um curso nesse intervalo para o
+        // save seguinte apagá-lo — a escrita não dizia "mudei o módulo 3", dizia
+        // "a categoria é isto aqui". O multi-path update endereça só os nós
+        // tocados, então alterações em partes diferentes da árvore convivem.
         async function saveData() {
             if (!currentDbPath) { console.error('currentDbPath não definido'); showWarning('Nenhuma categoria selecionada.'); return false; }
+            const savedPath = currentDbPath;
+            // Congela o que está sendo enviado: `data` pode continuar sendo
+            // editado enquanto a escrita está em voo, e a nova referência do
+            // servidor é o que foi enviado, não o que estiver na tela depois.
+            const payload = U.deepClone(data);
+            pendingSaves += 1;
             try {
-                await set(ref(db, currentDbPath), data);
+                await U.saveDiff(savedPath, baseline, payload);
+                if (savedPath === currentDbPath) baseline = payload;
                 // Ponte para a camada de apresentação da aba "Cursos" (js/admin-courses.js):
                 // qualquer save bem-sucedido (Tema/Assunto/Módulo/Avaliação) atualiza o grid.
                 window.UniAdminCourses?.refresh?.();
@@ -354,6 +452,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 console.error('Erro ao salvar dados:', error.message);
                 showWarning(`Não foi possível salvar os dados: ${error.message}`);
                 return false;
+            } finally {
+                pendingSaves -= 1;
             }
         }
 
@@ -1807,6 +1907,7 @@ function closeAdminPanel() {
     // Fora do painel não há nada para redesenhar: as assinaturas ao vivo do
     // Dashboard seriam tráfego sem destino.
     U.stopDashboardLiveSync?.();
+    U.stopCategoryLiveSync?.();
     // Volta a exigir a senha na próxima vez que abrirem as configurações.
     U.lock();
 }
