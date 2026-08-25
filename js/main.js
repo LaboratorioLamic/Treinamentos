@@ -1249,8 +1249,8 @@
 
         function renderPage(pageNum) {
             // Página 1 é capa: não conta tempo. A contagem começa na página 2.
-            // Exceção: PDF curto (até 4 páginas) — aí a página 1 já é conteúdo.
-            setModuleTimerGate(pageNum === 1 && totalPages > 4 ? 'waiting' : 'free');
+            // Exceção: PDF curto (até 6 páginas) — aí a página 1 já é conteúdo.
+            setModuleTimerGate(pageNum === 1 && totalPages > 6 ? 'waiting' : 'free');
             // Virar página é a interação de estudo do módulo de PDF: rearma (ou
             // solta) a trava de inatividade de 10 min.
             registerStudyActivity();
