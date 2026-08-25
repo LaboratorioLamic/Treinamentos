@@ -205,6 +205,10 @@
         // 'waiting' — módulo de vídeo parado/pausado, NÃO conta.
         let moduleTimerGate = 'free';
 
+        // Módulo atual é PDF/slide? Muda o texto do painel de tempo quando a
+        // trava está ativa (no PDF a trava é a página 1, não o play do vídeo).
+        let currentModuleIsPdf = false;
+
         // Trava por inatividade: 5 min sem interação de estudo (play de vídeo
         // ou virada de página do PDF) param a contagem. Fica separada de
         // moduleTimerGate porque as duas travas somam — o tempo só corre com o
@@ -359,8 +363,11 @@
                 note = 'Pausado por inatividade — dê play no vídeo ou passe uma página para retomar.';
             } else if (!running && moduleTimerGate === 'waiting') {
                 // Caso mais comum da trava por vídeo: aula aberta, vídeo parado.
+                // No PDF a trava equivalente é a capa (página 1).
                 icon = 'fa-circle-pause';
-                note = 'Pausado — dê play no vídeo para contar o tempo.';
+                note = currentModuleIsPdf
+                    ? 'Pausado — avance para a página 2 para contar o tempo.'
+                    : 'Pausado — dê play no vídeo para contar o tempo.';
             } else if (!running) {
                 icon = 'fa-circle-pause';
                 note = 'Pausado — a contagem volta ao retomar o curso.';
@@ -1241,6 +1248,9 @@
         }
 
         function renderPage(pageNum) {
+            // Página 1 é capa: não conta tempo. A contagem começa na página 2.
+            // Exceção: PDF curto (até 4 páginas) — aí a página 1 já é conteúdo.
+            setModuleTimerGate(pageNum === 1 && totalPages > 4 ? 'waiting' : 'free');
             // Virar página é a interação de estudo do módulo de PDF: rearma (ou
             // solta) a trava de inatividade de 10 min.
             registerStudyActivity();
@@ -1634,10 +1644,18 @@
             // 'waiting' (só conta ao dar play), módulo de PDF/slide conta
             // livremente. Sem isso, abrir uma aula de vídeo já contaria tempo
             // antes do primeiro play.
-            moduleTimerGate = mod.pdfUrl ? 'free' : 'waiting';
+            // Vídeo: 'waiting' até o play. PDF: também 'waiting' — a página 1
+            // é capa e não conta; renderPage libera ao sair dela (ou já na
+            // página 1 se o PDF tiver só uma página).
+            moduleTimerGate = 'waiting';
+            currentModuleIsPdf = !!mod.pdfUrl;
             // Abrir um módulo é interação: nunca cair num módulo novo já
             // pausado por inatividade anterior.
             idlePaused = false;
+            // Fecha a sessão que vinha do módulo anterior: sem isso
+            // resumeActiveCourseTimer sai cedo (mesmo curso, sessão aberta) e
+            // a trava do novo módulo nunca chegaria a pausar a contagem.
+            pauseActiveCourseTimer();
             // Retoma o contador ao voltar para o conteúdo — cobre tanto o
             // primeiro módulo quanto a volta depois de uma prova (loadQuiz
             // pausa e esquece o curso).
