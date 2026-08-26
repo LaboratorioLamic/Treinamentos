@@ -806,9 +806,14 @@ var UniAdmin = window.UniAdmin || {};
                     <div class="ranking-detail-stat"><b>${entry.comentarios}</b><span>Comentários</span></div>
                     <div class="ranking-detail-stat"><b>${fmtDuration(entry.tempoMedioMs)}</b><span>Tempo médio por curso</span></div>
                 </div>
-                <button type="button" class="ranking-see-courses-btn" data-see-courses="${escapeHtml(entry.userId)}">
-                    <i class="fas fa-list-check"></i> Ver cursos
-                </button>
+                <div class="ranking-detail-actions">
+                    <button type="button" class="ranking-see-courses-btn" data-see-courses="${escapeHtml(entry.userId)}">
+                        <i class="fas fa-list-check"></i> Ver cursos
+                    </button>
+                    <button type="button" class="ranking-params-btn" data-see-params="${escapeHtml(entry.userId)}">
+                        <i class="fas fa-sliders"></i> Parâmetros
+                    </button>
+                </div>
             </div>`;
 
         if (typeof Chart === 'undefined') return;
@@ -920,6 +925,158 @@ var UniAdmin = window.UniAdmin || {};
         document.getElementById('ranking-courses-overlay')?.classList.remove('is-open');
     }
 
+    /* ─── Janela "Parâmetros" ─── */
+
+    // Os sete critérios na MESMA ordem de compareEntries() — esta é a fonte de
+    // verdade visual da cascata de desempate. `value` devolve o texto exibido,
+    // `meter` (0..100) desenha a barrinha e `better` diz se mais é melhor.
+    const PARAM_ITEMS = [
+        {
+            icon: 'fa-graduation-cap', title: '% de cursos concluídos da função',
+            hint: 'Aprovados ÷ cursos ativos que a função enxerga.',
+            better: 'higher', recent: false,
+            value: e => `${fmt1(e.pctConclusao)}%`,
+            sub: e => `${e.concluidos} de ${e.denom} cursos`,
+            meter: e => e.pctConclusao
+        },
+        {
+            icon: 'fa-star', title: 'Nota média',
+            hint: 'Média da melhor nota de cada curso concluído.',
+            better: 'higher', recent: true,
+            value: e => e.notaMedia > 0 ? fmt1(e.notaMedia) : '—',
+            sub: () => 'escala de 0 a 10',
+            meter: e => Math.min(100, e.notaMedia * 10)
+        },
+        {
+            icon: 'fa-rotate-right', title: 'Retentativas',
+            hint: 'Envios além do primeiro em cada curso. O ideal é 0.',
+            better: 'lower', recent: true,
+            value: e => fmtInt(e.retentativas),
+            sub: e => e.retentativas === 0 ? 'nenhuma retentativa' : 'quanto menos, melhor',
+            meter: e => Math.max(0, 100 - Math.min(100, e.retentativas * 20))
+        },
+        {
+            icon: 'fa-book', title: 'Cursos realizados',
+            hint: 'Avaliações concluídas (enviadas), aprovadas ou não.',
+            better: 'higher', recent: false,
+            value: e => fmtInt(e.cursosRealizados),
+            sub: e => `de ${e.denom} elegíveis`,
+            meter: e => e.denom > 0 ? Math.min(100, (e.cursosRealizados / e.denom) * 100) : 0
+        },
+        {
+            icon: 'fa-clock', title: '% de pontualidade',
+            hint: 'Entregas no prazo ÷ (no prazo + em atraso).',
+            better: 'higher', recent: true,
+            value: e => e.temPrazos ? `${fmt1(e.pctPontualidade)}%` : '—',
+            sub: e => e.temPrazos ? `${e.onTime} no prazo · ${e.late} em atraso` : 'sem prazos definidos',
+            meter: e => e.temPrazos ? e.pctPontualidade : 0
+        },
+        {
+            icon: 'fa-comment-dots', title: 'Comentários',
+            hint: 'Avaliações enviadas com comentário — quanto mais, melhor.',
+            better: 'higher', recent: true,
+            value: e => fmtInt(e.comentarios),
+            sub: e => e.cursosRealizados > 0 ? `em ${e.cursosRealizados} avaliações` : 'nenhuma avaliação',
+            meter: e => e.cursosRealizados > 0 ? Math.min(100, (e.comentarios / e.cursosRealizados) * 100) : 0
+        },
+        {
+            icon: 'fa-hourglass-half', title: 'Tempo médio de conclusão',
+            hint: 'Tempo médio ativo por curso concluído — quanto maior, melhor.',
+            better: 'higher', recent: true,
+            value: e => fmtDuration(e.tempoMedioMs),
+            sub: () => 'tempo ativo por curso',
+            // 30 min de tempo ativo já enche a barra: acima disso a diferença
+            // não diz mais nada visualmente.
+            meter: e => Math.min(100, (Number(e.tempoMedioMs) || 0) / (30 * 60 * 1000) * 100)
+        }
+    ];
+
+    function paramRowHtml(item, entry, index) {
+        const meter = Math.max(0, Math.min(100, Number(item.meter(entry)) || 0));
+        const lower = item.better === 'lower';
+        return `
+            <li class="param-row">
+                <span class="param-order">${index + 1}º</span>
+                <span class="param-icon"><i class="fas ${item.icon}"></i></span>
+                <div class="param-body">
+                    <div class="param-title">
+                        <strong>${escapeHtml(item.title)}</strong>
+                        <span class="param-goal ${lower ? 'is-lower' : ''}">
+                            <i class="fas fa-arrow-${lower ? 'down' : 'up'}"></i> ${lower ? 'menos é melhor' : 'mais é melhor'}
+                        </span>
+                        ${item.recent ? '<span class="param-window">últimos 12 meses</span>' : ''}
+                    </div>
+                    <div class="param-hint">${escapeHtml(item.hint)}</div>
+                    <div class="param-meter"><span style="width:${meter.toFixed(2)}%"></span></div>
+                </div>
+                <div class="param-value">
+                    <b>${item.value(entry)}</b>
+                    <small>${escapeHtml(item.sub(entry))}</small>
+                </div>
+            </li>`;
+    }
+
+    // Mesmo padrão da janela "Ver cursos": overlay próprio com id fixo,
+    // reaproveitado entre aberturas, por cima do modal do ranking.
+    function openParamsWindow(entry) {
+        if (!entry) return;
+        let overlay = document.getElementById('ranking-params-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'ranking-params-overlay';
+            overlay.className = 'ranking-courses-overlay ranking-params-overlay';
+            overlay.innerHTML = `
+                <div class="ranking-courses-card ranking-params-card">
+                    <button type="button" class="ranking-courses-close" id="ranking-params-close" aria-label="Fechar">&times;</button>
+                    <div class="ranking-params-head">
+                        <div class="ranking-courses-avatar" id="ranking-params-avatar"></div>
+                        <div class="ranking-params-head-text">
+                            <span class="ranking-params-eyebrow"><i class="fas fa-scale-balanced"></i> Critério de desempate</span>
+                            <h3 id="ranking-params-name"></h3>
+                            <p id="ranking-params-sub"></p>
+                        </div>
+                    </div>
+                    <div class="ranking-courses-body ranking-params-body">
+                        <p class="ranking-params-intro">Os parâmetros são avaliados <strong>nesta ordem</strong>. O primeiro em que duas pessoas diferem decide a posição.</p>
+                        <ol class="param-list" id="ranking-params-list"></ol>
+                        <p class="ranking-params-foot">
+                            <i class="fas fa-clock-rotate-left"></i>
+                            Os critérios marcados como <em>últimos 12 meses</em> olham só o desempenho recente.
+                            Persistindo o empate em todos eles, o desempate final é alfabético.
+                        </p>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', event => { if (event.target === overlay) closeParamsWindow(); });
+            overlay.querySelector('#ranking-params-close').addEventListener('click', closeParamsWindow);
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && overlay.classList.contains('is-open')) closeParamsWindow();
+            });
+        }
+
+        overlay.querySelector('#ranking-params-avatar').innerHTML =
+            `<span style="--initials-hue:${initialsHue(entry.fullName)}">${escapeHtml(initials(entry.fullName))}</span>`;
+        overlay.querySelector('#ranking-params-name').textContent = entry.fullName;
+        overlay.querySelector('#ranking-params-sub').textContent =
+            `${entry.role || 'Sem função'}${entry.unit ? ` · ${entry.unit}` : ''}`;
+        overlay.querySelector('#ranking-params-list').innerHTML =
+            PARAM_ITEMS.map((item, i) => paramRowHtml(item, entry, i)).join('');
+
+        overlay.classList.add('is-open');
+        // As barras nascem em 0 (como em animateBars) para a janela abrir com
+        // o preenchimento acontecendo, não já pronto.
+        overlay.querySelectorAll('.param-meter > span').forEach((bar, i) => {
+            const target = bar.style.width;
+            bar.style.width = '0%';
+            bar.style.transitionDelay = `${Math.min(i * 55, 500)}ms`;
+            requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = target; }));
+        });
+    }
+
+    function closeParamsWindow() {
+        document.getElementById('ranking-params-overlay')?.classList.remove('is-open');
+    }
+
     function wire(root, entries) {
         const byId = new Map(entries.map(e => [e.userId, e]));
 
@@ -989,10 +1146,17 @@ var UniAdmin = window.UniAdmin || {};
         // um detalhe (linha ou pódio) é expandido — renderDetail roda depois
         // deste wire().
         root.addEventListener('click', event => {
-            const btn = event.target.closest('[data-see-courses]');
-            if (!btn) return;
-            event.stopPropagation();
-            openCoursesWindow(byId.get(btn.dataset.seeCourses));
+            const coursesBtn = event.target.closest('[data-see-courses]');
+            if (coursesBtn) {
+                event.stopPropagation();
+                openCoursesWindow(byId.get(coursesBtn.dataset.seeCourses));
+                return;
+            }
+            const paramsBtn = event.target.closest('[data-see-params]');
+            if (paramsBtn) {
+                event.stopPropagation();
+                openParamsWindow(byId.get(paramsBtn.dataset.seeParams));
+            }
         });
 
         // Botão "Critério de desempate": abre/fecha a legenda como popover.

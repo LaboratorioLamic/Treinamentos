@@ -747,13 +747,17 @@
     .podium-step.is-first  { order: 1; }
     .podium-step.is-second { order: 2; }
     .podium-step.is-third  { order: 3; }
+    /* Nome ocupa a largura toda numa faixa própria: dividindo a linha com o
+       bloco de percentual (que é largo por causa de "100,0%"), a coluna do
+       nome colapsava para "A…" em telas de ~390px. */
     .podium-step {
         width: 100%; max-width: 400px;
         display: grid;
-        grid-template-columns: auto minmax(0,1fr) auto auto;
+        grid-template-columns: auto minmax(0,1fr) auto;
         grid-template-areas:
-            "avatar name  block caret"
-            "avatar role  block caret";
+            "avatar name  caret"
+            "avatar role  caret"
+            "block  block block";
         align-items: center; column-gap: 12px; row-gap: 0;
         padding: 12px 14px;
         background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -762,20 +766,28 @@
     .podium-crown { position: absolute; top: -11px; left: 12px; font-size: 17px; }
     .podium-avatar { grid-area: avatar; }
     .is-first .podium-avatar { width: 58px; height: 58px; font-size: 1.15em; }
-    .podium-name { grid-area: name; text-align: left; align-self: flex-end; }
+    .podium-name {
+        grid-area: name; text-align: left; align-self: flex-end;
+        white-space: normal; overflow: visible; text-overflow: clip;
+        line-height: 1.25; overflow-wrap: anywhere;
+    }
     .podium-role { grid-area: role; text-align: left; align-self: flex-start; }
     .podium-block {
-        grid-area: block; width: auto; margin: 0;
+        grid-area: block; width: 100%; margin: 10px 0 0;
         padding: 8px 12px; border-radius: 10px;
         border: 1px solid var(--border); text-align: center;
+        display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap;
     }
+    .podium-block .podium-caption { width: 100%; margin-top: 0; }
     .is-first .podium-block,
     .is-second .podium-block,
     .is-third .podium-block { padding: 8px 12px; }
     .is-first .podium-pct { font-size: 1.4em; }
-    /* Nota+cursos some no card empilhado — já ficam no detalhe expandido, e
-       o card mobile não tem largura para uma terceira linha de estatística. */
-    .podium-stats, .podium-punctual { display: none; }
+    /* Nota+cursos some no card empilhado (já ficam no detalhe expandido), mas
+       o balão de "% no prazo" fica: é critério de desempate e sumia por
+       completo no mobile. Ele entra na faixa do bloco, abaixo do percentual. */
+    .podium-stats { display: none; }
+    .podium-punctual { width: 100%; margin: 6px 0 0; justify-content: center; }
     .podium-caret { grid-area: caret; margin: 0; }
 
     /* Linha da lista: chips descem para uma segunda faixa. */
@@ -795,6 +807,10 @@
     .ranking-you-body { gap: 11px; }
     .ranking-you-body .ranking-chips { justify-content: flex-start; }
 
+    /* "Parâmetros" desce para baixo de "Ver cursos": lado a lado os dois
+       rótulos ficariam apertados demais em ~390px. */
+    .ranking-detail-actions { flex-direction: column; }
+
     /* Detalhe empilhado: lado a lado, o grafico nao encolhe (flex-shrink:0 em
        css/main.css) e empurra as estatisticas para fora da tela. */
     .ranking-detail-inner { flex-direction: column; align-items: stretch; padding: 16px 14px; gap: 14px; }
@@ -806,6 +822,20 @@
     .ranking-courses-card { max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; }
     .ranking-courses-head { padding: 18px 46px 16px 16px; }
     .ranking-courses-body { padding: 14px 14px 18px; }
+
+    /* Linha de parâmetro: o valor desce para uma segunda faixa, alinhado à
+       esquerda sob o texto — à direita ele espremia o título. */
+    .ranking-params-head { padding: 18px 46px 16px 16px; }
+    .param-row {
+        grid-template-columns: 26px 34px minmax(0,1fr);
+        row-gap: 8px; padding: 12px;
+    }
+    .param-order { grid-column: 1; grid-row: 1; align-self: start; }
+    .param-icon  { grid-column: 2; grid-row: 1; align-self: start; }
+    .param-body  { grid-column: 3; grid-row: 1; }
+    .param-value { grid-column: 1 / -1; grid-row: 2; text-align: left; min-width: 0; }
+    .param-value b { display: inline; font-size: 1em; }
+    .param-value small { display: inline; margin-left: 6px; }
     .course-mini-grid { grid-template-columns: 1fr; }
 }
 
