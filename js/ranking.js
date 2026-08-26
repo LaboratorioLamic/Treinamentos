@@ -136,6 +136,36 @@ var UniAdmin = window.UniAdmin || {};
         return !DISABLED_SLUGS.includes(slug || currentSlug());
     }
 
+    /* ─── Correspondência de função ─── */
+
+    // O cargo do colaborador vem livre da planilha (coluna F) e costuma trazer
+    // a especialização junto — "Analista - Biomédico", "RH - Gerente". Já a
+    // função marcada no curso é o nome-base ("Analista", "RH"). Comparar por
+    // igualdade exata deixava essas pessoas com denominador 0: o curso não
+    // entrava na conta delas nem quando já o tinham concluído.
+    //
+    // A regra é hierárquica e só desce um nível: "Analista - Biomédico" casa
+    // com "Analista", mas "Analista" NÃO casa com "Analista - Biomédico" — quem
+    // é só "Analista" não deve herdar o curso exclusivo do biomédico.
+    // O separador é o hífen entre espaços, que é como a planilha escreve; a
+    // barra ("Atendente/Coletador") é cargo próprio, não hierarquia, e por isso
+    // fica de fora.
+    function roleBase(role) {
+        const key = norm(role);
+        const cut = key.indexOf(' - ');
+        return cut === -1 ? key : key.slice(0, cut).trim();
+    }
+
+    // `courseRole` é a função marcada no curso; `userRole`, o cargo da pessoa.
+    function roleMatches(courseRole, userRole) {
+        const course = norm(courseRole);
+        const user = norm(userRole);
+        if (!course || !user) return false;
+        if (course === user) return true;
+        // Especialização do colaborador cobre a função-base do curso.
+        return roleBase(user) === course;
+    }
+
     /* ─── Denominador por função ─── */
 
     // Quantos cursos ativos cada função enxerga, e a lista completa deles.
@@ -171,21 +201,33 @@ var UniAdmin = window.UniAdmin || {};
             });
         });
 
+        // Cursos marcados para funções que casam com o cargo da pessoa. Varre
+        // as chaves em vez de fazer lookup direto porque a correspondência é
+        // hierárquica (ver roleMatches), não igualdade.
+        function coursesMatching(role) {
+            const found = [];
+            roleCourses.forEach((courses, courseRoleKey) => {
+                if (roleMatches(courseRoleKey, role)) found.push(...courses);
+            });
+            return found;
+        }
+
         return {
             openTotal,
             byRole,
             // Sem função cadastrada, a pessoa só enxerga os cursos abertos.
-            totalFor(role) { return openTotal + (byRole.get(norm(role)) || 0); },
-            // Lista completa (abertos + os da função), sem duplicar um curso
-            // que seja aberto E também marcado para a função.
+            totalFor(role) { return this.coursesFor(role).length; },
+            // Lista completa (abertos + os da função). Desduplicada: um curso
+            // pode ser aberto E marcado para a função, ou estar marcado para
+            // duas funções que casam com o mesmo cargo.
             coursesFor(role) {
-                const key = norm(role);
-                const extra = roleCourses.get(key) || [];
-                const seen = new Set(openCourses.map(c => `${c.subjectId}/${c.themeId}`));
-                const merged = openCourses.slice();
-                extra.forEach(c => {
+                const seen = new Set();
+                const merged = [];
+                openCourses.concat(coursesMatching(role)).forEach(c => {
                     const k = `${c.subjectId}/${c.themeId}`;
-                    if (!seen.has(k)) { seen.add(k); merged.push(c); }
+                    if (seen.has(k)) return;
+                    seen.add(k);
+                    merged.push(c);
                 });
                 return merged;
             }
@@ -1080,7 +1122,7 @@ var UniAdmin = window.UniAdmin || {};
         }
     });
 
-    U.Ranking = { open, closeModal, renderInto, isEnabledFor, compareEntries, aggregate, buildRoleCourseCounts };
+    U.Ranking = { open, closeModal, renderInto, isEnabledFor, compareEntries, aggregate, buildRoleCourseCounts, roleMatches, roleBase };
 })();
 
 window.UniAdmin = UniAdmin;

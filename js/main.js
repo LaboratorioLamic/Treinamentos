@@ -1108,6 +1108,12 @@
             if (session?.isManager) return true;
             const role = (session?.role || '').trim();
             if (!role) return false;
+            // Correspondência hierárquica (js/ranking.js:roleMatches): o cargo
+            // da planilha traz a especialização ("Analista - Biomédico") e o
+            // curso é marcado pelo nome-base ("Analista"). Igualdade exata
+            // escondia o curso de quem tem cargo especializado.
+            const matches = window.UniAdmin?.Ranking?.roleMatches;
+            if (matches) return roles.some(r => matches(r, role));
             const key = window.UniAdmin.normalizeName(role);
             return roles.some(r => window.UniAdmin.normalizeName(r) === key);
         }
