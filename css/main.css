@@ -1887,6 +1887,21 @@
             color: var(--text-muted);
         }
 
+        .course-tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .course-tag-row .course-cert-tag { margin-top: 10px; }
+
+        .course-time-tag {
+            background: rgba(59, 130, 246, 0.14);
+            color: #1d4ed8;
+            font-variant-numeric: tabular-nums;
+        }
+
         .gallery-empty {
             display: flex;
             flex-direction: column;

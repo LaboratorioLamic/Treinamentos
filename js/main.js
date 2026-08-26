@@ -1207,12 +1207,29 @@
                 <span><i class="fas fa-clipboard-list"></i> ${quizData[`${subjectId}_${theme.id}`]?.length || 0} questões</span>`;
             body.appendChild(meta);
 
+            const tagRow = document.createElement('div');
+            tagRow.className = 'course-tag-row';
+
             const certTag = document.createElement('div');
             certTag.className = theme.certificateEnabled ? 'course-cert-tag has-cert' : 'course-cert-tag no-cert';
             certTag.innerHTML = theme.certificateEnabled
                 ? '<i class="fas fa-award"></i> Emite certificado'
                 : '<i class="fas fa-ban"></i> Não emite certificado';
-            body.appendChild(certTag);
+            tagRow.appendChild(certTag);
+
+            // Balão do tempo estimado: só aparece em curso com
+            // expectedCompletionMs configurado (mesmo campo do painel
+            // "Tempo mínimo projetado" da sidebar).
+            const expectedMs = Number(theme.expectedCompletionMs);
+            if (Number.isFinite(expectedMs) && expectedMs > 0) {
+                const timeTag = document.createElement('div');
+                timeTag.className = 'course-cert-tag course-time-tag';
+                timeTag.innerHTML = `<i class="fas fa-clock"></i> Tempo estimado ${formatElapsedHHMMSS(expectedMs)}`;
+                timeTag.title = `Tempo estimado para conclusão: ${formatElapsedHHMMSS(expectedMs)}`;
+                tagRow.appendChild(timeTag);
+            }
+
+            body.appendChild(tagRow);
 
             const progress = document.createElement('div');
             progress.className = 'course-progress';
