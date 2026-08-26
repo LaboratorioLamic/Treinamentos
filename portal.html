@@ -18,13 +18,13 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css?v=202608251200">
-    <link rel="stylesheet" href="css/admin.css?v=202608251200">
-    <link rel="stylesheet" href="css/admin-courses.css?v=202608251200">
-    <link rel="stylesheet" href="css/auth.css?v=202608251200">
-    <link rel="stylesheet" href="css/certificate.css?v=202608251200">
+    <link rel="stylesheet" href="css/main.css?v=202608261200">
+    <link rel="stylesheet" href="css/admin.css?v=202608261200">
+    <link rel="stylesheet" href="css/admin-courses.css?v=202608261200">
+    <link rel="stylesheet" href="css/auth.css?v=202608261200">
+    <link rel="stylesheet" href="css/certificate.css?v=202608261200">
     <!-- Camada de override mobile: precisa ser SEMPRE a ultima folha. -->
-    <link rel="stylesheet" href="css/mobile.css?v=202608251200">
+    <link rel="stylesheet" href="css/mobile.css?v=202608261200">
 </head>
 <body>
 
@@ -138,6 +138,14 @@
         </div>
     </div>
 
+    <!-- ─── MODAL: RANKING ─── -->
+    <div class="modal ranking-modal" id="ranking-modal" role="dialog" aria-modal="true" aria-label="Ranking de colaboradores">
+        <div class="modal-content ranking-modal-content">
+            <button type="button" class="ranking-modal-close" id="ranking-modal-close" aria-label="Fechar ranking">&times;</button>
+            <div class="ranking-modal-body" id="ranking-modal-body"></div>
+        </div>
+    </div>
+
     <!-- ─── SELECTION BAR ─── -->
     <div class="selection-bar">
         <div class="selection-inner">
@@ -171,6 +179,11 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Reabre o ranking sem perder o curso aberto (js/ranking.js). -->
+            <button type="button" id="ranking-btn" class="ranking-btn" title="Ver ranking" aria-label="Ver ranking">
+                <i class="fas fa-trophy"></i><span>Ranking</span>
+            </button>
         </div>
     </div>
 
@@ -196,11 +209,17 @@
             </div>
         </div>
 
-        <!-- Welcome state (before course selection) -->
+        <!-- Welcome state (before course selection). Em Treinamentos e Educação
+             Continuada o ranking toma esse espaço (js/ranking.js preenche
+             #welcome-ranking e esconde o fallback); Estágios e falha de rede
+             continuam vendo o texto original. -->
         <div class="welcome-screen" id="welcome-screen">
-            <div class="welcome-icon"><i class="fas fa-play-circle"></i></div>
-            <h2>Selecione um tema para começar</h2>
-            <p>Escolha o Tema no menu acima e os cursos disponíveis aparecerão aqui em cards.</p>
+            <div id="welcome-fallback" class="welcome-fallback">
+                <div class="welcome-icon"><i class="fas fa-play-circle"></i></div>
+                <h2>Selecione um tema para começar</h2>
+                <p>Escolha o Tema no menu acima e os cursos disponíveis aparecerão aqui em cards.</p>
+            </div>
+            <div id="welcome-ranking"></div>
         </div>
 
         <!-- Course content -->
@@ -2235,28 +2254,30 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-    <script src="js/course-image.js?v=202608251200"></script>
-    <script src="js/main.js?v=202608251200"></script>
-    <script src="js/firebase-config.js?v=202608251200"></script>
-    <script src="js/connection-guard.js?v=202608251200"></script>
-    <script src="js/db-sync.js?v=202608251200"></script>
-    <script src="js/crypto-utils.js?v=202608251200"></script>
-    <script src="js/deadlines.js?v=202608251200"></script>
-    <script src="js/attempts.js?v=202608251200"></script>
-    <script src="js/certificate.js?v=202608251200"></script>
-    <script src="js/colaboradores-sync.js?v=202608251200"></script>
-    <script src="js/ui.js?v=202608251200"></script>
-    <script src="js/auth.js?v=202608251200"></script>
-    <script src="js/student-auth.js?v=202608251200"></script>
-    <script src="js/admin.js?v=202608251200"></script>
-    <script src="js/admin-courses.js?v=202608251200"></script>
-    <script src="js/admin-colaboradores.js?v=202608251200"></script>
-    <script src="js/admin-users.js?v=202608251200"></script>
-    <script src="js/admin-excel.js?v=202608251200"></script>
-    <script src="js/admin-dashboard.js?v=202608251200"></script>
-    <script src="js/admin-history.js?v=202608251200"></script>
-    <script src="js/portal-auth.js?v=202608251200"></script>
-    <script src="js/student-profile.js?v=202608251200"></script>
-    <script src="js/student-header.js?v=202608251200"></script>
+    <script src="js/course-image.js?v=202608261200"></script>
+    <script src="js/main.js?v=202608261200"></script>
+    <script src="js/firebase-config.js?v=202608261200"></script>
+    <script src="js/connection-guard.js?v=202608261200"></script>
+    <script src="js/db-sync.js?v=202608261200"></script>
+    <script src="js/crypto-utils.js?v=202608261200"></script>
+    <script src="js/deadlines.js?v=202608261200"></script>
+    <script src="js/attempts.js?v=202608261200"></script>
+    <script src="js/certificate.js?v=202608261200"></script>
+    <script src="js/colaboradores-sync.js?v=202608261200"></script>
+    <script src="js/ui.js?v=202608261200"></script>
+    <script src="js/auth.js?v=202608261200"></script>
+    <script src="js/student-auth.js?v=202608261200"></script>
+    <script src="js/admin.js?v=202608261200"></script>
+    <script src="js/admin-courses.js?v=202608261200"></script>
+    <script src="js/admin-colaboradores.js?v=202608261200"></script>
+    <script src="js/admin-users.js?v=202608261200"></script>
+    <script src="js/admin-excel.js?v=202608261200"></script>
+    <script src="js/admin-dashboard.js?v=202608261200"></script>
+    <script src="js/admin-history.js?v=202608261200"></script>
+    <script src="js/portal-auth.js?v=202608261200"></script>
+    <script src="js/student-profile.js?v=202608261200"></script>
+    <script src="js/student-header.js?v=202608261200"></script>
+    <!-- Depois de admin-history.js (U.getHistoryRows) e student-auth.js (sessão). -->
+    <script src="js/ranking.js?v=202608261200"></script>
 </body>
 </html>

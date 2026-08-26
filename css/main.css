@@ -24,6 +24,10 @@
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
             --shadow: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
             --shadow-lg: 0 10px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+            /* Pódio do ranking (js/ranking.js) */
+            --gold: #d4a017;   --gold-soft: #fef3c7;
+            --silver: #8494a8; --silver-soft: #eef2f7;
+            --bronze: #b45309; --bronze-soft: #fde4c8;
         }
 
         body {
@@ -2244,3 +2248,535 @@
         .quiz-timer-box.is-urgent .quiz-timer-clock { color: var(--danger); }
         .quiz-timer-box.is-urgent .quiz-timer-icon { background: rgba(239, 68, 68, 0.14); color: var(--danger); }
         .quiz-timer-box.is-urgent .quiz-timer-fill { background: linear-gradient(90deg, var(--danger), #f87171); }
+
+        /* ─── RANKING ─────────────────────────────────────────────────────
+           Painel competitivo do portal (js/ranking.js). Renderizado em dois
+           modos: `inline` dentro do #welcome-screen e `modal` por cima do
+           curso aberto — mesmo HTML, só muda o invólucro. */
+
+        /* Botão da barra de seleção */
+        .ranking-btn {
+            margin-left: auto;
+            align-self: flex-end;
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 18px;
+            border: none; border-radius: var(--radius);
+            background: linear-gradient(135deg, #f2b705, var(--gold) 55%, #a97406);
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.82em; font-weight: 700; letter-spacing: 0.01em;
+            cursor: pointer;
+            box-shadow: 0 4px 14px -4px rgba(212,160,23,0.65), inset 0 1px 0 rgba(255,255,255,0.45);
+            transition: transform .16s, box-shadow .16s, filter .16s;
+        }
+        .ranking-btn i { font-size: 1.05em; }
+        .ranking-btn:hover { transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 8px 22px -6px rgba(212,160,23,0.8), inset 0 1px 0 rgba(255,255,255,0.45); }
+        .ranking-btn:active { transform: translateY(0); }
+        .ranking-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* Modo inline: o welcome-screen deixa de ser um bloco centrado estreito.
+           Sem `overflow:hidden` no painel — ele criaria um container de scroll e
+           o card "Sua posição" (sticky) pararia de grudar; os cantos são
+           arredondados no primeiro e no último filho. */
+        .welcome-screen.has-ranking { padding: 0; align-items: stretch; gap: 0; }
+        .ranking-host.is-inline { width: 100%; }
+        /* O texto "Selecione um tema…" ganhou um invólucro para poder sumir de
+           uma vez; sem isto ele perderia a centralização que herdava do flex
+           do .welcome-screen. */
+        .welcome-fallback { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        /* Estágios não tem ranking: o host fica vazio e não deve abrir espaço. */
+        #welcome-ranking:empty { display: none; }
+        .ranking-host.is-inline .ranking-panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+        .ranking-host.is-inline .ranking-list,
+        .ranking-host.is-inline .ranking-empty,
+        .ranking-host.is-inline .ranking-skeleton { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+        /* O <header> do portal é sticky com 68px — sem esse recuo o card
+           passaria por baixo dele. */
+        .ranking-host.is-inline .ranking-you { top: 68px; }
+
+        /* Modal. O scroll fica no corpo, não no .modal-content: assim o botão
+           de fechar (absolute) não sobe junto com o conteúdo, e o corpo vira o
+           container de scroll de que o card "Sua posição" precisa para grudar. */
+        .ranking-modal .modal-content.ranking-modal-content {
+            max-width: 1040px; width: 100%; max-height: 92vh;
+            display: flex; flex-direction: column;
+            overflow: hidden; padding: 0; border-radius: var(--radius-lg);
+        }
+        .ranking-modal .modal-content.ranking-modal-content::before { display: none; }
+        .ranking-modal-body { flex: 1; min-height: 0; overflow: auto; }
+        .ranking-modal-close {
+            position: absolute; top: 14px; right: 16px; z-index: 3;
+            width: 34px; height: 34px; border: none; border-radius: 50%;
+            background: rgba(0,0,0,0.28); color: #fff;
+            font-size: 22px; line-height: 1; cursor: pointer;
+            transition: background .15s;
+        }
+        .ranking-modal-close:hover { background: rgba(0,0,0,0.48); }
+
+        /* Painel. `text-align:left` explícito: no modo inline o painel vive
+           dentro de .welcome-screen, que centraliza tudo por herança. */
+        .ranking-panel { font-family: 'Inter', sans-serif; color: var(--text-primary); text-align: left; }
+
+        .ranking-head {
+            display: flex; align-items: center; gap: 14px;
+            padding: 22px 26px;
+            background: linear-gradient(135deg, #0f1923 0%, #3a2a06 45%, #7a5a0d 100%);
+            color: #fff;
+        }
+        .ranking-host.is-inline .ranking-head { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+        .ranking-head-icon {
+            width: 46px; height: 46px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 14px; font-size: 21px;
+            background: linear-gradient(135deg, #f7d060, var(--gold));
+            color: #3a2a06;
+            box-shadow: 0 6px 18px -6px rgba(212,160,23,0.9);
+        }
+        /* Cor explícita, não herdada: .welcome-screen h2 casa com o mesmo peso
+           de seletor e pintaria o título de escuro sobre o fundo escuro. */
+        .ranking-head h2 { font-size: 1.12em; font-weight: 800; letter-spacing: -0.2px; color: #fff; }
+        .ranking-head p { font-size: 0.78em; opacity: 0.72; margin-top: 2px; color: #fff; max-width: none; }
+
+        /* Pódio */
+        .ranking-podium {
+            position: relative; overflow: hidden;
+            display: flex; align-items: flex-end; justify-content: center; gap: 18px;
+            padding: 34px 26px 0;
+            background: radial-gradient(120% 80% at 50% 0%, #fffaf0 0%, var(--card) 60%);
+            border-bottom: 1px solid var(--border);
+        }
+        .podium-step {
+            position: relative; z-index: 1;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            width: 168px; max-width: 32%;
+            animation: podiumRise .5s cubic-bezier(0.22,1,0.36,1) backwards;
+            cursor: pointer; border-radius: var(--radius-lg);
+            transition: transform .16s;
+        }
+        .podium-step:hover { transform: translateY(-3px); }
+        .podium-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+        .podium-step:hover .podium-block,
+        .podium-step.is-open .podium-block { box-shadow: 0 6px 18px -8px rgba(15,23,42,0.22); }
+        .podium-step.is-second { animation-delay: .06s; }
+        .podium-step.is-third  { animation-delay: .12s; }
+        @keyframes podiumRise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+
+        .podium-crown {
+            font-size: 24px; color: var(--gold);
+            filter: drop-shadow(0 3px 6px rgba(212,160,23,0.55));
+            animation: crownFloat 2.6s ease-in-out infinite;
+        }
+        @keyframes crownFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+        .podium-avatar {
+            position: relative;
+            width: 62px; height: 62px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15em; font-weight: 800;
+            color: hsl(var(--initials-hue,220) 62% 30%);
+            background: linear-gradient(135deg, hsl(var(--initials-hue,220) 70% 92%), hsl(var(--initials-hue,220) 70% 82%));
+            border: 3px solid var(--card);
+            box-shadow: var(--shadow-sm);
+        }
+        .is-first .podium-avatar {
+            width: 78px; height: 78px; font-size: 1.4em;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 4px var(--gold-soft), 0 10px 26px -8px rgba(212,160,23,0.75);
+            animation: goldPulse 2.4s ease-in-out infinite;
+        }
+        @keyframes goldPulse {
+            0%,100% { box-shadow: 0 0 0 4px var(--gold-soft), 0 10px 26px -8px rgba(212,160,23,0.75); }
+            50%     { box-shadow: 0 0 0 8px rgba(254,243,199,0.55), 0 12px 30px -8px rgba(212,160,23,0.9); }
+        }
+        .is-second .podium-avatar { border-color: var(--silver); box-shadow: 0 0 0 3px var(--silver-soft); }
+        .is-third  .podium-avatar { border-color: var(--bronze); box-shadow: 0 0 0 3px var(--bronze-soft); }
+
+        .podium-medal {
+            position: absolute; bottom: -6px; right: -6px;
+            width: 26px; height: 26px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: #fff; border: 2px solid var(--card);
+        }
+        .is-first  .podium-medal { background: linear-gradient(135deg, #f7d060, var(--gold)); color: #3a2a06; }
+        .is-second .podium-medal { background: linear-gradient(135deg, #cbd5e1, var(--silver)); }
+        .is-third  .podium-medal { background: linear-gradient(135deg, #e8a765, var(--bronze)); }
+
+        .podium-name {
+            font-size: 0.88em; font-weight: 700; text-align: center;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .is-first .podium-name { font-size: 0.98em; }
+        .podium-role {
+            font-size: 0.7em; color: var(--text-muted); text-align: center;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .podium-block {
+            width: 100%; margin-top: 6px; padding: 12px 10px 14px;
+            border-radius: 12px 12px 0 0; text-align: center;
+            background: linear-gradient(180deg, var(--surface-2), var(--surface));
+            border: 1px solid var(--border); border-bottom: none;
+        }
+        .is-first  .podium-block { padding-top: 26px; padding-bottom: 26px; background: linear-gradient(180deg, var(--gold-soft), #fdf0c4); border-color: rgba(212,160,23,0.4); }
+        .is-second .podium-block { padding-top: 16px; }
+        .is-third  .podium-block { padding-top: 10px; }
+        .podium-place { font-size: 0.74em; font-weight: 800; color: var(--text-muted); letter-spacing: 0.06em; }
+        .is-first .podium-place { color: #8a6508; }
+        .podium-pct { font-size: 1.5em; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+        .is-first .podium-pct { font-size: 1.9em; color: #7a5a0d; }
+        .podium-caption { font-size: 0.66em; color: var(--text-muted); margin-top: 2px; }
+        .podium-stats {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border);
+            font-size: 0.7em; font-weight: 700; color: var(--text-secondary);
+        }
+        .podium-stats span { display: inline-flex; align-items: center; gap: 4px; }
+        .podium-stats i { color: var(--text-muted); font-size: 0.9em; }
+        .is-first .podium-stats { border-top-color: rgba(212,160,23,0.35); }
+        .podium-caret {
+            font-size: 0.72em; color: var(--text-muted); margin-top: 2px;
+            transition: transform .2s;
+        }
+        .podium-step.is-open .podium-caret { transform: rotate(180deg); }
+
+        /* Confete (só quando o usuário logado está no top 3) */
+        .ranking-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .ranking-confetti i {
+            position: absolute; top: -14px;
+            width: 7px; height: 12px; border-radius: 1px; opacity: 0;
+            animation-name: confettiFall; animation-timing-function: linear; animation-iteration-count: infinite;
+        }
+        @keyframes confettiFall {
+            0%   { opacity: 0; transform: translateY(-14px) rotate(0deg); }
+            10%  { opacity: 1; }
+            100% { opacity: 0; transform: translateY(320px) rotate(540deg); }
+        }
+
+        /* Card "Sua posição" */
+        .ranking-you {
+            position: sticky; top: 0; z-index: 2;
+            margin: 0; padding: 16px 22px;
+            background: linear-gradient(135deg, #e8f0fe, #f0eafc);
+            border-top: 1px solid var(--border);
+            border-bottom: 2px solid var(--accent);
+        }
+        .ranking-you-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            font-size: 0.7em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--accent); margin-bottom: 10px;
+        }
+        .ranking-you-body { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .ranking-you-body .ranking-main { flex: 1; min-width: 180px; }
+        .ranking-you-place {
+            font-size: 1.7em; font-weight: 800; color: var(--accent);
+            line-height: 1; font-variant-numeric: tabular-nums;
+        }
+        .ranking-you-place sup { font-size: 0.5em; }
+        .ranking-you-place small { display: block; font-size: 0.32em; font-weight: 600; color: var(--text-muted); letter-spacing: 0.04em; }
+        .ranking-you-gap {
+            margin-top: 10px; padding: 8px 12px; border-radius: var(--radius);
+            background: var(--card); border: 1px dashed var(--accent);
+            font-size: 0.78em; color: var(--text-secondary);
+        }
+        .ranking-you-gap i { color: var(--warning); margin-right: 6px; }
+        .ranking-you-gap.is-top { border-color: var(--gold); background: var(--gold-soft); color: #7a5a0d; }
+        .ranking-you-gap.is-top i { color: var(--gold); }
+        .ranking-you-tag {
+            margin-left: 6px; padding: 2px 8px; border-radius: 99px;
+            background: var(--accent); color: #fff;
+            font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .ranking-you.is-guest { text-align: center; }
+        .ranking-you.is-guest p { font-size: 0.82em; color: var(--text-secondary); margin-bottom: 12px; }
+        .ranking-you-cta {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 9px 18px; border: none; border-radius: var(--radius);
+            background: var(--accent); color: #fff;
+            font-family: 'Inter', sans-serif; font-size: 0.82em; font-weight: 700; cursor: pointer;
+            transition: background .15s;
+        }
+        .ranking-you-cta:hover { background: var(--accent-hover); }
+
+        .ranking-delta { font-size: 0.92em; font-weight: 700; letter-spacing: 0; text-transform: none; }
+        .ranking-delta.is-up { color: var(--success); }
+        .ranking-delta.is-down { color: var(--danger); }
+        .ranking-delta.is-flat { color: var(--text-muted); }
+
+        /* Lista do 4º em diante */
+        .ranking-list { padding: 6px 0 0; }
+        .ranking-row {
+            display: grid;
+            grid-template-columns: 44px 42px minmax(0,1fr) auto 18px;
+            align-items: center; gap: 12px;
+            padding: 12px 22px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer; background: var(--card);
+            transition: background .15s;
+        }
+        .ranking-row:hover { background: var(--surface); }
+        .ranking-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+        .ranking-row.is-me { background: rgba(79,142,247,0.07); box-shadow: inset 3px 0 0 var(--accent); }
+        .ranking-row.is-open .ranking-caret { transform: rotate(180deg); }
+
+        .ranking-pos {
+            font-size: 0.95em; font-weight: 800; color: var(--text-muted);
+            text-align: center; font-variant-numeric: tabular-nums;
+        }
+        .ranking-avatar {
+            width: 42px; height: 42px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.82em; font-weight: 800;
+            color: hsl(var(--initials-hue,220) 62% 32%);
+            background: linear-gradient(135deg, hsl(var(--initials-hue,220) 70% 92%), hsl(var(--initials-hue,220) 70% 83%));
+        }
+        .ranking-main { min-width: 0; }
+        .ranking-name {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.86em; font-weight: 700;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ranking-name .tier-gold { color: var(--gold); }
+        .ranking-name .tier-silver { color: var(--silver); }
+        .ranking-name .tier-bronze { color: var(--bronze); }
+        .ranking-name i { font-size: 0.85em; }
+        .ranking-role {
+            font-size: 0.72em; color: var(--text-muted); margin: 1px 0 8px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Critério 1 — barra. O rótulo fica ao lado, não sobreposto: uma
+           função com nome longo passaria por baixo dele. */
+        .ranking-bar-row { display: flex; align-items: center; gap: 9px; }
+        .ranking-bar {
+            flex: 1; min-width: 0;
+            height: 9px; border-radius: 99px;
+            background: var(--surface-2);
+        }
+        .ranking-bar > span {
+            display: block; height: 100%; border-radius: 99px;
+            background: linear-gradient(90deg, var(--gold), var(--accent));
+            transition: width .8s cubic-bezier(0.22,1,0.36,1);
+        }
+        .ranking-bar-row > b {
+            flex-shrink: 0; min-width: 46px; text-align: right;
+            font-size: 0.7em; font-weight: 800; color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Chips de critério */
+        .ranking-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .ranking-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; border-radius: 99px;
+            background: var(--surface); border: 1px solid var(--border);
+            font-size: 0.72em; font-weight: 600; color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .ranking-chip i { font-size: 0.9em; color: var(--text-muted); }
+        .ranking-chip.is-score i { color: var(--warning); }
+        .ranking-chip.is-punctual { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.28); color: #047857; }
+        .ranking-chip.is-punctual.has-late { background: rgba(245,158,11,0.09); border-color: rgba(245,158,11,0.3); color: #92400e; }
+        /* Zero retentativas é o cenário ideal do 3º critério — vale destaque. */
+        .ranking-chip.is-clean { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.28); color: #047857; }
+        .ranking-chip.is-clean i { color: var(--success); }
+
+        /* Critério 3 — pizza sem canvas: escala para qualquer nº de linhas */
+        .ranking-pie {
+            position: relative; flex-shrink: 0;
+            width: 15px; height: 15px; border-radius: 50%;
+            background: conic-gradient(var(--success) 0 calc(var(--p,0) * 1%), var(--danger) 0);
+        }
+        .ranking-pie.is-empty { background: var(--surface-2); }
+        .ranking-pie::after {
+            content: ''; position: absolute; inset: 4px;
+            border-radius: 50%; background: var(--card);
+        }
+
+        .ranking-caret { font-size: 0.8em; color: var(--text-muted); transition: transform .2s; }
+
+        /* Detalhe expandido (único ponto com Chart.js) */
+        .ranking-detail { background: var(--surface); border-bottom: 1px solid var(--border); }
+        .ranking-detail-inner {
+            display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+            padding: 18px 22px 18px 100px;
+            justify-content: center;
+        }
+        /* Detalhe do pódio (1º–3º): sem o recuo de 100px que alinha com o
+           avatar das linhas da lista — o pódio não tem essa coluna. */
+        [data-detail="__podium__"] .ranking-detail-inner { padding-left: 22px; }
+        [data-detail="__podium__"] { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .ranking-detail-chart { width: 190px; flex-shrink: 0; }
+        /* Altura definida + position:relative: com maintainAspectRatio:false o
+           Chart.js mede o pai, e um pai sem altura vira um canvas gigante. */
+        .ranking-detail-canvas { position: relative; height: 160px; }
+        .ranking-detail-chart-label {
+            display: block; text-align: center; margin-top: 6px;
+            font-size: 0.68em; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-muted);
+        }
+        .ranking-detail-stats {
+            flex: 1; min-width: 260px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(98px,1fr)); gap: 10px;
+        }
+        .ranking-detail-stat {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 10px 12px;
+        }
+        .ranking-detail-stat b { display: block; font-size: 1.15em; font-weight: 800; color: var(--accent); }
+        .ranking-detail-stat b small { font-size: 0.6em; font-weight: 600; color: var(--text-muted); }
+        .ranking-detail-stat span { display: block; font-size: 0.66em; color: var(--text-muted); margin-top: 2px; line-height: 1.35; }
+
+        .ranking-see-courses-btn {
+            width: 100%;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 11px 18px; border: none; border-radius: var(--radius);
+            background: var(--accent); color: #fff;
+            font-family: 'Inter', sans-serif; font-size: 0.8em; font-weight: 700;
+            cursor: pointer; transition: background .15s;
+        }
+        .ranking-see-courses-btn:hover { background: var(--accent-hover); }
+        .ranking-see-courses-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* Janela "Ver cursos" — overlay próprio por cima do modal do ranking
+           (ou do painel inline), reaproveitado entre chamadas via id fixo. */
+        .ranking-courses-overlay {
+            display: none; position: fixed; inset: 0; z-index: 2100;
+            align-items: center; justify-content: center; padding: 20px;
+            background: rgba(9,15,30,0.62); backdrop-filter: blur(8px);
+        }
+        .ranking-courses-overlay.is-open { display: flex; }
+        .ranking-courses-card {
+            position: relative; width: 100%; max-width: 720px; max-height: 86vh;
+            display: flex; flex-direction: column;
+            background: var(--card); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg); overflow: hidden;
+            animation: podiumRise .22s cubic-bezier(0.22,1,0.36,1);
+        }
+        .ranking-courses-close {
+            position: absolute; top: 14px; right: 16px; z-index: 2;
+            width: 32px; height: 32px; border: none; border-radius: 50%;
+            background: rgba(15,23,42,0.06); color: var(--text-secondary);
+            font-size: 20px; line-height: 1; cursor: pointer;
+            transition: background .15s;
+        }
+        .ranking-courses-close:hover { background: rgba(15,23,42,0.12); }
+        .ranking-courses-head {
+            display: flex; align-items: center; gap: 14px;
+            padding: 22px 50px 18px 22px;
+            border-bottom: 1px solid var(--border);
+        }
+        .ranking-courses-avatar span {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.95em; font-weight: 800;
+            color: hsl(var(--initials-hue,220) 62% 32%);
+            background: linear-gradient(135deg, hsl(var(--initials-hue,220) 70% 92%), hsl(var(--initials-hue,220) 70% 83%));
+        }
+        .ranking-courses-head h3 { font-size: 1.05em; font-weight: 800; }
+        .ranking-courses-head p { font-size: 0.78em; color: var(--text-muted); margin-top: 2px; }
+        .ranking-courses-body { padding: 18px 22px 22px; overflow-y: auto; }
+
+        .course-mini-section + .course-mini-section { margin-top: 20px; }
+        .course-mini-section h4 {
+            font-size: 0.72em; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;
+        }
+        .course-mini-empty { font-size: 0.8em; color: var(--text-muted); }
+        .course-mini-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 10px;
+        }
+        .course-mini-card {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 11px 12px; border-radius: var(--radius);
+            border: 1px solid var(--border); background: var(--surface);
+        }
+        .course-mini-status { flex-shrink: 0; font-size: 1.05em; margin-top: 1px; }
+        .course-mini-card.is-done .course-mini-status { color: var(--success); }
+        .course-mini-card.is-failed .course-mini-status { color: var(--danger); }
+        .course-mini-card.is-pending .course-mini-status { color: var(--text-muted); }
+        .course-mini-body { flex: 1; min-width: 0; }
+        .course-mini-subject { font-size: 0.68em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        .course-mini-theme { font-size: 0.84em; font-weight: 700; margin-top: 1px; line-height: 1.3; }
+        .course-mini-tag {
+            flex-shrink: 0; align-self: center;
+            padding: 3px 9px; border-radius: 99px;
+            font-size: 0.64em; font-weight: 700; white-space: nowrap;
+        }
+        .course-mini-card.is-done .course-mini-tag { background: rgba(16,185,129,0.12); color: #047857; }
+        .course-mini-card.is-failed .course-mini-tag { background: rgba(239,68,68,0.1); color: #b91c1c; }
+        .course-mini-card.is-pending .course-mini-tag { background: var(--surface-2); color: var(--text-secondary); }
+
+        /* Botão "Critério de desempate" + popover, no cabeçalho do ranking */
+        .ranking-legend-wrap { position: relative; margin-left: auto; flex-shrink: 0; }
+        .ranking-legend-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 8px 14px; border-radius: 99px;
+            border: 1px solid rgba(255,255,255,0.28);
+            background: rgba(255,255,255,0.1); color: #fff;
+            font-family: 'Inter', sans-serif; font-size: 0.74em; font-weight: 700;
+            white-space: nowrap; cursor: pointer;
+            transition: background .15s, border-color .15s;
+        }
+        .ranking-legend-btn:hover,
+        .ranking-legend-btn.is-open { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.45); }
+        .ranking-legend-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+        .ranking-legend-panel {
+            position: absolute; top: calc(100% + 10px); right: 0; z-index: 5;
+            width: 320px; max-width: min(320px, 82vw);
+            background: var(--card); color: var(--text-primary);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 16px 18px;
+            animation: podiumRise .18s ease-out;
+        }
+        .ranking-legend-panel-head {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.86em; font-weight: 800; margin-bottom: 6px;
+        }
+        .ranking-legend-panel-head i { color: var(--accent); }
+        .ranking-legend-panel-intro { font-size: 0.74em; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
+        .ranking-legend-list { list-style: none; counter-reset: legend; display: flex; flex-direction: column; gap: 9px; }
+        .ranking-legend-list li {
+            counter-increment: legend;
+            position: relative; padding-left: 26px;
+            font-size: 0.78em; line-height: 1.35;
+        }
+        .ranking-legend-list li::before {
+            content: counter(legend);
+            position: absolute; left: 0; top: 0;
+            width: 18px; height: 18px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--surface-2); color: var(--text-secondary);
+            font-size: 0.72em; font-weight: 800;
+        }
+        .ranking-legend-list strong { display: block; font-weight: 700; }
+        .ranking-legend-list span { color: var(--text-muted); }
+
+        /* Vazio, erro e carregamento */
+        .ranking-empty { padding: 56px 26px; text-align: center; }
+        .ranking-empty i { font-size: 42px; color: var(--surface-2); }
+        .ranking-empty h3 { font-size: 1.02em; font-weight: 700; margin: 14px 0 6px; }
+        .ranking-empty p { font-size: 0.82em; color: var(--text-muted); margin-bottom: 14px; }
+        .ranking-empty.is-error i { color: var(--warning); }
+
+        .ranking-skeleton { padding: 24px 22px; display: flex; flex-direction: column; gap: 12px; }
+        .ranking-skeleton span {
+            display: block; height: 46px; border-radius: var(--radius);
+            background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+            background-size: 400% 100%;
+            animation: rankingShimmer 1.3s ease-in-out infinite;
+        }
+        @keyframes rankingShimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            .podium-step, .podium-crown, .is-first .podium-avatar,
+            .ranking-confetti i, .ranking-skeleton span { animation: none; }
+            .ranking-bar > span { transition: none; }
+        }

@@ -717,3 +717,105 @@
     .cfg-warning-message { top: calc(18px + env(safe-area-inset-top, 0px)); }
     #cfg-root .content-area { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
 }
+
+
+/* ══ 14. RANKING ════════════════════════════════════════════════════════════
+   Painel de js/ranking.js. No desktop o pódio é uma linha de três pedestais;
+   aqui vira uma pilha de cards (1º, 2º, 3º) e cada linha da lista quebra os
+   chips de critério para uma segunda faixa. */
+
+@media (max-width: 1024px) {
+    .ranking-modal .modal-content.ranking-modal-content { max-height: 94vh; border-radius: 14px; }
+    .ranking-detail-inner { padding-left: 22px; }
+}
+
+@media (max-width: 720px) {
+    /* Com .selection-inner em coluna (css/main.css), o botão colado à direita
+       fica solto no meio do nada — melhor ocupar a largura toda. */
+    .selection-inner .ranking-btn { margin-left: 0; align-self: stretch; justify-content: center; }
+
+    /* O cabeçalho quebra em duas linhas: título em cima, botão de critérios
+       embaixo em largura total — lado a lado eles não cabem em 390px. */
+    .ranking-head { flex-wrap: wrap; padding: 16px 16px; gap: 11px; }
+    .ranking-head-icon { width: 38px; height: 38px; font-size: 17px; border-radius: 11px; }
+    .ranking-legend-wrap { margin-left: 0; width: 100%; }
+    .ranking-legend-btn { width: 100%; justify-content: center; }
+    .ranking-legend-panel { left: 0; right: 0; width: auto; max-width: none; }
+
+    /* Pódio empilhado: 1º no topo, cada colocado num card horizontal. */
+    .ranking-podium { flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px; }
+    .podium-step.is-first  { order: 1; }
+    .podium-step.is-second { order: 2; }
+    .podium-step.is-third  { order: 3; }
+    .podium-step {
+        width: 100%; max-width: 400px;
+        display: grid;
+        grid-template-columns: auto minmax(0,1fr) auto auto;
+        grid-template-areas:
+            "avatar name  block caret"
+            "avatar role  block caret";
+        align-items: center; column-gap: 12px; row-gap: 0;
+        padding: 12px 14px;
+        background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+    }
+    .podium-crown { position: absolute; top: -11px; left: 12px; font-size: 17px; }
+    .podium-avatar { grid-area: avatar; }
+    .is-first .podium-avatar { width: 58px; height: 58px; font-size: 1.15em; }
+    .podium-name { grid-area: name; text-align: left; align-self: flex-end; }
+    .podium-role { grid-area: role; text-align: left; align-self: flex-start; }
+    .podium-block {
+        grid-area: block; width: auto; margin: 0;
+        padding: 8px 12px; border-radius: 10px;
+        border: 1px solid var(--border); text-align: center;
+    }
+    .is-first .podium-block,
+    .is-second .podium-block,
+    .is-third .podium-block { padding: 8px 12px; }
+    .is-first .podium-pct { font-size: 1.4em; }
+    /* Nota+cursos some no card empilhado — já ficam no detalhe expandido, e
+       o card mobile não tem largura para uma terceira linha de estatística. */
+    .podium-stats { display: none; }
+    .podium-caret { grid-area: caret; margin: 0; }
+
+    /* Linha da lista: chips descem para uma segunda faixa. */
+    .ranking-row {
+        grid-template-columns: 32px 36px minmax(0,1fr) 16px;
+        row-gap: 9px; padding: 12px 14px; gap: 10px;
+    }
+    .ranking-pos    { grid-column: 1; grid-row: 1; }
+    .ranking-avatar { grid-column: 2; grid-row: 1; width: 36px; height: 36px; }
+    .ranking-main   { grid-column: 3; grid-row: 1; }
+    .ranking-caret  { grid-column: 4; grid-row: 1; }
+    .ranking-chips  { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+
+    /* .header-inner cai para 60px em <=720px (secao 2). */
+    .ranking-host.is-inline .ranking-you { top: 60px; }
+    .ranking-you { padding: 14px 14px; }
+    .ranking-you-body { gap: 11px; }
+    .ranking-you-body .ranking-chips { justify-content: flex-start; }
+
+    /* Detalhe empilhado: lado a lado, o grafico nao encolhe (flex-shrink:0 em
+       css/main.css) e empurra as estatisticas para fora da tela. */
+    .ranking-detail-inner { flex-direction: column; align-items: stretch; padding: 16px 14px; gap: 14px; }
+    .ranking-detail-chart { width: 100%; max-width: 220px; margin: 0 auto; }
+    .ranking-detail-stats { min-width: 0; width: 100%; grid-template-columns: repeat(auto-fit, minmax(96px,1fr)); }
+
+    /* Janela "Ver cursos": cabe na tela toda, um card por linha. */
+    .ranking-courses-overlay { padding: 0; align-items: flex-end; }
+    .ranking-courses-card { max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; }
+    .ranking-courses-head { padding: 18px 46px 16px 16px; }
+    .ranking-courses-body { padding: 14px 14px 18px; }
+    .course-mini-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+
+    .ranking-chip { padding: 3px 8px; font-size: 0.68em; }
+    .podium-name { font-size: 0.82em; }
+    .is-first .podium-name { font-size: 0.88em; }
+    .podium-pct { font-size: 1.25em; }
+    .is-first .podium-pct { font-size: 1.3em; }
+    .ranking-you-place { font-size: 1.4em; }
+    .ranking-detail-stats { grid-template-columns: 1fr 1fr; }
+}

@@ -94,6 +94,19 @@
         let initialContentLoaded = false;
         let stopContentLive = null;
 
+        // A tela de boas-vindas vira o ranking assim que o conteúdo carrega.
+        // O texto "Selecione um tema para começar" continua servindo Estágios
+        // (sem ranking) e o caso de o módulo não ter carregado.
+        function showWelcomeRanking() {
+            const host = document.getElementById('welcome-ranking');
+            const fallback = document.getElementById('welcome-fallback');
+            const Ranking = window.UniAdmin?.Ranking;
+            if (!host || !Ranking || !Ranking.isEnabledFor(currentCategorySlug)) return;
+            if (fallback) fallback.style.display = 'none';
+            document.getElementById('welcome-screen')?.classList.add('has-ranking');
+            Ranking.renderInto(host, { mode: 'inline', slug: currentCategorySlug });
+        }
+
         function applyCategoryContent(payload) {
             // Categoria ainda sem conteudo no banco: o Firebase devolve null.
             const data = payload || {};
@@ -101,6 +114,9 @@
             quizData = data.quizData || {};
             quizStatus = data.quizStatus || {};
             trainingData = data.trainingData || {};
+            // Publicado para js/ranking.js, que precisa dos `roles` de cada
+            // assunto para saber quantos cursos cada função deveria ter feito.
+            if (window.UniAdmin) window.UniAdmin.portalTrainingData = trainingData;
         }
 
         // Redesenha o que já está na tela depois de uma alteração publicada
@@ -136,6 +152,7 @@
                 // aluno fez, não o que o administrador publicou, e reaplicá-la
                 // a cada evento sobrescreveria o avanço da tela atual.
                 loadProgression();
+                showWelcomeRanking();
             }
 
             // Sem o SDK (ex.: página aberta de um contexto onde firebase-config
