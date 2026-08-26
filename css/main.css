@@ -2439,6 +2439,8 @@
         .podium-stats span { display: inline-flex; align-items: center; gap: 4px; }
         .podium-stats i { color: var(--text-muted); font-size: 0.9em; }
         .is-first .podium-stats { border-top-color: rgba(212,160,23,0.35); }
+        .podium-punctual { display: flex; justify-content: center; margin-top: 8px; }
+        .podium-punctual .ranking-chip { font-size: 0.66em; }
         .podium-caret {
             font-size: 0.72em; color: var(--text-muted); margin-top: 2px;
             transition: transform .2s;
@@ -2741,7 +2743,12 @@
             font-size: 0.86em; font-weight: 800; margin-bottom: 6px;
         }
         .ranking-legend-panel-head i { color: var(--accent); }
-        .ranking-legend-panel-intro { font-size: 0.74em; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
+        /* O popover vive dentro de .ranking-head, que pinta todo <p> de branco
+           com a mesma especificidade — daí o seletor composto aqui. */
+        .ranking-legend-panel .ranking-legend-panel-intro {
+            font-size: 0.74em; color: var(--text-muted);
+            margin-bottom: 10px; line-height: 1.4; opacity: 1;
+        }
         .ranking-legend-list { list-style: none; counter-reset: legend; display: flex; flex-direction: column; gap: 9px; }
         .ranking-legend-list li {
             counter-increment: legend;
@@ -2757,6 +2764,16 @@
             font-size: 0.72em; font-weight: 800;
         }
         .ranking-legend-list strong { display: block; font-weight: 700; }
+        .ranking-legend-window {
+            display: inline-block; margin-left: 6px; padding: 1px 7px;
+            border-radius: 99px; background: rgba(79,142,247,0.12); color: var(--accent);
+            font-size: 0.78em; font-style: normal; font-weight: 700; white-space: nowrap;
+        }
+        .ranking-legend-panel .ranking-legend-panel-foot {
+            margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+            font-size: 0.72em; color: var(--text-muted); line-height: 1.45; opacity: 1;
+        }
+        .ranking-legend-panel .ranking-legend-panel-foot i { color: var(--accent); margin-right: 5px; }
         .ranking-legend-list span { color: var(--text-muted); }
 
         /* Vazio, erro e carregamento */

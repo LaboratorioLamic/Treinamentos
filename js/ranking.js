@@ -98,6 +98,25 @@ var UniAdmin = window.UniAdmin || {};
         return `${s}s`;
     }
 
+    // Janela de desempenho recente: nota média, retentativas e pontualidade
+    // olham só os últimos 12 meses (ver aggregate). Usa data de calendário,
+    // não 365 dias fixos, para não deslocar em ano bissexto.
+    const PERFORMANCE_WINDOW_MONTHS = 12;
+
+    function windowCutoff(now = Date.now()) {
+        const date = new Date(now);
+        date.setMonth(date.getMonth() - PERFORMANCE_WINDOW_MONTHS);
+        return date.getTime();
+    }
+
+    // Registro sem data (planilha antiga sem a coluna) conta como recente: é
+    // mais justo que descartá-lo silenciosamente do desempenho da pessoa.
+    function isRecent(submittedAt, cutoff) {
+        const n = Number(submittedAt);
+        if (!Number.isFinite(n) || n <= 0) return true;
+        return n >= cutoff;
+    }
+
     function tierFor(pct) {
         return TIERS.find(t => pct >= t.min) || null;
     }
@@ -203,7 +222,9 @@ var UniAdmin = window.UniAdmin || {};
     // Uma entrada por colaborador com conta ativa. As linhas cruas trazem cada
     // tentativa; aqui elas viram uma situação final por curso (mesma lógica de
     // lastAttemptByPerson em js/admin-dashboard.js:118).
-    function aggregate(rows, users, roleCounts, slug) {
+    function aggregate(rows, users, roleCounts, slug, now = Date.now()) {
+        const cutoff = windowCutoff(now);
+
         // Duas chaves de agrupamento: userId (resultados gravados pelo portal)
         // e nome normalizado (results/imported, vindo de planilha, que não tem
         // userId). Mesmo pareamento de js/admin-users.js:65 — sem ele todo o
@@ -285,37 +306,49 @@ var UniAdmin = window.UniAdmin || {};
                 if (!courseRows) return;
                 realizados += 1;
                 const sorted = courseRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
-                const last = sorted[sorted.length - 1];
                 const approvedEver = sorted.some(r => r.approved === true);
+
+                // Nota média, retentativas, pontualidade, comentários e tempo
+                // médio valem só para os últimos 12 meses: são métricas de
+                // desempenho recente, e um atraso de 2022 não deve pesar no
+                // ranking de hoje. % de conclusão e cursos realizados continuam
+                // olhando o histórico inteiro — um curso concluído não
+                // "descompleta" com o tempo.
+                const recentes = sorted.filter(r => isRecent(r.submittedAt, cutoff));
 
                 // Retentativa = envio além do primeiro no mesmo curso. Quem
                 // acertou de primeira em todos soma 0, o cenário ideal.
-                retentativas += Math.max(0, sorted.length - 1);
+                retentativas += Math.max(0, recentes.length - 1);
 
                 // Pontualidade lê o status congelado no envio da última
                 // tentativa — reenviar não deve contar o prazo duas vezes.
-                const status = last?.deadlineStatus;
+                const lastRecente = recentes[recentes.length - 1];
+                const status = lastRecente?.deadlineStatus;
                 if (status === 'on_time' || status === 'forgiven') onTime += 1;
                 else if (status === 'late' || status === 'closed') late += 1;
 
                 if (!approvedEver) return;
                 concluidos += 1;
 
-                // Nota do curso = melhor tentativa: o que ficou valendo é o
-                // resultado alcançado, não o histórico de erros até lá.
-                const best = sorted.reduce((acc, r) => {
+                // Nota do curso = melhor tentativa recente. Só cursos
+                // concluídos entram na média: uma reprovação já é penalizada
+                // pela % de conclusão, e contá-la de novo aqui puniria a mesma
+                // coisa duas vezes.
+                const best = recentes.reduce((acc, r) => {
                     const n = Number(r.score);
                     return Number.isFinite(n) && n > acc ? n : acc;
                 }, -Infinity);
                 if (Number.isFinite(best)) notas.push(best);
 
-                const activeMs = sorted.reduce((acc, r) => Math.max(acc, Number(r.activeMs) || 0), 0);
+                const activeMs = recentes.reduce((acc, r) => Math.max(acc, Number(r.activeMs) || 0), 0);
                 if (activeMs > 0) tempos.push(activeMs);
             });
 
             // Comentários contam todas as linhas, não só as aprovadas: cada
             // avaliação enviada com comentário é uma contribuição.
-            const comentarios = userRows.filter(r => String(r.comment || '').trim() !== '').length;
+            const comentarios = userRows
+                .filter(r => isRecent(r.submittedAt, cutoff))
+                .filter(r => String(r.comment || '').trim() !== '').length;
 
             const comPrazo = onTime + late;
 
@@ -423,17 +456,24 @@ var UniAdmin = window.UniAdmin || {};
 
     /* ─── Render ─── */
 
-    function chipsHtml(entry) {
-        const pontualidade = entry.temPrazos
+    // Chip de pontualidade — usado na lista, no card "Sua posição" e no pódio.
+    // Único ponto de verdade: duas cópias do markup acabariam divergindo.
+    function punctualChipHtml(entry) {
+        const conteudo = entry.temPrazos
             ? `<span class="ranking-pie" style="--p:${entry.pctPontualidade.toFixed(2)}"></span> ${fmt1(entry.pctPontualidade)}% no prazo`
             : `<span class="ranking-pie is-empty"></span> sem prazos`;
+        const titulo = entry.temPrazos
+            ? `${entry.onTime} no prazo · ${entry.late} em atraso`
+            : 'Nenhum curso com prazo definido';
+        return `<span class="ranking-chip is-punctual ${entry.late > 0 ? 'has-late' : ''}" title="${titulo}">${conteudo}</span>`;
+    }
+
+    function chipsHtml(entry) {
         return `
             <span class="ranking-chip is-score" title="Nota média entre os cursos concluídos">
                 <i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt1(entry.notaMedia) : '—'}
             </span>
-            <span class="ranking-chip is-punctual ${entry.late > 0 ? 'has-late' : ''}" title="${entry.temPrazos ? `${entry.onTime} no prazo · ${entry.late} em atraso` : 'Nenhum curso com prazo definido'}">
-                ${pontualidade}
-            </span>
+            ${punctualChipHtml(entry)}
             <span class="ranking-chip ${entry.retentativas === 0 ? 'is-clean' : ''}" title="Retentativas — quanto menos, melhor (ideal: 0)">
                 <i class="fas fa-rotate-right"></i> ${fmtInt(entry.retentativas)}
             </span>
@@ -468,6 +508,7 @@ var UniAdmin = window.UniAdmin || {};
                         <span title="Nota média"><i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt1(entry.notaMedia) : '—'}</span>
                         <span title="Cursos realizados"><i class="fas fa-book"></i> ${fmtInt(entry.cursosRealizados)}</span>
                     </div>
+                    <div class="podium-punctual">${punctualChipHtml(entry)}</div>
                 </div>
                 <i class="fas fa-chevron-down podium-caret"></i>
             </div>`;
@@ -542,12 +583,12 @@ var UniAdmin = window.UniAdmin || {};
     // ruído visual em toda visita; agora é sob demanda.
     const LEGEND_ITEMS = [
         { title: '% de cursos concluídos da função', detail: 'Aprovados ÷ cursos ativos que a sua função enxerga (abertos a todos + os marcados para a sua função).' },
-        { title: 'Nota média', detail: 'Média da melhor nota de cada curso concluído.' },
-        { title: 'Quantidade de retentativas', detail: 'Envios além do primeiro em cada curso — quanto menos, melhor. O ideal é 0.' },
+        { title: 'Nota média', detail: 'Média da melhor nota de cada curso concluído.', recent: true },
+        { title: 'Quantidade de retentativas', detail: 'Envios além do primeiro em cada curso — quanto menos, melhor. O ideal é 0.', recent: true },
         { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), aprovadas ou não.' },
-        { title: '% de pontualidade', detail: 'Entregas no prazo ÷ (no prazo + em atraso), conforme a coluna Prazo do histórico.' },
-        { title: 'Comentários', detail: 'Quantidade de avaliações com comentário — quanto mais, melhor.' },
-        { title: 'Tempo médio de conclusão', detail: 'Tempo médio ativo por curso concluído — quanto maior, melhor.' }
+        { title: '% de pontualidade', detail: 'Entregas no prazo ÷ (no prazo + em atraso), conforme a coluna Prazo do histórico.', recent: true },
+        { title: 'Comentários', detail: 'Quantidade de avaliações com comentário — quanto mais, melhor.', recent: true },
+        { title: 'Tempo médio de conclusão', detail: 'Tempo médio ativo por curso concluído — quanto maior, melhor.', recent: true }
     ];
 
     function legendButtonHtml() {
@@ -564,8 +605,13 @@ var UniAdmin = window.UniAdmin || {};
                 </div>
                 <p class="ranking-legend-panel-intro">Em caso de empate, o critério seguinte decide — nesta ordem:</p>
                 <ol class="ranking-legend-list">
-                    ${LEGEND_ITEMS.map(item => `<li><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.detail)}</span></li>`).join('')}
+                    ${LEGEND_ITEMS.map(item => `<li><strong>${escapeHtml(item.title)}${item.recent ? '<em class="ranking-legend-window">últimos 12 meses</em>' : ''}</strong><span>${escapeHtml(item.detail)}</span></li>`).join('')}
                 </ol>
+                <p class="ranking-legend-panel-foot">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    Os critérios marcados olham só os últimos 12 meses — desempenho recente.
+                    A % de conclusão e os cursos realizados consideram todo o histórico.
+                </p>
             </div>`;
     }
 

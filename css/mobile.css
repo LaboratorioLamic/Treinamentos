@@ -775,7 +775,7 @@
     .is-first .podium-pct { font-size: 1.4em; }
     /* Nota+cursos some no card empilhado — já ficam no detalhe expandido, e
        o card mobile não tem largura para uma terceira linha de estatística. */
-    .podium-stats { display: none; }
+    .podium-stats, .podium-punctual { display: none; }
     .podium-caret { grid-area: caret; margin: 0; }
 
     /* Linha da lista: chips descem para uma segunda faixa. */
