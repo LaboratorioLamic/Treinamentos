@@ -80,6 +80,16 @@ var UniAdmin = window.UniAdmin || {};
         return Number(n || 0).toFixed(1).replace('.', ',');
     }
 
+    // Nota trabalha com 2 casas: é a precisão que o desempate enxerga, então a
+    // tela mostra o mesmo número que decidiu a posição.
+    function fmt2(n) {
+        return Number(n || 0).toFixed(2).replace('.', ',');
+    }
+
+    function round2(n) {
+        return Math.round((Number(n) || 0) * 100) / 100;
+    }
+
     function fmtInt(n) {
         return String(Math.round(Number(n) || 0));
     }
@@ -346,9 +356,12 @@ var UniAdmin = window.UniAdmin || {};
             let realizados = 0;
             courseList.forEach(({ rows: courseRows }) => {
                 if (!courseRows) return;
-                realizados += 1;
                 const sorted = courseRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
                 const approvedEver = sorted.some(r => r.approved === true);
+
+                // "Realizado" conta só avaliação concluída COM aprovação —
+                // reprovação não entra no desempate.
+                if (approvedEver) realizados += 1;
 
                 // Nota média, retentativas, pontualidade, comentários e tempo
                 // médio valem só para os últimos 12 meses: são métricas de
@@ -407,7 +420,9 @@ var UniAdmin = window.UniAdmin || {};
                 concluidos,
                 denom,
                 // 2º critério
-                notaMedia: notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0,
+                // Arredondada a 2 casas na origem: comparação, frase de gap e
+                // exibição usam todas o mesmo valor.
+                notaMedia: notas.length ? round2(notas.reduce((a, b) => a + b, 0) / notas.length) : 0,
                 // 3º critério — quanto MENOS retentativas, melhor (ideal: 0)
                 retentativas,
                 // 5º critério
@@ -415,8 +430,8 @@ var UniAdmin = window.UniAdmin || {};
                 temPrazos: comPrazo > 0,
                 onTime,
                 late,
-                // 4º critério — "realizado" = avaliação concluída (enviada),
-                // aprovada ou não; é o que premia quem tenta.
+                // 4º critério — "realizado" = avaliação concluída (enviada)
+                // apenas com aprovação.
                 cursosRealizados: realizados,
                 // 6º e 7º critérios
                 comentarios,
@@ -457,7 +472,7 @@ var UniAdmin = window.UniAdmin || {};
             return `Faltam <strong>${fmt1(ahead.pctConclusao - me.pctConclusao)}%</strong> de conclusão para alcançar o ${place}`;
         }
         if (ahead.notaMedia - me.notaMedia > EPS) {
-            return `Faltam <strong>${fmt1(ahead.notaMedia - me.notaMedia)}</strong> de nota média para alcançar o ${place}`;
+            return `Faltam <strong>${fmt2(ahead.notaMedia - me.notaMedia)}</strong> de nota média para alcançar o ${place}`;
         }
         if (me.retentativas > ahead.retentativas) {
             const n = me.retentativas - ahead.retentativas;
@@ -513,7 +528,7 @@ var UniAdmin = window.UniAdmin || {};
     function chipsHtml(entry) {
         return `
             <span class="ranking-chip is-score" title="Nota média entre os cursos concluídos">
-                <i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt1(entry.notaMedia) : '—'}
+                <i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt2(entry.notaMedia) : '—'}
             </span>
             ${punctualChipHtml(entry)}
             <span class="ranking-chip ${entry.retentativas === 0 ? 'is-clean' : ''}" title="Retentativas — quanto menos, melhor (ideal: 0)">
@@ -547,7 +562,7 @@ var UniAdmin = window.UniAdmin || {};
                     <div class="podium-pct" data-count="${entry.pctConclusao.toFixed(1)}" data-suffix="%">0%</div>
                     <div class="podium-caption">${entry.concluidos}/${entry.denom} cursos</div>
                     <div class="podium-stats">
-                        <span title="Nota média"><i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt1(entry.notaMedia) : '—'}</span>
+                        <span title="Nota média"><i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt2(entry.notaMedia) : '—'}</span>
                         <span title="Cursos realizados"><i class="fas fa-book"></i> ${fmtInt(entry.cursosRealizados)}</span>
                     </div>
                     <div class="podium-punctual">${punctualChipHtml(entry)}</div>
@@ -627,7 +642,7 @@ var UniAdmin = window.UniAdmin || {};
         { title: '% de cursos concluídos da função', detail: 'Aprovados ÷ cursos ativos que a sua função enxerga (abertos a todos + os marcados para a sua função).' },
         { title: 'Nota média', detail: 'Média da melhor nota de cada curso concluído.', recent: true },
         { title: 'Quantidade de retentativas', detail: 'Envios além do primeiro em cada curso — quanto menos, melhor. O ideal é 0.', recent: true },
-        { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), aprovadas ou não.' },
+        { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), apenas com aprovação.' },
         { title: '% de pontualidade', detail: 'Entregas no prazo ÷ (no prazo + em atraso), conforme a coluna Prazo do histórico.', recent: true },
         { title: 'Comentários', detail: 'Quantidade de avaliações com comentário — quanto mais, melhor.', recent: true },
         { title: 'Tempo médio de conclusão', detail: 'Tempo médio ativo por curso concluído — quanto maior, melhor.', recent: true }
@@ -798,7 +813,7 @@ var UniAdmin = window.UniAdmin || {};
                 </div>
                 <div class="ranking-detail-stats">
                     <div class="ranking-detail-stat"><b>${entry.concluidos}<small>/${entry.denom}</small></b><span>Cursos concluídos da função</span></div>
-                    <div class="ranking-detail-stat"><b>${entry.notaMedia > 0 ? fmt1(entry.notaMedia) : '—'}</b><span>Nota média</span></div>
+                    <div class="ranking-detail-stat"><b>${entry.notaMedia > 0 ? fmt2(entry.notaMedia) : '—'}</b><span>Nota média</span></div>
                     <div class="ranking-detail-stat"><b>${entry.retentativas}</b><span>Retentativas</span></div>
                     <div class="ranking-detail-stat"><b>${entry.onTime}</b><span>Entregas no prazo</span></div>
                     <div class="ranking-detail-stat"><b>${entry.late}</b><span>Entregas em atraso</span></div>
@@ -943,7 +958,7 @@ var UniAdmin = window.UniAdmin || {};
             icon: 'fa-star', title: 'Nota média',
             hint: 'Média da melhor nota de cada curso concluído.',
             better: 'higher', recent: true,
-            value: e => e.notaMedia > 0 ? fmt1(e.notaMedia) : '—',
+            value: e => e.notaMedia > 0 ? fmt2(e.notaMedia) : '—',
             sub: () => 'escala de 0 a 10',
             meter: e => Math.min(100, e.notaMedia * 10)
         },
@@ -957,7 +972,7 @@ var UniAdmin = window.UniAdmin || {};
         },
         {
             icon: 'fa-book', title: 'Cursos realizados',
-            hint: 'Avaliações concluídas (enviadas), aprovadas ou não.',
+            hint: 'Avaliações concluídas (enviadas), apenas com aprovação.',
             better: 'higher', recent: false,
             value: e => fmtInt(e.cursosRealizados),
             sub: e => `de ${e.denom} elegíveis`,
