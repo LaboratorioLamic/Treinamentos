@@ -545,6 +545,30 @@ var UniAdmin = window.UniAdmin || {};
             </span>`;
     }
 
+    // Nota média é o critério que decide o pódio quase sempre (todo mundo no
+    // topo tende a 100% de conclusão), então ela ganha bloco próprio em vez de
+    // dividir uma linha de ícones — e as 5 estrelas dão a leitura imediata da
+    // escala 0–10 sem o leitor ter de interpretar o número.
+    function podiumScoreHtml(entry) {
+        if (!(entry.notaMedia > 0)) {
+            return '<div class="podium-score is-empty"><span class="podium-score-label">Nota média</span><b>—</b></div>';
+        }
+        const pct = Math.max(0, Math.min(100, entry.notaMedia * 10));
+        return `
+            <div class="podium-score" title="Nota média entre os cursos concluídos — critério de desempate">
+                <span class="podium-score-label">Nota média</span>
+                <div class="podium-score-value">
+                    <i class="fas fa-star"></i>
+                    <b>${fmt2(entry.notaMedia)}</b>
+                    <small>/10</small>
+                </div>
+                <div class="podium-score-stars" role="img" aria-label="${fmt2(entry.notaMedia)} de 10">
+                    <span class="podium-score-stars-bg">★★★★★</span>
+                    <span class="podium-score-stars-fill" style="width:${pct.toFixed(2)}%">★★★★★</span>
+                </div>
+            </div>`;
+    }
+
     function podiumStepHtml(entry, place) {
         if (!entry) return '';
         const cls = ['is-first', 'is-second', 'is-third'][place - 1];
@@ -561,10 +585,7 @@ var UniAdmin = window.UniAdmin || {};
                     <div class="podium-place">${place}º</div>
                     <div class="podium-pct" data-count="${entry.pctConclusao.toFixed(1)}" data-suffix="%">0%</div>
                     <div class="podium-caption">${entry.concluidos}/${entry.denom} cursos</div>
-                    <div class="podium-stats">
-                        <span title="Nota média"><i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt2(entry.notaMedia) : '—'}</span>
-                        <span title="Cursos realizados"><i class="fas fa-book"></i> ${fmtInt(entry.cursosRealizados)}</span>
-                    </div>
+                    ${podiumScoreHtml(entry)}
                     <div class="podium-punctual">${punctualChipHtml(entry)}</div>
                 </div>
                 <i class="fas fa-chevron-down podium-caret"></i>

@@ -783,10 +783,17 @@
     .is-second .podium-block,
     .is-third .podium-block { padding: 8px 12px; }
     .is-first .podium-pct { font-size: 1.4em; }
-    /* Nota+cursos some no card empilhado (já ficam no detalhe expandido), mas
-       o balão de "% no prazo" fica: é critério de desempate e sumia por
-       completo no mobile. Ele entra na faixa do bloco, abaixo do percentual. */
-    .podium-stats { display: none; }
+    /* Nota média e "% no prazo" ficam no card empilhado: são os critérios que
+       decidem o pódio e sumiam por completo no mobile. Entram como faixas
+       cheias do bloco, abaixo do percentual. */
+    .podium-score {
+        width: 100%; margin: 8px 0 0; padding: 6px 10px 7px;
+        display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    }
+    .podium-score-label { font-size: 0.58em; }
+    .podium-score-value { margin-top: 0; }
+    .is-first .podium-score-value b { font-size: 1.25em; }
+    .podium-score-stars { margin-top: 0; }
     .podium-punctual { width: 100%; margin: 6px 0 0; justify-content: center; }
     .podium-caret { grid-area: caret; margin: 0; }
 
