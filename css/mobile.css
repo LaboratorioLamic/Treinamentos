@@ -743,7 +743,13 @@
     .ranking-legend-panel { left: 0; right: 0; width: auto; max-width: none; }
 
     /* Pódio empilhado: 1º no topo, cada colocado num card horizontal. */
+    .ranking-scope { padding: 14px 16px 0; }
+    .ranking-scope-btn { max-width: 100%; }
+    .ranking-scope-label { overflow: hidden; text-overflow: ellipsis; }
+    .ranking-scope-panel { width: 260px; }
+    .ranking-scope-options { max-height: 240px; }
     .ranking-podium { flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px; }
+    .ranking-scope + .ranking-podium { padding-top: 14px; }
     .podium-step.is-first  { order: 1; }
     .podium-step.is-second { order: 2; }
     .podium-step.is-third  { order: 3; }
@@ -794,7 +800,8 @@
     .podium-score-value { margin-top: 0; }
     .is-first .podium-score-value b { font-size: 1.25em; }
     .podium-score-stars { margin-top: 0; }
-    .podium-punctual { width: 100%; margin: 6px 0 0; justify-content: center; }
+    .podium-retry { width: 100%; margin: 6px 0 0; justify-content: center; }
+    .podium-punctual { width: 100%; margin: 5px 0 0; justify-content: center; }
     .podium-caret { grid-area: caret; margin: 0; }
 
     /* Linha da lista: chips descem para uma segunda faixa. */

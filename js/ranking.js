@@ -425,12 +425,12 @@ var UniAdmin = window.UniAdmin || {};
                 notaMedia: notas.length ? round2(notas.reduce((a, b) => a + b, 0) / notas.length) : 0,
                 // 3º critério — quanto MENOS retentativas, melhor (ideal: 0)
                 retentativas,
-                // 5º critério
+                // 4º critério
                 pctPontualidade: comPrazo > 0 ? (onTime / comPrazo) * 100 : 0,
                 temPrazos: comPrazo > 0,
                 onTime,
                 late,
-                // 4º critério — "realizado" = avaliação concluída (enviada)
+                // 5º critério — "realizado" = avaliação concluída (enviada)
                 // apenas com aprovação.
                 cursosRealizados: realizados,
                 // 6º e 7º critérios
@@ -456,8 +456,8 @@ var UniAdmin = window.UniAdmin || {};
             || cmpDesc(a.notaMedia, b.notaMedia)
             // Único critério "quanto menor, melhor": ordem invertida.
             || (a.retentativas - b.retentativas)
-            || (b.cursosRealizados - a.cursosRealizados)
             || cmpDesc(a.pctPontualidade, b.pctPontualidade)
+            || (b.cursosRealizados - a.cursosRealizados)
             || (b.comentarios - a.comentarios)
             || cmpDesc(a.tempoMedioMs, b.tempoMedioMs)
             || a.fullName.localeCompare(b.fullName, 'pt-BR');
@@ -478,12 +478,12 @@ var UniAdmin = window.UniAdmin || {};
             const n = me.retentativas - ahead.retentativas;
             return `Você tem <strong>${n} retentativa${n > 1 ? 's' : ''}</strong> a mais que o ${place}`;
         }
+        if (ahead.pctPontualidade - me.pctPontualidade > EPS) {
+            return `Faltam <strong>${fmt1(ahead.pctPontualidade - me.pctPontualidade)}%</strong> de pontualidade para alcançar o ${place}`;
+        }
         if (ahead.cursosRealizados > me.cursosRealizados) {
             const n = ahead.cursosRealizados - me.cursosRealizados;
             return `Falta${n > 1 ? 'm' : ''} <strong>${n} curso${n > 1 ? 's' : ''}</strong> para alcançar o ${place}`;
-        }
-        if (ahead.pctPontualidade - me.pctPontualidade > EPS) {
-            return `Faltam <strong>${fmt1(ahead.pctPontualidade - me.pctPontualidade)}%</strong> de pontualidade para alcançar o ${place}`;
         }
         if (ahead.comentarios > me.comentarios) {
             const n = ahead.comentarios - me.comentarios;
@@ -523,6 +523,19 @@ var UniAdmin = window.UniAdmin || {};
             ? `${entry.onTime} no prazo · ${entry.late} em atraso`
             : 'Nenhum curso com prazo definido';
         return `<span class="ranking-chip is-punctual ${entry.late > 0 ? 'has-late' : ''}" title="${titulo}">${conteudo}</span>`;
+    }
+
+    // Retentativas é o 3º critério de desempate e só aparecia no detalhe
+    // expandido. No pódio ela ganha balão próprio, com a mesma leitura verde de
+    // "0 = limpo" usada na lista.
+    function retryChipHtml(entry) {
+        const n = entry.retentativas;
+        const texto = n === 0
+            ? 'sem retentativas'
+            : `${fmtInt(n)} retentativa${n > 1 ? 's' : ''}`;
+        return `<span class="ranking-chip is-retry ${n === 0 ? 'is-clean' : ''}" title="Retentativas — envios além do primeiro em cada curso. Quanto menos, melhor (ideal: 0)">
+            <i class="fas ${n === 0 ? 'fa-circle-check' : 'fa-rotate-right'}"></i> ${texto}
+        </span>`;
     }
 
     function chipsHtml(entry) {
@@ -586,6 +599,7 @@ var UniAdmin = window.UniAdmin || {};
                     <div class="podium-pct" data-count="${entry.pctConclusao.toFixed(1)}" data-suffix="%">0%</div>
                     <div class="podium-caption">${entry.concluidos}/${entry.denom} cursos</div>
                     ${podiumScoreHtml(entry)}
+                    <div class="podium-retry">${retryChipHtml(entry)}</div>
                     <div class="podium-punctual">${punctualChipHtml(entry)}</div>
                 </div>
                 <i class="fas fa-chevron-down podium-caret"></i>
@@ -663,8 +677,8 @@ var UniAdmin = window.UniAdmin || {};
         { title: '% de cursos concluídos da função', detail: 'Aprovados ÷ cursos ativos que a sua função enxerga (abertos a todos + os marcados para a sua função).' },
         { title: 'Nota média', detail: 'Média da melhor nota de cada curso concluído.', recent: true },
         { title: 'Quantidade de retentativas', detail: 'Envios além do primeiro em cada curso — quanto menos, melhor. O ideal é 0.', recent: true },
-        { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), apenas com aprovação.' },
         { title: '% de pontualidade', detail: 'Entregas no prazo ÷ (no prazo + em atraso), conforme a coluna Prazo do histórico.', recent: true },
+        { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), apenas com aprovação.' },
         { title: 'Comentários', detail: 'Quantidade de avaliações com comentário — quanto mais, melhor.', recent: true },
         { title: 'Tempo médio de conclusão', detail: 'Tempo médio ativo por curso concluído — quanto maior, melhor.', recent: true }
     ];
@@ -693,6 +707,107 @@ var UniAdmin = window.UniAdmin || {};
             </div>`;
     }
 
+    /* ─── Escopo por função ─── */
+
+    // "Estagio/Atendente" é um estagiário DA função Atendente: no seletor ele
+    // pertence ao grupo Atendente, não a um grupo "Estagio" próprio. Só este
+    // prefixo desce para o que vem depois da barra — "Atendente/Coletador" é
+    // cargo duplo, um nome próprio, e continua inteiro.
+    // A planilha é escrita à mão: o padrão cobre estagio/estágio/estagiario/
+    // estagiária/plurais, com ou sem espaço antes da barra.
+    const ROLE_INTERN_PREFIX = /^est[aá]gi(?:o|os|[aá]ri[oa]|[aá]ri[oa]s)\s*\//i;
+
+    // O cargo da planilha traz a especialização junto ("Analista - Biomédico").
+    // O seletor agrupa pela função-base (o que vem antes do " - "), que é como
+    // o curso marca o público — mesma regra de roleBase() usada no denominador.
+    function roleLabel(role) {
+        let raw = String(role || '').trim();
+        if (!raw) return '';
+        // Antes do corte do " - ": "Estagio/Atendente - Noturno" tem de virar
+        // "Atendente", não "Estagio/Atendente".
+        if (ROLE_INTERN_PREFIX.test(raw)) raw = raw.replace(ROLE_INTERN_PREFIX, '').trim();
+        if (!raw) return '';
+        const cut = raw.indexOf(' - ');
+        return (cut === -1 ? raw : raw.slice(0, cut)).trim();
+    }
+
+    // Uma opção por função-base presente no ranking, com a contagem de gente.
+    // A grafia exibida é a primeira encontrada — a planilha é livre e às vezes
+    // escreve a mesma função em caixas diferentes.
+    //
+    // Função em que NINGUÉM concluiu nada fica de fora: o recorte só mostraria
+    // um pódio de zeros, que não é ranking nenhum. Basta uma pessoa acima de
+    // 0% para o grupo voltar à lista.
+    function roleOptions(entries) {
+        const map = new Map();
+        entries.forEach(entry => {
+            const label = roleLabel(entry.role);
+            if (!label) return;
+            const key = norm(label);
+            if (!map.has(key)) map.set(key, { key, label, count: 0, hasProgress: false });
+            const option = map.get(key);
+            option.count += 1;
+            if (entry.pctConclusao > EPS) option.hasProgress = true;
+        });
+        // Ordena pelo tamanho do grupo: as funções com mais gente são as que
+        // interessam a mais gente. O alfabético fica de desempate, para a lista
+        // não trocar de ordem entre duas aberturas com os mesmos dados.
+        return [...map.values()]
+            .filter(option => option.hasProgress)
+            .sort((a, b) => (b.count - a.count) || a.label.localeCompare(b.label, 'pt-BR'));
+    }
+
+    // Uma função só filtra se ela ainda estiver na lista de opções: se o último
+    // aprovado dela sair (ficando todo mundo em 0%), o recorte cai de volta no
+    // Ranking Geral em vez de mostrar um pódio vazio sem opção de voltar.
+    function isSelectableRole(entries, roleKey) {
+        return !!roleKey && roleOptions(entries).some(option => option.key === roleKey);
+    }
+
+    function entriesForRole(entries, roleKey) {
+        if (!isSelectableRole(entries, roleKey)) return entries;
+        return entries.filter(entry => norm(roleLabel(entry.role)) === roleKey);
+    }
+
+    // Chip central sobre o pódio: fechado mostra o escopo vigente ("Ranking
+    // Geral" ou o nome da função); aberto lista as funções participantes.
+    function scopeHtml(entries, roleKey) {
+        const options = roleOptions(entries);
+        const active = options.find(o => o.key === roleKey) || null;
+        const total = entries.length;
+        return `
+            <div class="ranking-scope" id="ranking-scope">
+                <button type="button" class="ranking-scope-btn ${active ? 'is-filtered' : ''}" id="ranking-scope-toggle"
+                        aria-expanded="false" aria-haspopup="listbox" aria-controls="ranking-scope-panel">
+                    <i class="fas ${active ? 'fa-user-tag' : 'fa-globe'}"></i>
+                    <span class="ranking-scope-label">${escapeHtml(active ? active.label : 'Ranking Geral')}</span>
+                    <span class="ranking-scope-count">${active ? active.count : total}</span>
+                    <i class="fas fa-chevron-down ranking-scope-caret"></i>
+                </button>
+                <div class="ranking-scope-panel" id="ranking-scope-panel" role="listbox" hidden>
+                    <div class="ranking-scope-panel-head">
+                        <i class="fas fa-users-viewfinder"></i> Ver ranking por função
+                    </div>
+                    <div class="ranking-scope-options">
+                        <button type="button" class="ranking-scope-option ${active ? '' : 'is-active'}" role="option"
+                                aria-selected="${active ? 'false' : 'true'}" data-role="">
+                            <span class="ranking-scope-option-icon is-all"><i class="fas fa-globe"></i></span>
+                            <span class="ranking-scope-option-name">Ranking Geral</span>
+                            <span class="ranking-scope-option-count">${total}</span>
+                        </button>
+                        ${options.map(option => `
+                            <button type="button" class="ranking-scope-option ${option.key === roleKey ? 'is-active' : ''}" role="option"
+                                    aria-selected="${option.key === roleKey}" data-role="${escapeHtml(option.key)}">
+                                <span class="ranking-scope-option-icon" style="--initials-hue:${initialsHue(option.label)}">${escapeHtml(initials(option.label))}</span>
+                                <span class="ranking-scope-option-name">${escapeHtml(option.label)}</span>
+                                <span class="ranking-scope-option-count">${option.count}</span>
+                            </button>`).join('')}
+                    </div>
+                    ${options.length === 0 ? '<p class="ranking-scope-empty">Nenhuma função cadastrada.</p>' : ''}
+                </div>
+            </div>`;
+    }
+
     function confettiHtml() {
         const colors = ['var(--gold)', 'var(--accent)', 'var(--success)', 'var(--silver)', 'var(--warning)'];
         let html = '<div class="ranking-confetti" aria-hidden="true">';
@@ -706,10 +821,17 @@ var UniAdmin = window.UniAdmin || {};
         return html + '</div>';
     }
 
-    function panelHtml(entries, slug, session) {
+    // `allEntries` é o ranking completo da categoria; `roleKey` recorta a
+    // função escolhida no seletor. O seletor lista sempre as funções do
+    // conjunto completo — senão, ao filtrar, ele perderia as outras opções.
+    function panelHtml(allEntries, slug, session, roleKey) {
         const label = CATEGORY_LABELS[slug] || slug;
+        // Normaliza antes de usar: um recorte que deixou de existir vira geral,
+        // e cabeçalho, chip e lista contam a mesma história.
+        if (!isSelectableRole(allEntries, roleKey)) roleKey = '';
+        const entries = entriesForRole(allEntries, roleKey);
 
-        if (entries.length === 0) {
+        if (allEntries.length === 0) {
             return `
                 <div class="ranking-panel">
                     <div class="ranking-head">
@@ -731,8 +853,11 @@ var UniAdmin = window.UniAdmin || {};
         const me = myIndex >= 0 ? entries[myIndex] : null;
         const myPlace = myIndex >= 0 ? myIndex + 1 : 0;
 
+        // A posição da última visita é a do ranking geral: gravar a posição de
+        // um recorte por função faria o "▲ subiu 3 posições" comparar duas
+        // escalas diferentes na visita seguinte.
         let delta = null;
-        if (me) {
+        if (me && !roleKey) {
             try {
                 const stored = Number(localStorage.getItem(LAST_POS_KEY(slug)));
                 if (Number.isFinite(stored) && stored > 0) delta = stored - myPlace;
@@ -757,7 +882,7 @@ var UniAdmin = window.UniAdmin || {};
                     <div class="ranking-head-icon"><i class="fas fa-trophy"></i></div>
                     <div>
                         <h2>Ranking · ${escapeHtml(label)}</h2>
-                        <p>${entries.length} colaborador${entries.length > 1 ? 'es' : ''} · atualizado agora</p>
+                        <p>${entries.length} colaborador${entries.length !== 1 ? 'es' : ''}${roleKey ? ' nesta função' : ''} · atualizado agora</p>
                     </div>
                     <div class="ranking-legend-wrap">
                         ${legendButtonHtml()}
@@ -765,17 +890,25 @@ var UniAdmin = window.UniAdmin || {};
                     </div>
                 </div>
 
+                ${scopeHtml(allEntries, roleKey)}
+
+                ${entries.length === 0 ? `
+                <div class="ranking-empty">
+                    <i class="fas fa-user-tag"></i>
+                    <h3>Ninguém nesta função ainda</h3>
+                    <p>Volte para o <strong>Ranking Geral</strong> para ver todos os colaboradores.</p>
+                </div>` : `
                 <div class="ranking-podium">
                     ${meInTop3 ? confettiHtml() : ''}
                     ${podiumOrder}
                 </div>
                 <div class="ranking-detail" data-detail="__podium__" hidden></div>
 
-                ${youCardHtml(me, myPlace, entries.length, myIndex > 0 ? entries[myIndex - 1] : null, delta)}
+                ${roleKey && !me ? '' : youCardHtml(me, myPlace, entries.length, myIndex > 0 ? entries[myIndex - 1] : null, delta)}
 
                 <div class="ranking-list">
                     ${rest.map((entry, i) => rowHtml(entry, i + 4, entry.userId === session?.userId)).join('')}
-                </div>
+                </div>`}
             </div>`;
     }
 
@@ -992,20 +1125,20 @@ var UniAdmin = window.UniAdmin || {};
             meter: e => Math.max(0, 100 - Math.min(100, e.retentativas * 20))
         },
         {
-            icon: 'fa-book', title: 'Cursos realizados',
-            hint: 'Avaliações concluídas (enviadas), apenas com aprovação.',
-            better: 'higher', recent: false,
-            value: e => fmtInt(e.cursosRealizados),
-            sub: e => `de ${e.denom} elegíveis`,
-            meter: e => e.denom > 0 ? Math.min(100, (e.cursosRealizados / e.denom) * 100) : 0
-        },
-        {
             icon: 'fa-clock', title: '% de pontualidade',
             hint: 'Entregas no prazo ÷ (no prazo + em atraso).',
             better: 'higher', recent: true,
             value: e => e.temPrazos ? `${fmt1(e.pctPontualidade)}%` : '—',
             sub: e => e.temPrazos ? `${e.onTime} no prazo · ${e.late} em atraso` : 'sem prazos definidos',
             meter: e => e.temPrazos ? e.pctPontualidade : 0
+        },
+        {
+            icon: 'fa-book', title: 'Cursos realizados',
+            hint: 'Avaliações concluídas (enviadas), apenas com aprovação.',
+            better: 'higher', recent: false,
+            value: e => fmtInt(e.cursosRealizados),
+            sub: e => `de ${e.denom} elegíveis`,
+            meter: e => e.denom > 0 ? Math.min(100, (e.cursosRealizados / e.denom) * 100) : 0
         },
         {
             icon: 'fa-comment-dots', title: 'Comentários',
@@ -1113,7 +1246,7 @@ var UniAdmin = window.UniAdmin || {};
         document.getElementById('ranking-params-overlay')?.classList.remove('is-open');
     }
 
-    function wire(root, entries) {
+    function wire(root, entries, onSelectRole) {
         const byId = new Map(entries.map(e => [e.userId, e]));
 
         // Linhas da lista (4º em diante): cada uma tem seu próprio container
@@ -1206,12 +1339,52 @@ var UniAdmin = window.UniAdmin || {};
                 legendToggle.setAttribute('aria-expanded', String(open));
                 legendToggle.classList.toggle('is-open', open);
             });
-            document.addEventListener('click', event => {
+            // Handler no document: cada remontagem do painel cria um novo, então
+            // ele se remove sozinho quando o elemento que observa sai do DOM.
+            function onLegendOutside(event) {
+                if (!legendPanel.isConnected) { document.removeEventListener('click', onLegendOutside); return; }
                 if (legendPanel.hidden) return;
                 if (legendPanel.contains(event.target) || legendToggle.contains(event.target)) return;
                 legendPanel.hidden = true;
                 legendToggle.setAttribute('aria-expanded', 'false');
                 legendToggle.classList.remove('is-open');
+            }
+            document.addEventListener('click', onLegendOutside);
+        }
+
+        // Seletor "Ranking Geral": abre a lista de funções e devolve a escolha
+        // a renderInto, que remonta o painel com o recorte novo.
+        const scopeToggle = root.querySelector('#ranking-scope-toggle');
+        const scopePanel = root.querySelector('#ranking-scope-panel');
+        if (scopeToggle && scopePanel) {
+            function closeScope() {
+                scopePanel.hidden = true;
+                scopeToggle.setAttribute('aria-expanded', 'false');
+                scopeToggle.classList.remove('is-open');
+            }
+            scopeToggle.addEventListener('click', event => {
+                event.stopPropagation();
+                const open = scopePanel.hidden;
+                scopePanel.hidden = !open;
+                scopeToggle.setAttribute('aria-expanded', String(open));
+                scopeToggle.classList.toggle('is-open', open);
+            });
+            scopePanel.addEventListener('click', event => {
+                const option = event.target.closest('.ranking-scope-option');
+                if (!option) return;
+                event.stopPropagation();
+                closeScope();
+                onSelectRole?.(option.dataset.role || '');
+            });
+            function onScopeOutside(event) {
+                if (!scopePanel.isConnected) { document.removeEventListener('click', onScopeOutside); return; }
+                if (scopePanel.hidden) return;
+                if (scopePanel.contains(event.target) || scopeToggle.contains(event.target)) return;
+                closeScope();
+            }
+            document.addEventListener('click', onScopeOutside);
+            root.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !scopePanel.hidden) { event.stopPropagation(); closeScope(); }
             });
         }
     }
@@ -1261,10 +1434,22 @@ var UniAdmin = window.UniAdmin || {};
         try {
             const { entries } = await loadData(slug);
             const session = U.StudentAuth?.getSession?.() || null;
-            container.innerHTML = panelHtml(entries, slug, session);
-            wire(container, entries);
-            animateCounters(container);
-            animateBars(container);
+
+            // Trocar a função remonta o painel a partir dos MESMOS dados já
+            // carregados — o recorte é visual, não uma consulta nova.
+            let roleKey = options.roleKey || '';
+            function paint() {
+                container.innerHTML = panelHtml(entries, slug, session, roleKey);
+                wire(container, entries, next => {
+                    if (next === roleKey) return;
+                    roleKey = next;
+                    Object.keys(detailCharts).forEach(destroyDetailChart);
+                    paint();
+                });
+                animateCounters(container);
+                animateBars(container);
+            }
+            paint();
         } catch (error) {
             console.error('Erro ao montar o ranking:', error);
             container.innerHTML = errorHtml();

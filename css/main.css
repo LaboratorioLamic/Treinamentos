@@ -2508,8 +2508,16 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.18); }
         }
-        .podium-punctual { display: flex; justify-content: center; margin-top: 8px; }
+        .podium-retry { display: flex; justify-content: center; margin-top: 8px; }
+        .podium-retry .ranking-chip { font-size: 0.66em; }
+        .podium-punctual { display: flex; justify-content: center; margin-top: 6px; }
         .podium-punctual .ranking-chip { font-size: 0.66em; }
+        /* No 1º lugar os balões ganham fundo sólido: sobre o dourado do bloco,
+           o cinza translúcido padrão sumia. */
+        .is-first .podium-retry .ranking-chip:not(.is-clean),
+        .is-first .podium-punctual .ranking-chip:not(.is-clean):not(.has-late) {
+            background: rgba(255,255,255,0.78); border-color: rgba(212,160,23,0.4);
+        }
         .podium-caret {
             font-size: 0.72em; color: var(--text-muted); margin-top: 2px;
             transition: transform .2s;
@@ -2943,6 +2951,94 @@
         }
         .ranking-legend-panel .ranking-legend-panel-foot i { color: var(--accent); margin-right: 5px; }
         .ranking-legend-list span { color: var(--text-muted); }
+
+        /* Seletor de escopo "Ranking Geral" — centralizado sobre o pódio.
+           Fica FORA de .ranking-podium (que tem overflow:hidden por causa do
+           confete) para o popover poder transbordar o bloco do pódio. */
+        .ranking-scope {
+            position: relative; z-index: 6;
+            display: flex; justify-content: center;
+            padding: 16px 26px 0;
+            background: radial-gradient(120% 140% at 50% 0%, #fffaf0 0%, var(--card) 70%);
+        }
+        .ranking-scope-btn {
+            display: inline-flex; align-items: center; gap: 9px;
+            padding: 9px 16px; border-radius: 99px;
+            border: 1px solid var(--border);
+            background: var(--card); color: var(--text-primary);
+            font-family: 'Inter', sans-serif; font-size: 0.82em; font-weight: 700;
+            cursor: pointer; white-space: nowrap;
+            box-shadow: var(--shadow-sm);
+            transition: border-color .15s, box-shadow .15s, transform .15s;
+        }
+        .ranking-scope-btn:hover { transform: translateY(-1px); border-color: var(--gold); box-shadow: 0 8px 20px -10px rgba(212,160,23,0.7); }
+        .ranking-scope-btn.is-open { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+        .ranking-scope-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .ranking-scope-btn > i:first-child { color: var(--gold); font-size: 0.95em; }
+        .ranking-scope-btn.is-filtered > i:first-child { color: var(--accent); }
+        .ranking-scope-label { letter-spacing: -0.2px; }
+        .ranking-scope-count {
+            min-width: 22px; padding: 1px 7px; border-radius: 99px;
+            background: var(--surface-2); color: var(--text-secondary);
+            font-size: 0.78em; font-weight: 800; text-align: center;
+        }
+        .ranking-scope-btn.is-filtered .ranking-scope-count { background: rgba(79,142,247,0.14); color: var(--accent); }
+        .ranking-scope-caret { font-size: 0.72em; color: var(--text-muted); transition: transform .18s; }
+        .ranking-scope-btn.is-open .ranking-scope-caret { transform: rotate(180deg); }
+
+        .ranking-scope-panel {
+            position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+            z-index: 7; width: 290px; max-width: min(290px, 86vw);
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+            padding: 12px; text-align: left;
+            animation: podiumRise .18s ease-out;
+        }
+        /* Setinha apontando para o botão. */
+        .ranking-scope-panel::before {
+            content: ''; position: absolute; top: -6px; left: 50%; margin-left: -6px;
+            width: 11px; height: 11px; transform: rotate(45deg);
+            background: var(--card); border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+        }
+        .ranking-scope-panel-head {
+            display: flex; align-items: center; gap: 7px;
+            padding: 0 6px 9px; margin-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.76em; font-weight: 800; color: var(--text-secondary);
+        }
+        .ranking-scope-panel-head i { color: var(--accent); }
+        /* Lista rolável: são tantas funções quanto a planilha tiver. */
+        .ranking-scope-options { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
+        .ranking-scope-option {
+            display: flex; align-items: center; gap: 9px; width: 100%;
+            padding: 8px 8px; border: none; border-radius: var(--radius-md, 10px);
+            background: transparent; color: var(--text-primary);
+            font-family: 'Inter', sans-serif; font-size: 0.8em; font-weight: 600;
+            text-align: left; cursor: pointer;
+            transition: background .12s;
+        }
+        .ranking-scope-option:hover { background: var(--surface-2); }
+        .ranking-scope-option.is-active { background: var(--gold-soft); font-weight: 800; }
+        .ranking-scope-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+        .ranking-scope-option-icon {
+            flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.72em; font-weight: 800;
+            color: hsl(var(--initials-hue,220) 62% 32%);
+            background: linear-gradient(135deg, hsl(var(--initials-hue,220) 70% 92%), hsl(var(--initials-hue,220) 70% 84%));
+        }
+        .ranking-scope-option-icon.is-all { background: linear-gradient(135deg, #f7d060, var(--gold)); color: #3a2a06; font-size: 0.8em; }
+        .ranking-scope-option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ranking-scope-option-count {
+            flex-shrink: 0; padding: 1px 7px; border-radius: 99px;
+            background: var(--surface-2); color: var(--text-secondary);
+            font-size: 0.82em; font-weight: 800;
+        }
+        .ranking-scope-option.is-active .ranking-scope-option-count { background: rgba(212,160,23,0.2); color: #7a5a0d; }
+        .ranking-scope-empty { padding: 10px 8px; font-size: 0.78em; color: var(--text-muted); }
+        /* O pódio já abre com 34px de topo; com o seletor acima dele o espaço
+           soma duas vezes. */
+        .ranking-scope + .ranking-podium { padding-top: 16px; }
 
         /* Vazio, erro e carregamento */
         .ranking-empty { padding: 56px 26px; text-align: center; }
