@@ -710,6 +710,40 @@
             });
         }
 
+        // Aprovações já registradas no histórico do aluno, por curso.
+        // Fonte: as mesmas linhas da aba Histórico (U.getHistoryRows), que
+        // reúne results/byUser (avaliações feitas no portal) E
+        // results/imported (histórico antigo trazido por planilha, sem
+        // userId — casa pelo nome, mesmo critério do Perfil do aluno,
+        // ver rowsForSession em js/student-profile.js).
+        // Devolve Map "subjectId_themeId" -> maior nota aprovada.
+        function fetchApprovedHistory(session) {
+            const U = window.UniAdmin;
+            if (!U.getHistoryRows) return Promise.resolve(new Map());
+            const nameKey = U.normalizeName(session.fullName || '');
+            return U.getHistoryRows().then(rows => {
+                const byCourse = new Map();
+                (rows || []).forEach(r => {
+                    if (r.slug !== currentCategorySlug) return;
+                    if (!r.subjectId || !r.themeId) return;
+                    // Linha do próprio aluno: pela conta, ou — no histórico
+                    // avulso/importado, que não tem conta — pelo nome.
+                    const isMine = r.userId === session.userId
+                        || (r.userId == null && U.normalizeName(r.fullName || '') === nameKey);
+                    if (!isMine || !r.approved) return;
+                    const score = Number(r.score);
+                    if (!Number.isFinite(score)) return;
+                    const key = `${r.subjectId}_${r.themeId}`;
+                    const best = byCourse.get(key);
+                    if (best === undefined || score > best) byCourse.set(key, score);
+                });
+                return byCourse;
+            }).catch(error => {
+                console.error('Erro ao carregar histórico aprovado:', error);
+                return new Map();
+            });
+        }
+
         // Ao logar (ou recarregar já logado), sincroniza completionStatus/
         // assessmentResults locais com a progressão gravada na nuvem — cobre
         // tanto continuar o curso em outro navegador/dispositivo quanto um
@@ -720,7 +754,10 @@
             if (!isProgressSyncEligible()) return;
             const U = window.UniAdmin;
             const session = U.StudentAuth.getSession();
-            U.get(U.ref(U.db, progressPathFor(session.userId))).then(snapshot => {
+            Promise.all([
+                U.get(U.ref(U.db, progressPathFor(session.userId))),
+                fetchApprovedHistory(session)
+            ]).then(([snapshot, approvedHistory]) => {
                 const remote = snapshot.exists() ? (snapshot.val() || {}) : {};
                 let changed = false;
 
@@ -736,20 +773,40 @@
                             if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
                             remoteProgressActiveMs[subjectId][themeId] = entry.activeMs;
                         }
+                        // Curso aprovado no histórico (inclusive o importado
+                        // por planilha, que não gera registro em
+                        // progress/byUser) conta como concluído: o card mostra
+                        // 100% e a nota, sem exigir reassistir os módulos.
+                        // Só o reset do curso zera isso — ele apaga também as
+                        // linhas de results/imported (ver resetCourse em
+                        // js/admin-dashboard.js), então a aprovação some daqui
+                        // junto com o resto.
+                        const moduleCount = (theme.modules || []).length;
+                        const historyScore = approvedHistory.get(`${subjectId}_${themeId}`);
+                        const hasHistoryApproval = historyScore !== undefined;
+
                         const localDone = (completionStatus[subjectId]?.[themeId] || []).filter(Boolean).length;
-                        const remoteDone = entry?.done || 0;
+                        const remoteDone = hasHistoryApproval
+                            ? Math.max(entry?.done || 0, moduleCount)
+                            : (entry?.done || 0);
 
                         // Reconstrói o array de booleans do tamanho certo sempre que a
                         // progressão remota diverge da local (para mais OU para menos).
                         if (remoteDone !== localDone) {
                             if (!completionStatus[subjectId]) completionStatus[subjectId] = {};
-                            const arr = new Array((theme.modules || []).length).fill(false);
+                            const arr = new Array(moduleCount).fill(false);
                             for (let i = 0; i < Math.min(remoteDone, arr.length); i++) arr[i] = true;
                             completionStatus[subjectId][themeId] = arr;
                             changed = true;
                         }
 
-                        const remoteApproved = (entry?.approved !== undefined && entry?.approved !== null) ? entry.approved : undefined;
+                        const entryApproved = (entry?.approved !== undefined && entry?.approved !== null) ? entry.approved : undefined;
+                        // Entre a nota da nuvem e a do histórico vale a maior —
+                        // o histórico importado costuma ser a única fonte de
+                        // cursos feitos antes do portal.
+                        const remoteApproved = hasHistoryApproval
+                            ? (entryApproved !== undefined ? Math.max(entryApproved, historyScore) : historyScore)
+                            : entryApproved;
                         const localApproved = assessmentResults[subjectId]?.[themeId];
                         if (remoteApproved !== localApproved) {
                             if (remoteApproved !== undefined) {

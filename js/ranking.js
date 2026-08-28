@@ -382,19 +382,25 @@ var UniAdmin = window.UniAdmin || {};
                 if (status === 'on_time' || status === 'forgiven') onTime += 1;
                 else if (status === 'late' || status === 'closed') late += 1;
 
-                if (!approvedEver) return;
-                concluidos += 1;
+                if (approvedEver) concluidos += 1;
 
-                // Nota do curso = melhor tentativa recente. Só cursos
-                // concluídos entram na média: uma reprovação já é penalizada
-                // pela % de conclusão, e contá-la de novo aqui puniria a mesma
-                // coisa duas vezes.
+                // Nota do curso = melhor tentativa recente. Curso REPROVADO
+                // também entra na média, com a nota que tirou: a média é a
+                // leitura de desempenho nas avaliações, e deixar a reprovação
+                // de fora fazia quem só passava nos cursos fáceis exibir média
+                // alta enquanto quem tentou um curso difícil e ficou em 5,0
+                // não via diferença nenhuma. Dentro do curso continua valendo
+                // a melhor tentativa (a retentativa já é penalizada no 3º
+                // critério, e a não conclusão na % de conclusão).
                 const best = recentes.reduce((acc, r) => {
                     const n = Number(r.score);
                     return Number.isFinite(n) && n > acc ? n : acc;
                 }, -Infinity);
                 if (Number.isFinite(best)) notas.push(best);
 
+                // Tempo médio segue só nos concluídos: curso abandonado no
+                // meio não tem duração comparável com um curso terminado.
+                if (!approvedEver) return;
                 const activeMs = recentes.reduce((acc, r) => Math.max(acc, Number(r.activeMs) || 0), 0);
                 if (activeMs > 0) tempos.push(activeMs);
             });
@@ -540,7 +546,7 @@ var UniAdmin = window.UniAdmin || {};
 
     function chipsHtml(entry) {
         return `
-            <span class="ranking-chip is-score" title="Nota média entre os cursos concluídos">
+            <span class="ranking-chip is-score" title="Nota média entre os cursos avaliados — reprovações incluídas">
                 <i class="fas fa-star"></i> ${entry.notaMedia > 0 ? fmt2(entry.notaMedia) : '—'}
             </span>
             ${punctualChipHtml(entry)}
@@ -568,7 +574,7 @@ var UniAdmin = window.UniAdmin || {};
         }
         const pct = Math.max(0, Math.min(100, entry.notaMedia * 10));
         return `
-            <div class="podium-score" title="Nota média entre os cursos concluídos — critério de desempate">
+            <div class="podium-score" title="Nota média entre os cursos avaliados, reprovações incluídas — critério de desempate">
                 <span class="podium-score-label">Nota média</span>
                 <div class="podium-score-value">
                     <i class="fas fa-star"></i>
@@ -675,7 +681,7 @@ var UniAdmin = window.UniAdmin || {};
     // ruído visual em toda visita; agora é sob demanda.
     const LEGEND_ITEMS = [
         { title: '% de cursos concluídos da função', detail: 'Aprovados ÷ cursos ativos que a sua função enxerga (abertos a todos + os marcados para a sua função).' },
-        { title: 'Nota média', detail: 'Média da melhor nota de cada curso concluído.', recent: true },
+        { title: 'Nota média', detail: 'Média da melhor nota de cada curso avaliado, incluindo os reprovados.', recent: true },
         { title: 'Quantidade de retentativas', detail: 'Envios além do primeiro em cada curso — quanto menos, melhor. O ideal é 0.', recent: true },
         { title: '% de pontualidade', detail: 'Entregas no prazo ÷ (no prazo + em atraso), conforme a coluna Prazo do histórico.', recent: true },
         { title: 'Cursos realizados', detail: 'Quantidade de avaliações concluídas (enviadas), apenas com aprovação.' },
@@ -1110,7 +1116,7 @@ var UniAdmin = window.UniAdmin || {};
         },
         {
             icon: 'fa-star', title: 'Nota média',
-            hint: 'Média da melhor nota de cada curso concluído.',
+            hint: 'Média da melhor nota de cada curso avaliado, incluindo os reprovados.',
             better: 'higher', recent: true,
             value: e => e.notaMedia > 0 ? fmt2(e.notaMedia) : '—',
             sub: () => 'escala de 0 a 10',

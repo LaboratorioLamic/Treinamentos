@@ -663,16 +663,56 @@
         renderProgress(rows, courseIndexCache);
     }
 
+    // progress/byUser só existe para cursos feitos dentro do portal. Um
+    // curso aprovado que só consta no histórico (inclusive o importado por
+    // planilha, que não tem userId e casa pelo nome — ver rowsForSession)
+    // ficava aqui como "em andamento" com o % parcial dos módulos abertos.
+    // Aprovação vale como curso concluído: 100%. Só o reset do curso desfaz
+    // isso, pois apaga tanto results/imported quanto progress/byUser.
+    function applyApprovedHistoryToProgress(progressRows, historyRows, courseIndex) {
+        const approved = new Set();
+        historyRows.forEach(r => {
+            if (r.approved && r.subjectId && r.themeId) approved.add(`${r.slug}|${r.subjectId}|${r.themeId}`);
+        });
+        if (approved.size === 0) return progressRows;
+
+        const byKey = new Map(progressRows.map(p => [`${p.slug}|${p.subjectId}|${p.themeId}`, p]));
+        const merged = progressRows.map(p => (
+            approved.has(`${p.slug}|${p.subjectId}|${p.themeId}`)
+                ? { ...p, done: p.total || p.done, pct: 100 }
+                : p
+        ));
+        // Curso aprovado sem nenhum registro de progressão (histórico antigo
+        // puro) não tem linha para atualizar — entra como concluído usando o
+        // total de módulos do índice de cursos.
+        courseIndex.forEach(course => {
+            const key = `${course.slug}|${course.subjectId}|${course.themeId}`;
+            if (!approved.has(key) || byKey.has(key)) return;
+            const total = course.moduleCount || 0;
+            if (total === 0) return;
+            merged.push({
+                slug: course.slug, subjectId: course.subjectId, themeId: course.themeId,
+                total, done: total, pct: 100, approved: null, updatedAt: null
+            });
+        });
+        return merged;
+    }
+
     async function loadProgress(session) {
         if (!progressListEl) return;
         progressListEl.innerHTML = '<p class="form-hint">Carregando progressão...</p>';
         try {
-            const [progressRows, courseIndex] = await Promise.all([
+            const [progressRows, courseIndex, allHistoryRows] = await Promise.all([
                 U.StudentAuth.getCourseProgressForUser(session.userId),
-                U.getCourseIndex()
+                U.getCourseIndex(),
+                U.getHistoryRows().catch(() => [])
             ]);
-            progressRowsCache = progressRows;
             courseIndexCache = courseIndex;
+            progressRowsCache = applyApprovedHistoryToProgress(
+                progressRows,
+                rowsForSession(allHistoryRows, session),
+                courseIndex
+            );
             applyProgressForCategory();
         } catch (error) {
             progressListEl.innerHTML = '<p class="form-hint">Não foi possível carregar a progressão agora.</p>';
