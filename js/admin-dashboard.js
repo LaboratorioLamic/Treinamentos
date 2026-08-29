@@ -1388,9 +1388,9 @@
         </table>`;
     }
 
-    // "Faltam realizar": público-alvo do curso que ainda não aparece nas
-    // realizações (rows), com progresso de módulos assistidos, do maior
-    // para o menor.
+    // "Faltam realizar": público-alvo do curso que ainda não tem nenhuma
+    // aprovação (nunca fez a prova ou só reprovou), com progresso de
+    // módulos assistidos, do maior para o menor.
     function renderMissingTable(rows, slug, subjectId, theme) {
         const container = document.getElementById('cfg-dash-course-missing');
         if (!container) return;
@@ -1401,8 +1401,10 @@
             return;
         }
 
+        // Só aprovação encerra a pendência: quem reprovou e não tem nenhuma
+        // aprovação continua na lista, porque ainda precisa refazer a prova.
         const doneKeys = new Set();
-        rows.forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
+        rows.filter(row => row.approved).forEach(row => personKeysOfRow(row).forEach(key => doneKeys.add(key)));
         const audience = courseAudience(theme);
         missingRowsCache = audience
             .filter(colab => !personKeysOfColaborador(colab).some(key => doneKeys.has(key)))

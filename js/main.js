@@ -1656,9 +1656,9 @@
             catch (error) { /* indisponível */ }
         }
 
-        // Minutos da prova = 2 min por questão.
+        // Minutos da prova = 3 min por questão.
         function quizDurationMs(questionCount) {
-            return questionCount * 2 * 60 * 1000;
+            return questionCount * 3 * 60 * 1000;
         }
 
         function formatClock(ms) {
@@ -1723,7 +1723,7 @@
         function openQuizIntro(subjectId, themeId, questionCount, attemptsState = null) {
             resetContent();
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            const minutes = questionCount * 2;
+            const minutes = questionCount * 3;
             document.getElementById('quiz-intro-count').textContent = `${questionCount} questões`;
             document.getElementById('quiz-intro-time').textContent = `${minutes} minutos`;
 
