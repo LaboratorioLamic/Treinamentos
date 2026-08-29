@@ -1000,7 +1000,21 @@
                 </div>
                 <div class="tab-content" id="cfg-dash-course-tab-info">
                     <div class="panel-card">
-                        <div class="panel-header"><h2>Comentários da Pesquisa de Satisfação</h2></div>
+                        <div class="panel-header">
+                            <h2>Comentários da Pesquisa de Satisfação</h2>
+                            <div class="panel-header-actions">
+                                <div class="hfilter-chip dash-unit-chip" id="cfg-dash-course-comments-unit-chip">
+                                    <button type="button" class="hfilter-chip-btn" title="Filtrar por unidade">
+                                        <i class="fas fa-building"></i>
+                                        <span class="hfilter-chip-label" data-default="Unidade">Unidade</span>
+                                    </button>
+                                    <div class="hfilter-chip-popover">
+                                        <button type="button" class="hfilter-chip-clear" id="cfg-dash-course-comments-unit-clear" hidden><i class="fas fa-eraser"></i> Limpar filtro</button>
+                                        <div class="hfilter-chip-list" id="cfg-dash-course-comments-unit-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="panel-body">
                             <div id="cfg-dash-course-comments" class="dashboard-table-wrap"></div>
                             <div class="dash-comments-pagination" id="cfg-dash-course-comments-pagination"></div>
@@ -1021,8 +1035,17 @@
                     </div>
                     <div class="dashboard-chart-row">
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Satisfação com o Curso</h2></div>
+                            <div class="panel-header">
+                                <h2>Satisfação com o Curso</h2>
+                                <div class="panel-header-actions">
+                                    <div class="dash-mode-switch" id="cfg-dash-course-satisfaction-mode">
+                                        <button type="button" class="dash-mode-btn is-active" data-mode="geral">Geral</button>
+                                        <button type="button" class="dash-mode-btn" data-mode="unidade">Unidade</button>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="panel-body"><canvas id="cfg-dash-course-satisfaction-chart"></canvas></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-course-satisfaction-pagination"></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
                             <div class="panel-header"><h2>Realização do Curso</h2></div>

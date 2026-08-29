@@ -1051,6 +1051,17 @@
         }
         .hfilter-chip-toggle-all:hover { background: var(--cfg-primary-light); }
         .hfilter-chip-toggle-all i { font-size: 12px; }
+        /* "Limpar filtro" no topo do popover: zera a seleção sem precisar
+           desmarcar unidade por unidade. Some quando nada está marcado. */
+        .hfilter-chip-clear {
+            width: 100%; display: flex; align-items: center; gap: 6px;
+            padding: 8px 9px; margin-bottom: 4px; border: 1px solid var(--cfg-border); border-radius: 8px;
+            background: none; font-size: 12.5px; font-weight: 600; color: var(--text-2);
+            cursor: pointer; transition: background 0.1s, color 0.1s, border-color 0.1s; font-family: inherit;
+        }
+        .hfilter-chip-clear:hover { background: var(--cfg-danger-light, #fee2e2); color: var(--cfg-danger); border-color: var(--cfg-danger); }
+        .hfilter-chip-clear i { font-size: 12px; }
+        .hfilter-chip-clear[hidden] { display: none; }
         .hfilter-chip-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
         .hfilter-chip-item {
             padding: 8px 9px; border-radius: 8px; font-size: 12.5px; color: var(--text);
@@ -2275,6 +2286,18 @@
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap table.is-sticky thead th {
             position: sticky; top: 0; background: var(--cfg-surface); z-index: 1;
         }
+        /* Cabeçalho clicável: ordena a tabela por aquela coluna. O ícone
+           mostra a direção atual e fica apagado nas colunas não ordenadas. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable {
+            cursor: pointer; user-select: none; transition: color 0.12s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable:hover { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable i {
+            font-size: 10px; margin-left: 3px; opacity: 0.25;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable:hover i { opacity: 0.6; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sorted { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sorted i { opacity: 1; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap td {
             padding: 10px 10px; border-bottom: 1px solid var(--cfg-border); color: var(--text); vertical-align: middle;
         }
@@ -2353,6 +2376,22 @@
             background: var(--cfg-danger-light); border-color: var(--cfg-danger); color: var(--cfg-danger);
         }
 
+        /* Alternador Geral/Unidade do gráfico de Satisfação: mesmo gráfico,
+           duas leituras (distribuição de estrelas x média por unidade). */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-switch {
+            display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px;
+            border: 1.5px solid var(--cfg-border); background: var(--bg);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn {
+            height: 24px; padding: 0 12px; border: none; border-radius: 999px; background: none;
+            font-size: 11.5px; font-weight: 600; font-family: inherit; color: var(--text-3);
+            cursor: pointer; transition: background 0.15s, color 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn:hover { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn.is-active {
+            background: var(--cfg-surface); color: var(--cfg-primary); box-shadow: var(--cfg-shadow-sm);
+        }
+
         /* --- Comentários: cards em vez de tabela crua, com estrelas douradas --- */
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-cards { display: flex; flex-direction: column; gap: 10px; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card {
@@ -2372,6 +2411,17 @@
             font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;
         }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name i { color: var(--cfg-primary); font-size: 14px; }
+        /* Unidade do colaborador ao lado do nome: dá contexto ao comentário
+           sem precisar abrir o detalhe da avaliação. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-unit {
+            font-size: 11px; font-weight: 600; color: var(--text-3);
+            display: inline-flex; align-items: center; gap: 4px;
+            background: var(--bg-2, #f1f5f9); border-radius: 999px; padding: 2px 8px;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-unit i { font-size: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-head-left {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;
+        }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-rating { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text {
             font-size: 12.5px; color: var(--text-2); line-height: 1.5;

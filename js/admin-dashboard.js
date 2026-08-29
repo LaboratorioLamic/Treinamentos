@@ -998,6 +998,17 @@
     const COMMENTS_PAGE_SIZE = 5;
     let commentsPage = 1;
     let commentsRowsCache = [];
+    // Comentários filtrados pelas unidades marcadas no chip (vazio = todas).
+    // O índice do card aponta pra esta lista, não pro cache completo.
+    let commentsVisibleRows = [];
+
+    function commentUnitOf(row) { return row.unit || 'Sem unidade'; }
+
+    function filteredCommentRows() {
+        const units = commentsUnitChip ? commentsUnitChip.getValues() : null;
+        if (!units || units.size === 0) return commentsRowsCache;
+        return commentsRowsCache.filter(r => units.has(commentUnitOf(r)));
+    }
 
     function renderCommentsPagination(totalPages) {
         const pager = document.getElementById('cfg-dash-course-comments-pagination');
@@ -1017,7 +1028,13 @@
 
     function paintCommentsPage() {
         const container = document.getElementById('cfg-dash-course-comments');
-        const rows = commentsRowsCache;
+        const rows = filteredCommentRows();
+        commentsVisibleRows = rows;
+        if (rows.length === 0) {
+            container.innerHTML = '<p class="dashboard-table-empty">Nenhum comentário nas unidades selecionadas.</p>';
+            renderCommentsPagination(1);
+            return;
+        }
         const totalPages = Math.max(1, Math.ceil(rows.length / COMMENTS_PAGE_SIZE));
         commentsPage = Math.min(Math.max(1, commentsPage), totalPages);
         const start = (commentsPage - 1) * COMMENTS_PAGE_SIZE;
@@ -1029,7 +1046,10 @@
             return `
             <div class="comment-card ${ratingClass} is-clickable" data-row-i="${start + i}" title="Ver detalhes da avaliação">
                 <div class="comment-card-head">
-                    <span class="comment-card-name"><i class="fas fa-user-circle"></i> ${escapeHtml(r.fullName)}</span>
+                    <span class="comment-card-head-left">
+                        <span class="comment-card-name"><i class="fas fa-user-circle"></i> ${escapeHtml(r.fullName)}</span>
+                        <span class="comment-card-unit"><i class="fas fa-building"></i> ${escapeHtml(commentUnitOf(r))}</span>
+                    </span>
                     <span class="comment-card-rating">${scoreBadgeGradientHtml(r.score)}${starsHtml(r.rating)}</span>
                 </div>
                 <p class="comment-card-text ${r.comment ? '' : 'is-empty'}">${r.comment ? escapeHtml(r.comment) : 'Em branco'}</p>
@@ -1046,7 +1066,7 @@
         });
         container.querySelectorAll('.comment-card.is-clickable').forEach(card => {
             card.addEventListener('click', () => {
-                const row = commentsRowsCache[Number(card.dataset.rowI)];
+                const row = commentsVisibleRows[Number(card.dataset.rowI)];
                 if (row) openReviewModal(row);
             });
         });
@@ -1062,13 +1082,33 @@
         commentsRowsCache = rows.filter(r => r.comment || (Number(r.rating) || 0) <= 3)
             .sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
         commentsPage = 1;
+        // Só as unidades que realmente têm comentário entram no filtro:
+        // listar unidade sem comentário daria opção que não filtra nada.
+        commentsUnitChip?.setOptions([...new Set(commentsRowsCache.map(commentUnitOf))]
+            .sort((a, b) => a.localeCompare(b, 'pt-BR')));
         if (commentsRowsCache.length === 0) {
+            commentsVisibleRows = [];
             container.innerHTML = '<p class="dashboard-table-empty">Nenhum comentário registrado para este curso.</p>';
             if (pager) pager.innerHTML = '';
             return;
         }
         paintCommentsPage();
     }
+
+    // Filtro por unidade dos comentários: mesmo popover multi-seleção dos
+    // gráficos, com "Limpar filtro" no topo. Trocar a seleção volta pra
+    // página 1 (senão a paginação podia apontar pra página vazia).
+    const commentsUnitChip = createMultiFilterChip('cfg-dash-course-comments-unit-chip', 'cfg-dash-course-comments-unit-list', () => {
+        commentsPage = 1;
+        paintCommentsPage();
+    });
+
+    document.getElementById('cfg-dash-course-comments-unit-clear')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        commentsUnitChip.clear();
+        commentsPage = 1;
+        paintCommentsPage();
+    });
 
     // ─── Modal de detalhe da avaliação (clique num comentário) ───
     // Mostra quem é o aluno (unidade, cargo, média geral e total de cursos
@@ -1265,6 +1305,86 @@
         </tr>`;
     }
 
+    // Ordenação por coluna das tabelas de Aprovados/Reprovados: clicar no
+    // título ordena por aquela coluna, clicar de novo inverte. Cada tabela
+    // guarda sua própria ordenação (o mesmo paint serve as duas), e `null`
+    // significa a ordem natural do cache — mais recente primeiro.
+    const CONCLUSION_COLUMNS = [
+        { key: 'date', label: 'Data/Hora', numeric: true, value: (r) => r.submittedAt || 0 },
+        { key: 'name', label: 'Nome', value: (r) => r.fullName || '' },
+        { key: 'unit', label: 'Unidade', value: (r) => r.unit || '' },
+        { key: 'role', label: 'Cargo', value: (r) => r.role || '' },
+        { key: 'deadline', label: 'Prazo', value: (r) => U.Deadlines.STATUS_LABELS[r.deadlineStatus] || r.deadlineStatus || '' },
+        { key: 'score', label: 'Nota', numeric: true, value: (r) => Number(r.score) },
+        { key: 'duration', label: 'Tempo', numeric: true, value: (r) => Number(r.durationSeconds) },
+        // "Conclusão" não está na linha do histórico: vem do activeMs gravado
+        // em progress/byUser, a mesma leitura que a célula faz.
+        { key: 'active', label: 'Conclusão', numeric: true, value: (r) => Number(r.userId ? allProgress[r.userId]?.[r.slug]?.[r.subjectId]?.[r.themeId]?.activeMs : NaN) },
+        { key: 'situation', label: 'Situação', numeric: true, value: (r) => (r.approved ? 1 : 0) }
+    ];
+
+    const conclusionSort = {};
+
+    function sortedConclusionRows(containerId, rows) {
+        const sort = conclusionSort[containerId];
+        if (!sort) return rows;
+        const column = CONCLUSION_COLUMNS.find(c => c.key === sort.key);
+        if (!column) return rows;
+        const dir = sort.dir === 'asc' ? 1 : -1;
+        return rows.slice().sort((a, b) => {
+            const va = column.value(a);
+            const vb = column.value(b);
+            if (column.numeric) {
+                // Sem valor (prova sem tempo gravado, por ex.) sempre por
+                // último, independente da direção — senão a coluna começa
+                // com uma pilha de tracinhos (—).
+                const aOk = Number.isFinite(va);
+                const bOk = Number.isFinite(vb);
+                if (!aOk || !bOk) return aOk === bOk ? 0 : (aOk ? -1 : 1);
+                return (va - vb) * dir;
+            }
+            return String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' }) * dir;
+        });
+    }
+
+    function conclusionHeadHtml(containerId) {
+        const sort = conclusionSort[containerId];
+        const ths = CONCLUSION_COLUMNS.map(col => {
+            const active = sort && sort.key === col.key;
+            const icon = active ? (sort.dir === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : 'fa-sort';
+            return `<th class="is-sortable ${active ? 'is-sorted' : ''}" data-sort-key="${col.key}" title="Ordenar por ${escapeHtml(col.label)}">
+                ${escapeHtml(col.label)} <i class="fas ${icon}"></i>
+            </th>`;
+        }).join('');
+        return `<thead><tr>${ths}<th></th></tr></thead>`;
+    }
+
+    // Qual repaint chamar depois de trocar a ordenação de cada tabela — as
+    // duas passam pelo mesmo paint, mas cada uma tem seus próprios filtros
+    // (busca, "Críticos") que precisam ser reaplicados.
+    const CONCLUSION_REPAINT = {
+        'cfg-dash-course-completed': () => paintCompletedPage(),
+        'cfg-dash-course-reproved': () => paintReprovedPage()
+    };
+
+    function bindConclusionSort(container, containerId) {
+        container.querySelectorAll('th.is-sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.dataset.sortKey;
+                const current = conclusionSort[containerId];
+                const column = CONCLUSION_COLUMNS.find(c => c.key === key);
+                if (current && current.key === key) {
+                    conclusionSort[containerId] = { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+                } else {
+                    // Primeiro clique: texto começa em A-Z, número/data começa
+                    // do maior (nota mais alta, realização mais recente).
+                    conclusionSort[containerId] = { key, dir: column?.numeric ? 'desc' : 'asc' };
+                }
+                CONCLUSION_REPAINT[containerId]?.();
+            });
+        });
+    }
+
     function paintConclusionsTable(containerId, rowsCache, searchTerm, emptyIcon, emptyMessage) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -1281,10 +1401,12 @@
             return;
         }
 
+        const ordered = sortedConclusionRows(containerId, filtered);
         container.innerHTML = `<table class="is-sticky dash-cards">
-            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Unidade</th><th>Cargo</th><th>Prazo</th><th>Nota</th><th>Tempo</th><th>Conclusão</th><th>Situação</th><th></th></tr></thead>
-            <tbody>${filtered.map((r, i) => conclusionRowHtml(r, i)).join('')}</tbody>
+            ${conclusionHeadHtml(containerId)}
+            <tbody>${ordered.map((r, i) => conclusionRowHtml(r, i)).join('')}</tbody>
         </table>`;
+        bindConclusionSort(container, containerId);
 
         container.querySelectorAll('.dash-forgive-btn').forEach(btn => {
             btn.addEventListener('click', (event) => {
@@ -1293,7 +1415,7 @@
             });
         });
         container.querySelectorAll('tr.is-clickable').forEach(tr => {
-            tr.addEventListener('click', () => openReviewModal(filtered[Number(tr.dataset.rowI)]));
+            tr.addEventListener('click', () => openReviewModal(ordered[Number(tr.dataset.rowI)]));
         });
     }
 
@@ -1309,6 +1431,10 @@
 
     function renderCompletedTable(rows, slug, subjectId, themeId) {
         conclusionsCourseIds = { slug, subjectId, themeId };
+        // Curso novo abre na ordem padrão (mais recente primeiro), sem herdar
+        // a coluna que estava ordenada no curso anterior.
+        delete conclusionSort['cfg-dash-course-completed'];
+        delete conclusionSort['cfg-dash-course-reproved'];
         const sorted = rows.slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
         completedRowsCache = sorted.filter(r => r.approved);
         reprovedRowsCache = sorted.filter(r => !r.approved);
@@ -1626,6 +1752,10 @@
                     : `${values.size} unidades`;
             }
             chip?.classList.toggle('is-active', values.size > 0);
+            // "Limpar filtro" (quando o popover tem um) só aparece com algo
+            // marcado — sem seleção o botão não teria o que limpar.
+            const clearBtn = chip?.querySelector('.hfilter-chip-clear');
+            if (clearBtn) clearBtn.hidden = values.size === 0;
             paint();
         }
 
@@ -1644,6 +1774,12 @@
             setOptions(newOptions) {
                 options = newOptions;
                 values = new Set([...values].filter(v => options.includes(v)));
+                refresh();
+            },
+            // Zera a seleção sem disparar onChange — quem chama decide o que
+            // repintar (usado pelo botão "Limpar filtro" do popover).
+            clear() {
+                values = new Set();
                 refresh();
             },
             getValues() { return values; }
@@ -1687,12 +1823,95 @@
         () => renderCourseEvalTimeChart(courseChartEvalTimeCache)
     );
 
-    // Parte da aba Gráficos que depende de data (Satisfação, Prazo,
-    // Retentativas, Por Unidade) — respeita o filtro de ano. "Realização do
-    // Curso" fica de fora: compara com o público-alvo total, não faz sentido
-    // recortar por ano.
-    function renderCourseCharts(allRows) {
-        const rows = filterRowsByYear(allRows, courseChartYearChip.getValue());
+    // Gráfico de Satisfação em dois modos, alternados pelos botões
+    // "Geral"/"Unidade" no cabeçalho do painel:
+    //   geral   — distribuição de quantas avaliações cada nota de estrela
+    //              recebeu (leitura original do gráfico);
+    //   unidade — média de estrelas de cada unidade, da menor para a maior,
+    //              pra achar rápido onde a satisfação está pior.
+    let satisfactionMode = 'geral';
+    let satisfactionRowsCache = [];
+    // Paginação do modo "Unidade" (o modo "Geral" tem 5 barras fixas e não
+    // pagina). Mesmo tamanho de página de "Notas por Unidade" — acima disso
+    // as barras ficam finas demais e os nomes se atropelam.
+    const SATISFACTION_PAGE_SIZE = 7;
+    let satisfactionPage = 1;
+
+    // Média de estrelas por unidade. Só linhas com estrela válida (1-5)
+    // entram — quem concluiu sem responder a pesquisa não deve puxar a
+    // média da unidade pra baixo.
+    function satisfactionByUnit(rows) {
+        const byUnit = new Map();
+        rows.forEach(r => {
+            const rating = Number(r.rating);
+            if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+            const unit = r.unit || 'Sem unidade';
+            if (!byUnit.has(unit)) byUnit.set(unit, { sum: 0, count: 0 });
+            const entry = byUnit.get(unit);
+            entry.sum += rating;
+            entry.count++;
+        });
+        return [...byUnit.entries()]
+            .map(([unit, e]) => ({ unit, avg: e.sum / e.count, count: e.count }))
+            .sort((a, b) => a.avg - b.avg || a.unit.localeCompare(b.unit, 'pt-BR'));
+    }
+
+    // Pager do gráfico (some no modo "Geral" e quando cabe tudo numa página).
+    function paintSatisfactionPagination(totalPages) {
+        const pager = document.getElementById('cfg-dash-course-satisfaction-pagination');
+        if (!pager) return;
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        pager.innerHTML = `<button type="button" class="comments-page-btn" data-page="prev" ${satisfactionPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>` +
+            `<span class="comments-page-info">Página ${satisfactionPage} de ${totalPages}</span>` +
+            `<button type="button" class="comments-page-btn" data-page="next" ${satisfactionPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        pager.querySelectorAll('.comments-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                satisfactionPage += btn.dataset.page === 'prev' ? -1 : 1;
+                renderCourseSatisfactionChart(satisfactionRowsCache);
+            });
+        });
+    }
+
+    function renderCourseSatisfactionChart(rows) {
+        satisfactionRowsCache = rows;
+
+        if (satisfactionMode === 'unidade') {
+            const allUnits = satisfactionByUnit(rows);
+            const totalPages = Math.max(1, Math.ceil(allUnits.length / SATISFACTION_PAGE_SIZE));
+            satisfactionPage = Math.min(Math.max(1, satisfactionPage), totalPages);
+            const start = (satisfactionPage - 1) * SATISFACTION_PAGE_SIZE;
+            const units = allUnits.slice(start, start + SATISFACTION_PAGE_SIZE);
+
+            renderChart('courseSatisfaction', 'cfg-dash-course-satisfaction-chart', {
+                type: 'bar',
+                data: {
+                    labels: units.map(u => u.unit),
+                    datasets: [{ data: units.map(u => Number(u.avg.toFixed(2))), backgroundColor: CHART_COLORS.warning, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => {
+                            const u = units[ctx.dataIndex];
+                            return `Média ${u.avg.toFixed(1).replace('.', ',')}★ • ${u.count} ${u.count === 1 ? 'avaliação' : 'avaliações'}`;
+                        } } }
+                    },
+                    // Escala fixa 0-5: comparar unidades só faz sentido na mesma
+                    // régua de estrelas, senão o eixo se ajusta e exagera a
+                    // diferença entre médias parecidas.
+                    // autoSkip: false garante nome em TODA barra da página —
+                    // sem ele o Chart.js esconde rótulos que não couberem.
+                    scales: {
+                        x: { min: 0, max: 5, ticks: { stepSize: 1, callback: (v) => `${v}★` } },
+                        y: { ticks: { autoSkip: false } }
+                    }
+                }
+            });
+            paintSatisfactionPagination(totalPages);
+            return;
+        }
+        paintSatisfactionPagination(1);
 
         const ratingCounts = [1, 2, 3, 4, 5].map(star => rows.filter(r => r.rating === star).length);
         renderChart('courseSatisfaction', 'cfg-dash-course-satisfaction-chart', {
@@ -1703,6 +1922,26 @@
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => singleSeriesTooltipLabel(ctx) } } }
             }
         });
+    }
+
+    document.getElementById('cfg-dash-course-satisfaction-mode')?.querySelectorAll('.dash-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (satisfactionMode === btn.dataset.mode) return;
+            satisfactionMode = btn.dataset.mode;
+            satisfactionPage = 1;
+            btn.parentElement.querySelectorAll('.dash-mode-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+            renderCourseSatisfactionChart(satisfactionRowsCache);
+        });
+    });
+
+    // Parte da aba Gráficos que depende de data (Satisfação, Prazo,
+    // Retentativas, Por Unidade) — respeita o filtro de ano. "Realização do
+    // Curso" fica de fora: compara com o público-alvo total, não faz sentido
+    // recortar por ano.
+    function renderCourseCharts(allRows) {
+        const rows = filterRowsByYear(allRows, courseChartYearChip.getValue());
+
+        renderCourseSatisfactionChart(rows);
 
         const lastAttempts = lastAttemptByPerson(rows);
         const onTime = lastAttempts.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus)).length;
@@ -2487,6 +2726,9 @@
         renderChart('courseScoresByUnit', 'cfg-dash-course-scores-byunit-chart', {
             type: 'bar',
             data: {
+                // Rótulo é só o nome da unidade: em duas linhas (nome + média) o
+                // texto não cabia na altura da barra e o autoSkip do eixo
+                // escondia parte das unidades. A média vive no tooltip.
                 labels: pageUnits.map(u => u.unit),
                 datasets: SCORE_BAND_DEFS.map(band => ({
                     label: band.label, backgroundColor: band.color,
@@ -2503,20 +2745,42 @@
                     const count = u.counts[band.key];
                     const pct = u.total > 0 ? Math.round((count / u.total) * 100) : 0;
                     openPeopleModal(`${band.label} — ${u.unit}`, '', u.people[band.key],
-                        `${count} de ${u.total} colaboradores da unidade (${pct}%)`);
+                        `${count} de ${u.total} colaboradores da unidade (${pct}%) • média da unidade ${u.avg === null ? '—' : formatScore(u.avg)}`);
                 },
                 onHover: (event, elements) => {
                     event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
                 },
                 plugins: {
-                    tooltip: { callbacks: { label: (ctx) => {
-                        const u = pageUnits[ctx.dataIndex];
-                        const band = SCORE_BAND_DEFS[ctx.datasetIndex];
-                        const count = u.counts[band.key];
-                        return `${band.label}: ${count} (${Math.round(ctx.parsed.x)}%)`;
-                    } } }
+                    // Tooltip por categoria (mode 'index' no eixo y): passar o
+                    // mouse na barra da unidade lista TODAS as faixas dela, não
+                    // só a faixa exata sob o cursor. As faixas zeradas ficam de
+                    // fora (`filter`) pra não poluir com "Nota 6-7: 0 (0%)".
+                    // Só o tooltip usa 'index' — o onClick continua no padrão
+                    // 'nearest'/intersect, senão clicar abriria sempre a
+                    // primeira faixa em vez da clicada.
+                    tooltip: {
+                        mode: 'index', intersect: false, axis: 'y',
+                        filter: (item) => (Number(item.parsed.x) || 0) > 0,
+                        callbacks: {
+                            title: (items) => {
+                                const u = pageUnits[items[0].dataIndex];
+                                return [u.unit, `média ${u.avg === null ? '—' : formatScore(u.avg)} • ${u.total} ${u.total === 1 ? 'pessoa' : 'pessoas'}`];
+                            },
+                            label: (ctx) => {
+                                const u = pageUnits[ctx.dataIndex];
+                                const band = SCORE_BAND_DEFS[ctx.datasetIndex];
+                                const count = u.counts[band.key];
+                                return `${band.label}: ${count} (${Math.round(ctx.parsed.x)}%)`;
+                            }
+                        }
+                    }
                 },
-                scales: { x: { stacked: true, min: 0, max: 100, ticks: { callback: (v) => `${v}%` } }, y: { stacked: true } }
+                // autoSkip: false no eixo das unidades — com muitas barras o
+                // Chart.js escondia rótulos e a unidade aparecia sem nome.
+                scales: {
+                    x: { stacked: true, min: 0, max: 100, ticks: { callback: (v) => `${v}%` } },
+                    y: { stacked: true, ticks: { autoSkip: false } }
+                }
             }
         });
 
@@ -2541,19 +2805,20 @@
             if (!Number.isFinite(score)) return;
             const unit = r.unit || 'Sem unidade';
             if (!byUnit.has(unit)) byUnit.set(unit, {
-                total: 0,
+                total: 0, scoreSum: 0,
                 counts: { nota10: 0, nota89: 0, nota67: 0, critico: 0 },
                 people: { nota10: [], nota89: [], nota67: [], critico: [] }
             });
             const entry = byUnit.get(unit);
             entry.total++;
+            entry.scoreSum += score;
             const band = scoreBand(score).key;
             entry.counts[band]++;
             entry.people[band].push({ fullName: r.fullName || 'Sem nome', unit, score });
         });
 
         scoresByUnitDataCache = [...byUnit.entries()]
-            .map(([unit, e]) => ({ unit, total: e.total, counts: e.counts, people: e.people }))
+            .map(([unit, e]) => ({ unit, total: e.total, counts: e.counts, people: e.people, avg: e.total ? e.scoreSum / e.total : null }))
             .sort((a, b) => (b.total ? b.counts.critico / b.total : 0) - (a.total ? a.counts.critico / a.total : 0));
         scoresByUnitPage = 1;
         paintScoresByUnitPage();
