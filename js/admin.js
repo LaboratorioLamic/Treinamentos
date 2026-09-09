@@ -1467,10 +1467,30 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         const moduleCaptionInput = document.getElementById('cfg-module-caption');
         const moduleVideoInput = document.getElementById('cfg-module-video');
         const modulePdfInput = document.getElementById('cfg-module-pdf');
+        const moduleTypeInput = document.getElementById('cfg-module-type');
         const moduleAttachmentsInput = document.getElementById('cfg-module-attachments');
         const moduleSaveBtn = document.getElementById('cfg-module-save');
         const moduleDeleteBtn = document.getElementById('cfg-module-delete');
         const modulesContainer = document.getElementById('cfg-modules-container');
+
+        // Tipo do modulo. Modulos criados antes deste campo nao tem `type`:
+        // a inferencia abaixo repete a regra que o portal ja aplicava na
+        // pratica (pdfUrl ganhava de videoId), entao nada muda para eles.
+        // O mesmo helper existe em js/main.js — os dois arquivos nao
+        // compartilham escopo.
+        function moduleKind(mod) {
+            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts') return mod.type;
+            if (Array.isArray(mod?.shorts) && mod.shorts.length) return 'shorts';
+            if (mod?.pdfUrl) return 'pdf';
+            return 'video';
+        }
+
+        // A lista de vídeos curtos (adicionar/remover) é gerida por
+        // js/admin-courses.js; aqui só lemos o hidden JSON que ela mantém
+        // atualizado (#cfg-module-shorts-data).
+        function currentModuleShorts() {
+            return window.UniAdminCourses?.readShortsData?.() || [];
+        }
 
         function populateModuleThemes() {
             const subjectId = moduleSubjectSelect.value;
@@ -1506,7 +1526,15 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 card.className = 'module-card';
                 const isFirst = index === 0;
                 const isLast = index === orderedModules.length - 1;
+                const kind = moduleKind(mod);
+                const shortsCount = Array.isArray(mod.shorts) ? mod.shorts.length : 0;
+                const typeTag = kind === 'pdf'
+                    ? '<span class="module-type-tag is-pdf"><i class="fas fa-file-pdf"></i> PDF</span>'
+                    : kind === 'shorts'
+                        ? `<span class="module-type-tag is-shorts"><i class="fas fa-mobile-screen"></i> ${shortsCount} ${shortsCount === 1 ? 'video curto' : 'videos curtos'}</span>`
+                        : '<span class="module-type-tag"><i class="fas fa-play"></i> Video</span>';
                 card.innerHTML = `
+                    ${typeTag}
                     <h3>${mod.title}</h3>
                     ${mod.caption ? `<p class="card-desc">${mod.caption}</p>` : ''}
                     <div class="card-footer">
@@ -1524,13 +1552,18 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             modulesContainer.querySelectorAll('.edit-module').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const index = parseInt(btn.dataset.index);
-                    currentModuleIndex = index;
                     const mod = orderedModules[index];
+                    // `index` e a posicao NA LISTA EXIBIDA; o save e o delete do
+                    // formulario indexam o array cru. Sem traduzir, editar um
+                    // modulo depois de reordenar gravava por cima de outro.
+                    currentModuleIndex = modules.indexOf(mod);
                     moduleTitleInput.value = mod.title;
                     moduleCaptionInput.value = mod.caption || '';
                     moduleVideoInput.value = mod.videoId || '';
                     modulePdfInput.value = mod.pdfUrl || '';
+                    window.UniAdminCourses?.setShortsItems?.(mod.shorts || []);
                     moduleAttachmentsInput.value = mod.attachments?.map(a => `${a.title};${a.url}`).join('\n') || '';
+                    window.UniAdminCourses?.setModuleType?.(moduleKind(mod));
                     moduleDeleteBtn.style.display = 'flex';
                 });
             });
@@ -1555,6 +1588,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                                 currentModuleIndex = null;
                                 moduleTitleInput.value = ''; moduleCaptionInput.value = ''; moduleVideoInput.value = '';
                                 modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
+                                window.UniAdminCourses?.setModuleType?.('video');
+                                window.UniAdminCourses?.setShortsItems?.([]);
                                 moduleDeleteBtn.style.display = 'none';
                                 populateModules(); showWarning('Módulo excluído com sucesso!');
                             } else { populateModules(); }
@@ -1584,11 +1619,21 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const [t, url] = line.split(';');
                 return { title: t?.trim(), url: url?.trim() };
             }).filter(a => a.title && a.url);
+            // Tipos exclusivos: so o campo do tipo escolhido e gravado, entao
+            // trocar de tipo e salvar limpa o conteudo do tipo anterior.
+            const kind = moduleTypeInput?.value || 'video';
+            const shorts = kind === 'shorts' ? currentModuleShorts() : [];
+            if (kind === 'shorts' && shorts.length === 0) {
+                showWarning('Adicione ao menos um video curto (um link por linha).');
+                return;
+            }
             const module = {
                 title,
+                type: kind,
                 ...(moduleCaptionInput.value.trim() && { caption: moduleCaptionInput.value.trim() }),
-                ...(moduleVideoInput.value.trim() && { videoId: moduleVideoInput.value.trim() }),
-                ...(modulePdfInput.value.trim() && { pdfUrl: modulePdfInput.value.trim() }),
+                ...(kind === 'video' && moduleVideoInput.value.trim() && { videoId: moduleVideoInput.value.trim() }),
+                ...(kind === 'pdf' && modulePdfInput.value.trim() && { pdfUrl: modulePdfInput.value.trim() }),
+                ...(kind === 'shorts' && { shorts }),
                 attachments: attachments.length ? attachments : []
             };
             showSpinner('cfg-module-loading', true);
@@ -1608,6 +1653,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     currentModuleIndex = null;
                     moduleTitleInput.value = ''; moduleCaptionInput.value = ''; moduleVideoInput.value = '';
                     modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
+                    window.UniAdminCourses?.setModuleType?.('video');
+                    window.UniAdminCourses?.setShortsItems?.([]);
                     moduleDeleteBtn.style.display = 'none';
                     populateModules(); showWarning('Módulo salvo com sucesso!');
                 } else { populateModules(); }
@@ -1949,6 +1996,9 @@ window.UniAdminCoursesData = {
         currentModuleIndex = null;
         moduleTitleInput.value = ''; moduleCaptionInput.value = ''; moduleVideoInput.value = '';
         modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
+        window.UniAdminCourses?.setModuleType?.('video');
+        window.UniAdminCourses?.setShortsItems?.([]);
+        window.UniAdminCourses?.closeCtypePopover?.();
         moduleDeleteBtn.style.display = 'none';
     },
     resetQuizForm,

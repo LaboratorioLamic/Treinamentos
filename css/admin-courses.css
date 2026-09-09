@@ -304,3 +304,146 @@ body.cfg-mstack-open { overflow: hidden; }
     .course-drawer-hero { flex-wrap: wrap; }
     .course-info-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Seletor de tipo de conteúdo do módulo (popover) ─────────────────
+   Mesmo padrão visual de .roles-picker (css/admin.css): botão-resumo +
+   popover. Os três tipos são exclusivos, então o popover é um radiogroup
+   e cada painel .ctype-panel aparece só para o tipo ativo.
+   ------------------------------------------------------------------- */
+#cfg-root .ctype-picker { position: relative; }
+#cfg-root .ctype-picker-btn {
+    display: flex; align-items: center; gap: 13px; width: 100%;
+    padding: 13px 15px; border-radius: 12px; cursor: pointer;
+    border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+    font-family: inherit; text-align: left;
+    transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+}
+#cfg-root .ctype-picker-btn:hover {
+    border-color: var(--cfg-primary);
+    box-shadow: 0 4px 14px -8px rgba(37,99,235,0.55);
+}
+#cfg-root .ctype-picker-btn[aria-expanded="true"] {
+    border-color: var(--cfg-primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.16);
+}
+#cfg-root .ctype-picker-icon {
+    width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px;
+    transition: background 0.2s;
+}
+#cfg-root .ctype-picker-text { flex: 1; min-width: 0; }
+#cfg-root .ctype-picker-text strong {
+    display: block; font-size: 13px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cfg-root .ctype-picker-text small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+#cfg-root .ctype-picker-arrow {
+    color: var(--text-3); font-size: 12px;
+    transition: transform 0.18s;
+}
+#cfg-root .ctype-picker-btn[aria-expanded="true"] .ctype-picker-arrow { transform: rotate(180deg); }
+
+/* Gradiente por tipo — repetido no botão-resumo e na opção do popover,
+   para o admin reconhecer o tipo pela cor antes de ler o rótulo. */
+#cfg-root .ctype-picker-icon.is-video,
+#cfg-root .ctype-popover-option-mark.is-video { background: linear-gradient(135deg, #2563eb, #60a5fa); }
+#cfg-root .ctype-picker-icon.is-pdf,
+#cfg-root .ctype-popover-option-mark.is-pdf { background: linear-gradient(135deg, #d97706, #fbbf24); }
+#cfg-root .ctype-picker-icon.is-shorts,
+#cfg-root .ctype-popover-option-mark.is-shorts { background: linear-gradient(135deg, #db2777, #a855f7); }
+
+/* O card do formulário tem overflow:hidden e cortaria a lista: o popover é
+   movido para o fim de #cfg-root e posicionado em coordenadas de viewport
+   (position:fixed) por js/admin-courses.js. */
+#cfg-root .ctype-popover {
+    position: fixed; z-index: 3000;
+    background: #fff; border: 1.5px solid var(--cfg-border); border-radius: 12px;
+    box-shadow: 0 18px 44px -16px rgba(15,34,68,0.4);
+    padding: 10px; display: flex; flex-direction: column; gap: 6px;
+}
+#cfg-root .ctype-popover[hidden] { display: none; }
+#cfg-root .ctype-popover-option {
+    display: flex; align-items: center; gap: 11px; width: 100%; cursor: pointer;
+    padding: 10px 11px; border: 1.5px solid transparent; border-radius: 11px;
+    background: var(--bg); font-family: inherit; color: var(--text); text-align: left;
+    transition: background 0.16s, border-color 0.16s, transform 0.12s, box-shadow 0.16s;
+}
+#cfg-root .ctype-popover-option:hover { border-color: var(--cfg-primary); transform: translateY(-1px); }
+#cfg-root .ctype-popover-option:focus-visible {
+    outline: none; border-color: var(--cfg-primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
+}
+#cfg-root .ctype-popover-option.is-selected {
+    background: var(--cfg-primary-light); border-color: var(--cfg-primary);
+}
+#cfg-root .ctype-popover-option-mark {
+    width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px;
+}
+#cfg-root .ctype-popover-option-text { flex: 1; min-width: 0; }
+#cfg-root .ctype-popover-option-text strong {
+    display: block; font-size: 13px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cfg-root .ctype-popover-option-text small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+#cfg-root .ctype-popover-option-check {
+    flex-shrink: 0; font-size: 12px; color: var(--cfg-primary); opacity: 0;
+    transition: opacity 0.16s;
+}
+#cfg-root .ctype-popover-option.is-selected .ctype-popover-option-check { opacity: 1; }
+#cfg-root .ctype-popover-hint { font-size: 11.5px; color: var(--text-3); margin: 2px 0 0; padding: 0 2px; }
+
+#cfg-root .ctype-panel[hidden] { display: none; }
+
+/* Lista de vídeos curtos: cada item vem do formulário de adicionar abaixo
+   dela (link + título opcional). Estado vivo em js/admin-courses.js,
+   espelhado no hidden #cfg-module-shorts-data que admin.js lê ao salvar. */
+#cfg-root .shorts-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+#cfg-root .shorts-list-empty { font-size: 12px; color: var(--text-3); margin: 0; padding: 2px; }
+#cfg-root .shorts-list-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 10px;
+    border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+}
+#cfg-root .shorts-list-item-index {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--cfg-primary-light, #eff6ff); color: var(--cfg-primary-h);
+    font-size: 11px; font-weight: 700;
+}
+#cfg-root .shorts-list-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#cfg-root .shorts-list-item-text strong {
+    font-size: 12.5px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cfg-root .shorts-list-item-text small { font-size: 11px; color: var(--text-3); }
+#cfg-root .shorts-list-item-remove {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+    border: none; background: transparent; color: var(--danger);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.16s;
+}
+#cfg-root .shorts-list-item-remove:hover { background: #fef2f2; }
+
+/* Formulário de adicionar: link + título opcional + botão. Empilha em telas
+   estreitas (o modal tem max-width: 560px — ver admin-courses.css). */
+#cfg-root .shorts-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+#cfg-root .shorts-add-row .form-control { flex: 1 1 160px; min-width: 0; }
+#cfg-root .shorts-add-btn { flex-shrink: 0; white-space: nowrap; }
+
+/* Selo de tipo no card do módulo (populateModules em js/admin.js). */
+#cfg-root .module-type-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    background: var(--cfg-primary-light, #eff6ff); color: var(--cfg-primary-h);
+    margin-bottom: 6px;
+}
+#cfg-root .module-type-tag.is-pdf { background: #fef3c7; color: #b45309; }
+#cfg-root .module-type-tag.is-shorts { background: #fce7f3; color: #be185d; }
+
+@media (max-width: 640px) {
+    #cfg-root .ctype-picker-text small,
+    #cfg-root .ctype-popover-option-text small { display: none; }
+}

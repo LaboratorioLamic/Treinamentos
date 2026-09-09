@@ -144,6 +144,23 @@
     /* Exceção: dentro do player os controles são minúsculos por design e não
        recebem digitação. */
     .player-controls select { font-size: 0.72em; }
+
+    /* Vídeos curtos: no celular o quadro 9:16 ocupa a largura toda, então a
+       altura passa a ser ditada pela largura (main.css deriva o contrário).
+       As setas de navegação saem de cena — sobre o vídeo elas atrapalham, e o
+       gesto de arrastar já cobre a função. */
+    .shorts-stage {
+        --shorts-h: min(78vh, calc(100vw * 16 / 9));
+        --shorts-w: 100%;
+    }
+    .shorts-nav { display: none; }
+    .shorts-segments { width: calc(100% - 20px); }
+    .shorts-counter { right: 10px; }
+    .shorts-hint { font-size: 0.74em; padding: 8px 14px; }
+    .shorts-hint span { white-space: normal; }
+    /* Alvo de toque confortável para o botão de som e para o aviso de avanço. */
+    .shorts-mute { width: 44px; height: 44px; }
+    .shorts-autonext { min-height: 44px; }
 }
 
 @media (max-width: 480px) {
@@ -151,6 +168,13 @@
     .selection-inner { padding: 12px; }
     .module-info { padding: 16px 14px; }
     .quiz-container, .form-container { padding: 16px 14px; }
+
+    /* Barra de progresso total encolhe junto com o .module-info. */
+    .shorts-total { padding: 10px 12px; }
+    .shorts-total-label { font-size: 0.74em; }
+    .shorts-slide-label { max-width: calc(100% - 86px); font-size: 0.74em; }
+    .shorts-hint { bottom: 18px; max-width: calc(100% - 32px); }
+    .shorts-autonext { bottom: 18px; }
 }
 
 

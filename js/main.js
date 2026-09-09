@@ -217,6 +217,18 @@
         const attachmentContainer = document.getElementById('attachment-container');
         const modulesDiv = document.getElementById('modules');
         const playerCard = document.querySelector('.player-card');
+        const shortsStage = document.getElementById('shorts-stage');
+        const shortsViewport = document.getElementById('shorts-viewport');
+        const shortsSegmentsEl = document.getElementById('shorts-segments');
+        const shortsCounterEl = document.getElementById('shorts-counter');
+        const shortsHintEl = document.getElementById('shorts-hint');
+        const shortsAutonextEl = document.getElementById('shorts-autonext');
+        const shortsPrevBtn = document.getElementById('shorts-prev');
+        const shortsNextBtn = document.getElementById('shorts-next');
+        const shortsTotalEl = document.getElementById('shorts-total');
+        const shortsTotalCountEl = document.getElementById('shorts-total-count');
+        const shortsTotalPctEl = document.getElementById('shorts-total-pct');
+        const shortsTotalFillEl = document.getElementById('shorts-total-fill');
         const quizContainer = document.getElementById('quiz-container');
         const resultContainer = document.getElementById('result-container');
         const formContainer = document.getElementById('form-container');
@@ -280,9 +292,25 @@
         // 'waiting' — módulo de vídeo parado/pausado, NÃO conta.
         let moduleTimerGate = 'free';
 
-        // Módulo atual é PDF/slide? Muda o texto do painel de tempo quando a
-        // trava está ativa (no PDF a trava é a página 1, não o play do vídeo).
-        let currentModuleIsPdf = false;
+        // Tipo do módulo aberto: 'video' | 'pdf' | 'shorts'. Muda o texto do
+        // painel de tempo quando a trava está ativa — no PDF a trava é a
+        // página 1; no vídeo (longo ou curto) é o play.
+        let currentModuleKind = 'video';
+
+        // Módulos criados antes do campo `type` não o têm: a inferência
+        // abaixo repete a regra que já valia na prática (pdfUrl ganhava de
+        // videoId). O mesmo helper existe em js/admin.js — os dois arquivos
+        // não compartilham escopo.
+        function moduleKind(mod) {
+            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts') return mod.type;
+            if (Array.isArray(mod?.shorts) && mod.shorts.length) return 'shorts';
+            if (mod?.pdfUrl) return 'pdf';
+            return 'video';
+        }
+
+        function shortsCountOf(mod) {
+            return moduleKind(mod) === 'shorts' && Array.isArray(mod?.shorts) ? mod.shorts.length : 0;
+        }
 
         // Trava por inatividade: 5 min sem interação de estudo (play de vídeo
         // ou virada de página do PDF) param a contagem. Fica separada de
@@ -440,9 +468,11 @@
                 // Caso mais comum da trava por vídeo: aula aberta, vídeo parado.
                 // No PDF a trava equivalente é a capa (página 1).
                 icon = 'fa-circle-pause';
-                note = currentModuleIsPdf
+                note = currentModuleKind === 'pdf'
                     ? 'Pausado — avance para a página 2 para contar o tempo.'
-                    : 'Pausado — dê play no vídeo para contar o tempo.';
+                    : currentModuleKind === 'shorts'
+                        ? 'Pausado — dê play no vídeo curto para contar o tempo.'
+                        : 'Pausado — dê play no vídeo para contar o tempo.';
             } else if (!running) {
                 icon = 'fa-circle-pause';
                 note = 'Pausado — a contagem volta ao retomar o curso.';
@@ -551,6 +581,9 @@
         // continua tocando o áudio em segundo plano). Silencioso quando não há
         // player ou a API ainda não carregou.
         function pauseVideoIfPlaying() {
+            // Os curtos têm players próprios (janela de 3), fora de ytPlayer:
+            // precisam ser pausados antes do early return abaixo.
+            pauseShortsIfPlaying();
             if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
             const YT_STATE = window.YT?.PlayerState;
             if (!YT_STATE) return;
@@ -940,20 +973,606 @@
                     const tile = moduleTiles[currentModuleIndex];
                     if (tile) {
                         const modules = theme.modules;
-                        let moduleTitle = '';
-                        if (moduleIndexMapping.has(currentModuleIndex)) {
-                            const origIdx = moduleIndexMapping.get(currentModuleIndex);
-                            moduleTitle = modules[origIdx]?.title || '';
-                        } else {
-                            moduleTitle = modules[currentModuleIndex]?.title || '';
-                        }
-                        tile.innerHTML = renderModuleTitle(moduleTitle, true);
+                        const completedMod = moduleIndexMapping.has(currentModuleIndex)
+                            ? modules[moduleIndexMapping.get(currentModuleIndex)]
+                            : modules[currentModuleIndex];
+                        tile.innerHTML = renderModuleTitle(completedMod?.title || '', true, shortsCountOf(completedMod));
                         tile.classList.add('completed');
                         tile.classList.remove('active');
                     }
                 }
             }
         }
+
+
+        // ═══════════════════════════════════════════════════════════════
+        // VÍDEOS CURTOS — carrossel vertical (módulos type:'shorts')
+        // ═══════════════════════════════════════════════════════════════
+        // O avanço usa scroll-snap nativo do #shorts-viewport, então no
+        // celular arrastar para cima já passa de vídeo sem JS de gesto; o
+        // teclado, a roda do mouse e o arraste com ponteiro chamam
+        // goToShort() para reproduzir o mesmo efeito no desktop.
+        //
+        // Regras de tempo (ver moduleTimerGate): o contador do curso só
+        // corre com um curto tocando — igual ao módulo de vídeo longo. A
+        // diferença é o debounce de SHORTS_GATE_IDLE_MS: a troca de vídeo
+        // passa por PAUSED/ENDED e, sem a espera, cada transição fecharia a
+        // sessão e gravaria progresso na nuvem.
+
+        // Um curto conta como assistido aos 90% — não há controle de seek
+        // no palco, então chegar aos 90% significa ter assistido mesmo.
+        const SHORTS_WATCHED_RATIO = 0.9;
+        const SHORTS_AUTONEXT_MS = 1000;
+        const SHORTS_GATE_IDLE_MS = 1500;
+        const SHORTS_HINT_OPEN_MS = 4500;
+        const SHORTS_HINT_IDLE_MS = 3000;
+        const SHORTS_HINT_IDLE_DELAY_MS = 6000;
+
+        let shortsList = [];
+        const shortsPlayers = new Map(); // índice → YT.Player (janela de 3)
+        let shortsWatched = [];
+        let shortsActive = 0;
+        let shortsKey = null;            // chave localStorage do módulo atual
+        let shortsObserver = null;
+        let shortsTicker = null;
+        let shortsHintTimer = null;
+        let shortsIdleHintTimer = null;
+        let shortsAutonextTimer = null;
+        let shortsGateIdleTimer = null;
+        let shortsWheelLock = false;
+        let shortsDragStartY = null;
+        let shortsDragged = false;
+        let shortsMuted = false;
+        // Autoplay sem gesto do usuário é bloqueado pelo navegador: o
+        // primeiro curto espera um toque, e daí em diante os próximos já
+        // podem começar sozinhos ao virar.
+        let shortsUserGesture = false;
+        // Invalida callbacks assíncronos (carga da API do YouTube) quando o
+        // aluno troca de módulo antes de a promessa resolver.
+        let shortsToken = 0;
+
+        function shortsSlideAt(index) {
+            return shortsViewport?.querySelector(`.shorts-slide[data-index="${index}"]`) || null;
+        }
+
+        function shortsStorageKey(subjectId, themeId, originalIndex) {
+            return `shortsWatched_${subjectId}_${themeId}_${originalIndex}`;
+        }
+
+        // Sub-progresso por vídeo é local (localStorage). A nuvem continua
+        // guardando só a conclusão do módulo, via markCurrentModuleCompleted.
+        function loadShortsWatched(key, count) {
+            if (key) {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(key) || 'null');
+                    // Tamanho diferente = o admin mudou a lista de vídeos:
+                    // recomeça zerado, mesmo critério do completionStatus.
+                    if (Array.isArray(saved) && saved.length === count) return saved.map(Boolean);
+                } catch { /* JSON inválido ou storage bloqueado */ }
+            }
+            return new Array(count).fill(false);
+        }
+
+        function saveShortsWatched() {
+            if (!shortsKey) return;
+            try { localStorage.setItem(shortsKey, JSON.stringify(shortsWatched)); } catch { /* storage cheio/bloqueado */ }
+        }
+
+        function buildShortsSlide(item, index, total) {
+            const slide = document.createElement('div');
+            slide.className = 'shorts-slide is-paused';
+            slide.dataset.index = String(index);
+
+            const frame = document.createElement('div');
+            frame.className = 'shorts-frame';
+
+            // A API do YouTube substitui este elemento pelo iframe.
+            const host = document.createElement('div');
+            host.id = `shorts-frame-${index}`;
+            frame.appendChild(host);
+
+            const tap = document.createElement('button');
+            tap.type = 'button';
+            tap.className = 'shorts-tap';
+            tap.setAttribute('aria-label', 'Reproduzir ou pausar');
+            const badge = document.createElement('span');
+            badge.className = 'shorts-play-badge';
+            badge.innerHTML = '<i class="fas fa-play"></i>';
+            tap.appendChild(badge);
+            frame.appendChild(tap);
+
+            const label = document.createElement('div');
+            label.className = 'shorts-slide-label';
+            const idx = document.createElement('span');
+            idx.className = 'shorts-slide-index';
+            idx.textContent = `${index + 1}/${total}`;
+            label.appendChild(idx);
+            if (item.title) {
+                const title = document.createElement('span');
+                title.className = 'shorts-slide-title';
+                title.textContent = item.title;
+                label.appendChild(title);
+            }
+            frame.appendChild(label);
+
+            const mute = document.createElement('button');
+            mute.type = 'button';
+            mute.className = 'shorts-mute';
+            mute.setAttribute('aria-label', 'Ativar ou desativar o som');
+            mute.innerHTML = '<i class="fas fa-volume-high"></i>';
+            frame.appendChild(mute);
+
+            const progress = document.createElement('div');
+            progress.className = 'shorts-progress';
+            progress.appendChild(document.createElement('span'));
+            frame.appendChild(progress);
+
+            const check = document.createElement('div');
+            check.className = 'shorts-check';
+            check.innerHTML = '<i class="fas fa-circle-check"></i>';
+            frame.appendChild(check);
+
+            slide.appendChild(frame);
+            return slide;
+        }
+
+        function renderShorts(list) {
+            destroyShorts();
+            if (!shortsStage || !shortsViewport) return;
+            const token = shortsToken;
+            shortsList = (list || []).filter(item => item && item.id);
+            if (!shortsList.length) return;
+
+            // completionStatus é indexado pelo índice ORIGINAL do módulo no
+            // array (não pela posição exibida) — a chave local segue a mesma
+            // referência para não trocar de módulo ao reordenar.
+            const originalIndex = moduleIndexMapping.has(currentModuleIndex)
+                ? moduleIndexMapping.get(currentModuleIndex)
+                : currentModuleIndex;
+            shortsKey = (currentTrainingId && currentThemeId != null && originalIndex != null)
+                ? shortsStorageKey(currentTrainingId, currentThemeId, originalIndex)
+                : null;
+            shortsWatched = loadShortsWatched(shortsKey, shortsList.length);
+
+            const total = shortsList.length;
+            const slides = document.createDocumentFragment();
+            shortsList.forEach((item, index) => slides.appendChild(buildShortsSlide(item, index, total)));
+            shortsViewport.appendChild(slides);
+
+            if (shortsSegmentsEl) {
+                const segments = document.createDocumentFragment();
+                shortsList.forEach(() => {
+                    const segment = document.createElement('div');
+                    segment.className = 'shorts-segment';
+                    segment.appendChild(document.createElement('span'));
+                    segments.appendChild(segment);
+                });
+                shortsSegmentsEl.appendChild(segments);
+            }
+
+            shortsActive = 0;
+            shortsViewport.scrollTop = 0;
+            shortsStage.style.display = 'block';
+            if (shortsTotalEl) shortsTotalEl.style.display = '';
+            shortsList.forEach((_, index) => setShortsProgress(index, shortsWatched[index] ? 1 : 0));
+            paintShortsUI();
+            observeShorts();
+            applyShortsMute();
+            showShortsHint(SHORTS_HINT_OPEN_MS);
+
+            loadYouTubeAPI().then(() => {
+                if (token !== shortsToken) return; // já trocou de módulo
+                ensureShortsPlayers(shortsActive);
+                startShortsTicker();
+            });
+        }
+
+        function destroyShorts() {
+            shortsToken++;
+            stopShortsTicker();
+            clearShortsGateIdle();
+            cancelShortsAutonext();
+            clearShortsIdleHint();
+            if (shortsHintTimer) { clearTimeout(shortsHintTimer); shortsHintTimer = null; }
+            if (shortsObserver) { shortsObserver.disconnect(); shortsObserver = null; }
+            shortsPlayers.forEach(player => { try { player.destroy(); } catch { /* já destruído */ } });
+            shortsPlayers.clear();
+            shortsList = [];
+            shortsWatched = [];
+            shortsActive = 0;
+            shortsKey = null;
+            shortsDragStartY = null;
+            shortsDragged = false;
+            if (shortsViewport) shortsViewport.innerHTML = '';
+            if (shortsSegmentsEl) shortsSegmentsEl.innerHTML = '';
+            if (shortsHintEl) shortsHintEl.hidden = true;
+            if (shortsStage) { shortsStage.style.display = 'none'; shortsStage.classList.remove('is-complete'); }
+            if (shortsTotalEl) { shortsTotalEl.style.display = 'none'; shortsTotalEl.classList.remove('is-complete'); }
+        }
+
+        // Só três iframes vivos por vez (anterior/atual/próximo): um módulo
+        // com dez curtos não pode montar dez players do YouTube de uma vez.
+        function ensureShortsPlayers(center) {
+            const keep = [];
+            for (let i = center - 1; i <= center + 1; i++) {
+                if (i >= 0 && i < shortsList.length) keep.push(i);
+            }
+            Array.from(shortsPlayers.keys()).forEach(index => {
+                if (keep.includes(index)) return;
+                const player = shortsPlayers.get(index);
+                shortsPlayers.delete(index);
+                try { player.destroy(); } catch { /* já destruído */ }
+                resetShortsHost(index);
+                setShortsProgress(index, shortsWatched[index] ? 1 : 0);
+            });
+            keep.forEach(index => createShortsPlayer(index));
+        }
+
+        // destroy() remove o iframe: repõe o div hospedeiro para o slide
+        // poder ser remontado quando o aluno voltar para ele.
+        function resetShortsHost(index) {
+            const slide = shortsSlideAt(index);
+            if (!slide) return;
+            const frame = slide.querySelector('.shorts-frame');
+            if (!frame) return;
+            frame.querySelector('iframe')?.remove();
+            if (!frame.querySelector(`#shorts-frame-${index}`)) {
+                const host = document.createElement('div');
+                host.id = `shorts-frame-${index}`;
+                frame.insertBefore(host, frame.firstChild);
+            }
+            slide.classList.add('is-paused');
+        }
+
+        function createShortsPlayer(index) {
+            if (shortsPlayers.has(index)) return;
+            const host = document.getElementById(`shorts-frame-${index}`);
+            if (!host || !window.YT || !window.YT.Player) return;
+            // Sem controles nativos e sem teclado do YouTube: o palco não
+            // oferece nenhuma forma de pular o vídeo.
+            const player = new YT.Player(host, {
+                videoId: shortsList[index].id,
+                playerVars: {
+                    controls: 0, modestbranding: 1, rel: 0, playsinline: 1,
+                    iv_load_policy: 3, fs: 0, disablekb: 1
+                },
+                events: {
+                    onReady: (event) => {
+                        try { if (shortsMuted) event.target.mute(); else event.target.unMute(); } catch { /* indisponível */ }
+                        if (index === shortsActive && shortsUserGesture) safeShortsPlay(event.target);
+                    },
+                    onStateChange: (event) => onShortsStateChange(index, event)
+                }
+            });
+            shortsPlayers.set(index, player);
+        }
+
+        function onShortsStateChange(index, event) {
+            const YT_STATE = window.YT?.PlayerState;
+            if (!YT_STATE) return;
+            const slide = shortsSlideAt(index);
+            if (event.data === YT_STATE.PLAYING) {
+                slide?.classList.remove('is-paused');
+                // Um player fora de foco só pode ter voltado a tocar sozinho
+                // (pré-carga): silencia para o áudio não se sobrepor.
+                if (index !== shortsActive) { try { event.target.pauseVideo(); } catch { /* indisponível */ } return; }
+                clearShortsGateIdle();
+                registerStudyActivity();
+                setModuleTimerGate('playing');
+                return;
+            }
+            if (event.data === YT_STATE.PAUSED) {
+                slide?.classList.add('is-paused');
+                if (index === shortsActive) scheduleShortsGateIdle();
+                return;
+            }
+            if (event.data === YT_STATE.ENDED) {
+                slide?.classList.add('is-paused');
+                if (index !== shortsActive) return;
+                markShortWatched(index);
+                setShortsProgress(index, 1);
+                if (index < shortsList.length - 1) startShortsAutonext();
+                else scheduleShortsGateIdle();
+            }
+        }
+
+        function clearShortsGateIdle() {
+            if (shortsGateIdleTimer) { clearTimeout(shortsGateIdleTimer); shortsGateIdleTimer = null; }
+        }
+
+        // Trocar de curto passa rapidamente por PAUSED/ENDED. Sem esta espera,
+        // cada transição fecharia a sessão do contador e dispararia um
+        // syncCourseProgressToCloud — dez curtos virariam dez escritas.
+        function scheduleShortsGateIdle() {
+            clearShortsGateIdle();
+            shortsGateIdleTimer = setTimeout(() => {
+                shortsGateIdleTimer = null;
+                if (currentModuleKind === 'shorts') setModuleTimerGate('waiting');
+            }, SHORTS_GATE_IDLE_MS);
+        }
+
+        function startShortsTicker() {
+            stopShortsTicker();
+            // Ticker próprio: progressTimer é compartilhado com o cronômetro
+            // da avaliação (startQuizTimer) e não pode ser reaproveitado.
+            shortsTicker = setInterval(() => {
+                const player = shortsPlayers.get(shortsActive);
+                if (!player || typeof player.getDuration !== 'function') return;
+                let current = 0;
+                let duration = 0;
+                try {
+                    current = player.getCurrentTime() || 0;
+                    duration = player.getDuration() || 0;
+                } catch { return; /* player entre montagens */ }
+                if (duration <= 0) return;
+                const ratio = Math.min(1, current / duration);
+                setShortsProgress(shortsActive, ratio);
+                if (ratio >= SHORTS_WATCHED_RATIO) markShortWatched(shortsActive);
+            }, 250);
+        }
+
+        function stopShortsTicker() {
+            if (!shortsTicker) return;
+            clearInterval(shortsTicker);
+            shortsTicker = null;
+        }
+
+        function setShortsProgress(index, ratio) {
+            const pct = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+            const bar = shortsSlideAt(index)?.querySelector('.shorts-progress > span');
+            if (bar) bar.style.width = pct;
+            if (index !== shortsActive || shortsWatched[index]) return;
+            const segment = shortsSegmentsEl?.children?.[index]?.firstElementChild;
+            if (segment) segment.style.width = pct;
+        }
+
+        function markShortWatched(index) {
+            if (shortsWatched[index]) return;
+            shortsWatched[index] = true;
+            saveShortsWatched();
+            const slide = shortsSlideAt(index);
+            if (slide) {
+                slide.classList.remove('is-just-watched');
+                void slide.offsetWidth; // reinicia a animação do selo
+                slide.classList.add('is-just-watched');
+            }
+            paintShortsUI();
+            if (shortsWatched.every(Boolean)) {
+                // Todos vistos = módulo concluído. Daqui em diante é o fluxo
+                // normal: localStorage + transação em progress/byUser.
+                markCurrentModuleCompleted();
+            } else {
+                scheduleShortsIdleHint();
+            }
+        }
+
+        function paintShortsUI() {
+            const total = shortsList.length;
+            const done = shortsWatched.filter(Boolean).length;
+            if (shortsCounterEl) shortsCounterEl.textContent = `${Math.min(shortsActive + 1, total)} / ${total}`;
+            if (shortsSegmentsEl) {
+                Array.from(shortsSegmentsEl.children).forEach((segment, index) => {
+                    const watched = !!shortsWatched[index];
+                    segment.classList.toggle('is-watched', watched);
+                    const fill = segment.firstElementChild;
+                    if (!fill) return;
+                    if (watched) fill.style.width = '100%';
+                    else if (index !== shortsActive) fill.style.width = '0';
+                });
+            }
+            const pct = total ? Math.round((done / total) * 100) : 0;
+            if (shortsTotalCountEl) shortsTotalCountEl.textContent = `${done} de ${total}`;
+            if (shortsTotalPctEl) shortsTotalPctEl.textContent = `${pct}%`;
+            if (shortsTotalFillEl) shortsTotalFillEl.style.width = `${pct}%`;
+            const complete = total > 0 && done === total;
+            shortsTotalEl?.classList.toggle('is-complete', complete);
+            shortsStage?.classList.toggle('is-complete', complete);
+            if (shortsPrevBtn) shortsPrevBtn.disabled = shortsActive <= 0;
+            if (shortsNextBtn) shortsNextBtn.disabled = shortsActive >= total - 1;
+        }
+
+        function observeShorts() {
+            if (shortsObserver) shortsObserver.disconnect();
+            if (!('IntersectionObserver' in window)) return;
+            shortsObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const index = Number(entry.target.dataset.index);
+                    if (Number.isNaN(index) || index === shortsActive) return;
+                    setActiveShort(index);
+                });
+            }, { root: shortsViewport, threshold: 0.6 });
+            shortsViewport.querySelectorAll('.shorts-slide').forEach(slide => shortsObserver.observe(slide));
+        }
+
+        function setActiveShort(index) {
+            shortsActive = index;
+            cancelShortsAutonext();
+            clearShortsIdleHint();
+            hideShortsHint();
+            // Virar o vídeo é a interação de estudo dos curtos — equivale à
+            // virada de página do PDF e rearma a trava de inatividade.
+            registerStudyActivity();
+            ensureShortsPlayers(index);
+            shortsPlayers.forEach((player, playerIndex) => {
+                if (playerIndex === index) return;
+                try { player.pauseVideo(); } catch { /* indisponível */ }
+            });
+            const player = shortsPlayers.get(index);
+            if (player && shortsUserGesture) safeShortsPlay(player);
+            paintShortsUI();
+        }
+
+        function goToShort(index) {
+            if (index < 0 || index >= shortsList.length) return;
+            const slide = shortsSlideAt(index);
+            if (!slide || !shortsViewport) return;
+            // scrollTo no viewport, não scrollIntoView: este último também
+            // rolaria a PÁGINA até o player quando ele está meio fora da tela.
+            shortsViewport.scrollTo({ top: slide.offsetTop, behavior: 'smooth' });
+        }
+
+        function safeShortsPlay(player) {
+            try { player.playVideo(); } catch { /* player ainda montando */ }
+        }
+
+        function toggleShortsPlayback() {
+            const player = shortsPlayers.get(shortsActive);
+            if (!player) return;
+            // Este é o gesto que autoriza o autoplay dos próximos vídeos.
+            shortsUserGesture = true;
+            let state;
+            try { state = player.getPlayerState(); } catch { return; }
+            if (state === window.YT?.PlayerState?.PLAYING) {
+                try { player.pauseVideo(); } catch { /* indisponível */ }
+            } else {
+                safeShortsPlay(player);
+            }
+        }
+
+        function applyShortsMute() {
+            shortsPlayers.forEach(player => {
+                try { if (shortsMuted) player.mute(); else player.unMute(); } catch { /* indisponível */ }
+            });
+            shortsViewport?.querySelectorAll('.shorts-mute i').forEach(icon => {
+                icon.className = shortsMuted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
+            });
+        }
+
+        function pauseShortsIfPlaying() {
+            const YT_STATE = window.YT?.PlayerState;
+            if (!YT_STATE || !shortsPlayers.size) return;
+            shortsPlayers.forEach(player => {
+                let state;
+                try { state = player.getPlayerState(); } catch { return; }
+                if (state === YT_STATE.PLAYING || state === YT_STATE.BUFFERING) {
+                    try { player.pauseVideo(); } catch { /* indisponível */ }
+                }
+            });
+        }
+
+        // ─── Avanço automático ao terminar o vídeo ───
+        function startShortsAutonext() {
+            const from = shortsActive;
+            if (!shortsAutonextEl) { goToShort(from + 1); return; }
+            cancelShortsAutonext();
+            shortsAutonextEl.hidden = false;
+            shortsAutonextEl.classList.add('is-running');
+            shortsAutonextTimer = setTimeout(() => {
+                shortsAutonextTimer = null;
+                hideShortsAutonext();
+                if (shortsActive === from) goToShort(from + 1);
+            }, SHORTS_AUTONEXT_MS);
+        }
+
+        function cancelShortsAutonext() {
+            if (shortsAutonextTimer) { clearTimeout(shortsAutonextTimer); shortsAutonextTimer = null; }
+            hideShortsAutonext();
+        }
+
+        function hideShortsAutonext() {
+            if (!shortsAutonextEl) return;
+            shortsAutonextEl.classList.remove('is-running');
+            shortsAutonextEl.hidden = true;
+        }
+
+        // ─── Instrução temporária de swipe ───
+        // Aparece na abertura do módulo e volta quando o aluno termina um
+        // vídeo e fica parado: só quando ainda há para onde avançar.
+        function showShortsHint(duration) {
+            if (!shortsHintEl || shortsList.length < 2) return;
+            if (shortsActive >= shortsList.length - 1) return;
+            if (shortsHintTimer) clearTimeout(shortsHintTimer);
+            shortsHintEl.hidden = false;
+            shortsHintTimer = setTimeout(() => {
+                shortsHintTimer = null;
+                shortsHintEl.hidden = true;
+            }, duration);
+        }
+
+        function hideShortsHint() {
+            if (shortsHintTimer) { clearTimeout(shortsHintTimer); shortsHintTimer = null; }
+            if (shortsHintEl) shortsHintEl.hidden = true;
+        }
+
+        function clearShortsIdleHint() {
+            if (shortsIdleHintTimer) { clearTimeout(shortsIdleHintTimer); shortsIdleHintTimer = null; }
+        }
+
+        function scheduleShortsIdleHint() {
+            clearShortsIdleHint();
+            shortsIdleHintTimer = setTimeout(() => {
+                shortsIdleHintTimer = null;
+                showShortsHint(SHORTS_HINT_IDLE_MS);
+            }, SHORTS_HINT_IDLE_DELAY_MS);
+        }
+
+        // ─── Entrada de gestos/teclado (o toque usa o snap nativo) ───
+        shortsViewport?.addEventListener('click', (event) => {
+            const slide = event.target.closest('.shorts-slide');
+            if (!slide) return;
+            if (event.target.closest('.shorts-mute')) {
+                shortsMuted = !shortsMuted;
+                applyShortsMute();
+                return;
+            }
+            if (!event.target.closest('.shorts-tap')) return;
+            if (shortsDragged) { shortsDragged = false; return; }
+            const index = Number(slide.dataset.index);
+            if (index !== shortsActive) { goToShort(index); return; }
+            toggleShortsPlayback();
+        });
+
+        shortsViewport?.addEventListener('wheel', (event) => {
+            if (shortsList.length < 2) return;
+            if (Math.abs(event.deltaY) < 8) return;
+            // Conduz o avanço em vez de deixar a rolagem livre: com snap, a
+            // roda do mouse costuma parar entre dois vídeos.
+            event.preventDefault();
+            if (shortsWheelLock) return;
+            shortsWheelLock = true;
+            setTimeout(() => { shortsWheelLock = false; }, 380);
+            goToShort(shortsActive + (event.deltaY > 0 ? 1 : -1));
+        }, { passive: false });
+
+        shortsViewport?.addEventListener('pointerdown', (event) => {
+            // No toque o scroll-snap já resolve; aqui é só para mouse/caneta.
+            if (event.pointerType === 'touch') return;
+            shortsDragStartY = event.clientY;
+            shortsDragged = false;
+        });
+        shortsViewport?.addEventListener('pointerup', (event) => {
+            if (shortsDragStartY === null) return;
+            const delta = shortsDragStartY - event.clientY;
+            shortsDragStartY = null;
+            if (Math.abs(delta) < 60) return;
+            // Marca o arraste para o clique seguinte não virar play/pausa.
+            shortsDragged = true;
+            goToShort(shortsActive + (delta > 0 ? 1 : -1));
+        });
+        shortsViewport?.addEventListener('pointercancel', () => { shortsDragStartY = null; });
+
+        shortsViewport?.addEventListener('keydown', (event) => {
+            if (!shortsList.length) return;
+            if (event.key === 'ArrowDown' || event.key === 'PageDown') {
+                event.preventDefault();
+                goToShort(shortsActive + 1);
+            } else if (event.key === 'ArrowUp' || event.key === 'PageUp') {
+                event.preventDefault();
+                goToShort(shortsActive - 1);
+            } else if (event.key === ' ' || event.key === 'Spacebar') {
+                event.preventDefault();
+                toggleShortsPlayback();
+            }
+        });
+
+        shortsPrevBtn?.addEventListener('click', () => goToShort(shortsActive - 1));
+        shortsNextBtn?.addEventListener('click', () => goToShort(shortsActive + 1));
+        shortsAutonextEl?.addEventListener('click', () => {
+            cancelShortsAutonext();
+            // Ficar no vídeo é escolha do aluno: lembra como avançar depois.
+            showShortsHint(SHORTS_HINT_IDLE_MS);
+        });
 
         function bindControls() {
             playPauseBtn.onclick = () => {
@@ -1567,7 +2186,7 @@
                 const originalIndex = moduleIndexMapping.get(displayIndex);
                 const div = document.createElement('div');
                 div.className = 'module';
-                div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][originalIndex]);
+                div.innerHTML = renderModuleTitle(mod.title, completionStatus[subjectId][themeId][originalIndex], shortsCountOf(mod));
                 if (completionStatus[subjectId][themeId][originalIndex]) div.classList.add('completed');
                 div.onclick = () => {
                     // Avaliação em andamento: nada de módulo destrava o aluno
@@ -1808,10 +2427,14 @@
                 : '<i class="fas fa-clipboard-list" style="color:#92400e;margin-right:8px;"></i>Avaliação Final';
         }
 
-        function renderModuleTitle(title, completed) {
+        function renderModuleTitle(title, completed, shortsCount) {
+            // Deixa claro, já na lista, quantos vídeos o módulo tem.
+            const countTag = shortsCount > 1
+                ? `<span class="module-count-tag">${shortsCount} vídeos</span>`
+                : '';
             return completed
-                ? `${title} <i class="fas fa-circle-check status-icon" aria-hidden="true"></i>`
-                : title;
+                ? `${title} ${countTag}<i class="fas fa-circle-check status-icon" aria-hidden="true"></i>`
+                : `${title}${countTag}`;
         }
 
         function loadModule(mod, modules, moduleIndex) {
@@ -1823,8 +2446,9 @@
             // Vídeo: 'waiting' até o play. PDF: também 'waiting' — a página 1
             // é capa e não conta; renderPage libera ao sair dela (ou já na
             // página 1 se o PDF tiver só uma página).
+            // Curtos entram como vídeo: 'waiting' até o primeiro play.
             moduleTimerGate = 'waiting';
-            currentModuleIsPdf = !!mod.pdfUrl;
+            currentModuleKind = moduleKind(mod);
             // Abrir um módulo é interação: nunca cair num módulo novo já
             // pausado por inatividade anterior.
             idlePaused = false;
@@ -1840,12 +2464,20 @@
             }
             if (playerCard) playerCard.style.display = '';
             currentModuleIndex = moduleIndex;
-            if (mod.pdfUrl) {
+            if (currentModuleKind === 'pdf') {
                 if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
                 pdfContainer.style.display = 'block';
                 video.style.display = 'none';
                 customPlayerContainer.style.display = 'none';
                 loadPDF(mod.pdfUrl);
+            } else if (currentModuleKind === 'shorts') {
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+                pdfContainer.style.display = 'none';
+                video.style.display = 'none';
+                customPlayerContainer.style.display = 'none';
+                // currentModuleIndex já está definido acima: renderShorts o usa
+                // para montar a chave do progresso local dos vídeos.
+                renderShorts(mod.shorts || []);
             } else {
                 initOrLoadVideo(mod.videoId);
                 customPlayerContainer.style.display = 'block';
@@ -2447,6 +3079,9 @@
 
         function resetContent() {
             stopQuizTimer();
+            // Sem isso o áudio de um curto continuaria tocando ao trocar de
+            // módulo (os players vivem fora de ytPlayer).
+            destroyShorts();
             video.src = '';
             video.style.display = 'none';
             pdfContainer.style.display = 'none';

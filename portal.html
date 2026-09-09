@@ -18,13 +18,13 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css?v=202608261200">
-    <link rel="stylesheet" href="css/admin.css?v=202608261200">
-    <link rel="stylesheet" href="css/admin-courses.css?v=202608261200">
-    <link rel="stylesheet" href="css/auth.css?v=202608261200">
-    <link rel="stylesheet" href="css/certificate.css?v=202608261200">
+    <link rel="stylesheet" href="css/main.css?v=202609091400">
+    <link rel="stylesheet" href="css/admin.css?v=202609091400">
+    <link rel="stylesheet" href="css/admin-courses.css?v=202609091400">
+    <link rel="stylesheet" href="css/auth.css?v=202609091400">
+    <link rel="stylesheet" href="css/certificate.css?v=202609091400">
     <!-- Camada de override mobile: precisa ser SEMPRE a ultima folha. -->
-    <link rel="stylesheet" href="css/mobile.css?v=202608261200">
+    <link rel="stylesheet" href="css/mobile.css?v=202609091400">
 </head>
 <body>
 
@@ -256,9 +256,46 @@
                                 <canvas id="pdf-canvas"></canvas>
                                 <div class="pdf-navigation" id="pdf-navigation"></div>
                             </div>
+
+                            <!-- Carrossel vertical de vídeos curtos (módulos type:'shorts').
+                                 Os slides são gerados por renderShorts() em js/main.js; o
+                                 avanço usa scroll-snap nativo, então arrastar para cima já
+                                 passa para o próximo vídeo no celular. -->
+                            <div id="shorts-stage" class="shorts-stage" style="display:none;">
+                                <div class="shorts-segments" id="shorts-segments"></div>
+                                <div class="shorts-counter" id="shorts-counter">1 / 1</div>
+                                <div class="shorts-viewport" id="shorts-viewport" tabindex="0"
+                                     role="group" aria-label="Vídeos curtos do módulo"></div>
+                                <button type="button" class="shorts-nav shorts-nav-prev" id="shorts-prev" aria-label="Vídeo anterior">
+                                    <i class="fas fa-chevron-up"></i>
+                                </button>
+                                <button type="button" class="shorts-nav shorts-nav-next" id="shorts-next" aria-label="Próximo vídeo">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <div class="shorts-hint" id="shorts-hint" hidden aria-hidden="true">
+                                    <i class="fas fa-chevron-up"></i>
+                                    <span>Deslize para cima para o próximo vídeo</span>
+                                </div>
+                                <button type="button" class="shorts-autonext" id="shorts-autonext" hidden>
+                                    <span class="shorts-autonext-ring"><span class="shorts-autonext-fill"></span></span>
+                                    <span class="shorts-autonext-text">Próximo vídeo<small>Toque para ficar neste</small></span>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="module-info">
+                            <!-- Progresso do módulo de vídeos curtos: quantos já foram
+                                 assistidos do total. Só aparece em módulos type:'shorts'. -->
+                            <div class="shorts-total" id="shorts-total" style="display:none;">
+                                <div class="shorts-total-head">
+                                    <span class="shorts-total-label">
+                                        <i class="fas fa-mobile-screen"></i>
+                                        <strong id="shorts-total-count">0 de 0</strong> vídeos assistidos
+                                    </span>
+                                    <span class="shorts-total-pct" id="shorts-total-pct">0%</span>
+                                </div>
+                                <div class="shorts-total-track"><div class="shorts-total-fill" id="shorts-total-fill"></div></div>
+                            </div>
                             <h2 id="title"></h2>
                             <p id="caption"></p>
                             <div id="attachment-container" class="attachment-container"></div>
@@ -1850,11 +1887,79 @@
                     <label class="form-label" for="cfg-module-caption">Subtítulo</label>
                     <textarea class="form-control" id="cfg-module-caption" placeholder="Descrição do módulo"></textarea>
                 </div>
+                <!-- Tipo de conteúdo: um módulo é Vídeo OU PDF OU Vídeos curtos.
+                     O hidden abaixo é a fonte da verdade lida por js/admin.js;
+                     quem o mantém em dia é o popover de js/admin-courses.js. -->
+                <input type="hidden" id="cfg-module-type" value="video">
                 <div class="form-group">
+                    <label class="form-label">Tipo de conteúdo</label>
+                    <div class="ctype-picker" id="cfg-module-ctype-picker">
+                        <button type="button" class="ctype-picker-btn" id="cfg-module-ctype-btn"
+                                aria-haspopup="true" aria-expanded="false">
+                            <span class="ctype-picker-icon is-video" id="cfg-module-ctype-badge"><i class="fas fa-play" id="cfg-module-ctype-icon"></i></span>
+                            <span class="ctype-picker-text">
+                                <strong id="cfg-module-ctype-summary">Vídeo (YouTube)</strong>
+                                <small id="cfg-module-ctype-desc">Aula em vídeo horizontal</small>
+                            </span>
+                            <i class="fas fa-chevron-down ctype-picker-arrow"></i>
+                        </button>
+                        <!-- .modal-content tem overflow:hidden e cortaria a lista: o
+                             popover é movido para o fim de #cfg-root e posicionado em
+                             coordenadas de viewport (position:fixed) por admin-courses.js. -->
+                        <div class="ctype-popover" id="cfg-module-ctype-popover" role="radiogroup" aria-label="Tipo de conteúdo" hidden>
+                            <button type="button" class="ctype-popover-option" data-ctype="video" role="radio" aria-checked="true">
+                                <span class="ctype-popover-option-mark is-video"><i class="fas fa-play"></i></span>
+                                <span class="ctype-popover-option-text">
+                                    <strong>Vídeo (YouTube)</strong>
+                                    <small>Aula em vídeo horizontal</small>
+                                </span>
+                                <i class="fas fa-check ctype-popover-option-check"></i>
+                            </button>
+                            <button type="button" class="ctype-popover-option" data-ctype="shorts" role="radio" aria-checked="false">
+                                <span class="ctype-popover-option-mark is-shorts"><i class="fas fa-mobile-screen"></i></span>
+                                <span class="ctype-popover-option-text">
+                                    <strong>Vídeos curtos</strong>
+                                    <small>Vários vídeos verticais em carrossel</small>
+                                </span>
+                                <i class="fas fa-check ctype-popover-option-check"></i>
+                            </button>
+                            <button type="button" class="ctype-popover-option" data-ctype="pdf" role="radio" aria-checked="false">
+                                <span class="ctype-popover-option-mark is-pdf"><i class="fas fa-file-pdf"></i></span>
+                                <span class="ctype-popover-option-text">
+                                    <strong>PDF / Slides</strong>
+                                    <small>Documento hospedado no Dropbox</small>
+                                </span>
+                                <i class="fas fa-check ctype-popover-option-check"></i>
+                            </button>
+                            <p class="ctype-popover-hint">Cada módulo tem um tipo só — trocar limpa o campo do tipo anterior.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="ctype-panel form-group" data-ctype="video">
                     <label class="form-label" for="cfg-module-video">ID do Vídeo (YouTube)</label>
                     <input class="form-control" type="text" id="cfg-module-video" placeholder="Ex.: dQw4w9WgXcQ">
                 </div>
-                <div class="form-group">
+                <div class="ctype-panel form-group" data-ctype="shorts" hidden>
+                    <label class="form-label">Vídeos curtos</label>
+                    <!-- Lista construída por js/admin-courses.js — cada item vem de
+                         #cfg-module-shorts-link + #cfg-module-shorts-title, adicionado
+                         pelo botão abaixo. #cfg-module-shorts-data é o hidden com o
+                         JSON efetivamente salvo (fonte de verdade lida por admin.js). -->
+                    <input type="hidden" id="cfg-module-shorts-data" value="[]">
+                    <div class="shorts-list" id="cfg-module-shorts-list"></div>
+                    <div class="shorts-add-row">
+                        <input class="form-control" type="text" id="cfg-module-shorts-link"
+                               placeholder="Link do vídeo (shorts, youtu.be ou ID)">
+                        <input class="form-control" type="text" id="cfg-module-shorts-title"
+                               placeholder="Título (opcional)">
+                        <button type="button" class="btn btn-ghost shorts-add-btn" id="cfg-module-shorts-add">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                    <small class="form-hint" id="cfg-module-shorts-error" style="display:none;color:var(--danger);"></small>
+                    <small class="form-hint">Formato vertical (9:16). O aluno assiste em carrossel, arrastando para cima.</small>
+                </div>
+                <div class="ctype-panel form-group" data-ctype="pdf" hidden>
                     <label class="form-label" for="cfg-module-pdf">Diretório do PDF</label>
                     <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Código após dropbox.com/scl/fi/…">
                 </div>
@@ -2277,30 +2382,30 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-    <script src="js/course-image.js?v=202608261200"></script>
-    <script src="js/main.js?v=202608261200"></script>
-    <script src="js/firebase-config.js?v=202608261200"></script>
-    <script src="js/connection-guard.js?v=202608261200"></script>
-    <script src="js/db-sync.js?v=202608261200"></script>
-    <script src="js/crypto-utils.js?v=202608261200"></script>
-    <script src="js/deadlines.js?v=202608261200"></script>
-    <script src="js/attempts.js?v=202608261200"></script>
-    <script src="js/certificate.js?v=202608261200"></script>
-    <script src="js/colaboradores-sync.js?v=202608261200"></script>
-    <script src="js/ui.js?v=202608261200"></script>
-    <script src="js/auth.js?v=202608261200"></script>
-    <script src="js/student-auth.js?v=202608261200"></script>
-    <script src="js/admin.js?v=202608261200"></script>
-    <script src="js/admin-courses.js?v=202608261200"></script>
-    <script src="js/admin-colaboradores.js?v=202608261200"></script>
-    <script src="js/admin-users.js?v=202608261200"></script>
-    <script src="js/admin-excel.js?v=202608261200"></script>
-    <script src="js/admin-dashboard.js?v=202608261200"></script>
-    <script src="js/admin-history.js?v=202608261200"></script>
-    <script src="js/portal-auth.js?v=202608261200"></script>
-    <script src="js/student-profile.js?v=202608261200"></script>
-    <script src="js/student-header.js?v=202608261200"></script>
+    <script src="js/course-image.js?v=202609091400"></script>
+    <script src="js/main.js?v=202609091400"></script>
+    <script src="js/firebase-config.js?v=202609091400"></script>
+    <script src="js/connection-guard.js?v=202609091400"></script>
+    <script src="js/db-sync.js?v=202609091400"></script>
+    <script src="js/crypto-utils.js?v=202609091400"></script>
+    <script src="js/deadlines.js?v=202609091400"></script>
+    <script src="js/attempts.js?v=202609091400"></script>
+    <script src="js/certificate.js?v=202609091400"></script>
+    <script src="js/colaboradores-sync.js?v=202609091400"></script>
+    <script src="js/ui.js?v=202609091400"></script>
+    <script src="js/auth.js?v=202609091400"></script>
+    <script src="js/student-auth.js?v=202609091400"></script>
+    <script src="js/admin.js?v=202609091400"></script>
+    <script src="js/admin-courses.js?v=202609091400"></script>
+    <script src="js/admin-colaboradores.js?v=202609091400"></script>
+    <script src="js/admin-users.js?v=202609091400"></script>
+    <script src="js/admin-excel.js?v=202609091400"></script>
+    <script src="js/admin-dashboard.js?v=202609091400"></script>
+    <script src="js/admin-history.js?v=202609091400"></script>
+    <script src="js/portal-auth.js?v=202609091400"></script>
+    <script src="js/student-profile.js?v=202609091400"></script>
+    <script src="js/student-header.js?v=202609091400"></script>
     <!-- Depois de admin-history.js (U.getHistoryRows) e student-auth.js (sessão). -->
-    <script src="js/ranking.js?v=202608261200"></script>
+    <script src="js/ranking.js?v=202609091400"></script>
 </body>
 </html>

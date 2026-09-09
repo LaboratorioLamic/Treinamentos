@@ -3062,3 +3062,379 @@
             .ranking-confetti i, .ranking-skeleton span { animation: none; }
             .ranking-bar > span { transition: none; }
         }
+
+        /* ═══════════════════════════════════════════════════════════
+           VÍDEOS CURTOS — carrossel vertical (módulos type:'shorts')
+           ═══════════════════════════════════════════════════════════
+           O palco vive dentro do .player-card escuro, no lugar do player
+           16:9. A altura do palco (--shorts-h) manda em tudo: a largura da
+           coluna de vídeo é derivada dela (9/16 = 0.5625), e as sobreposições
+           (segmentos, contador, dica) usam a mesma largura para ficarem
+           alinhadas ao vídeo, não à página. */
+        .shorts-stage {
+            --shorts-h: min(72vh, 640px);
+            --shorts-w: calc(var(--shorts-h) * 0.5625);
+            position: relative;
+            width: 100%;
+            height: var(--shorts-h);
+            display: none; /* js/main.js troca para 'block' no módulo de curtos */
+            background:
+                radial-gradient(120% 80% at 50% 0%, #16233a 0%, #05070c 70%);
+            overflow: hidden;
+        }
+
+        /* Rolagem com encaixe: no toque, arrastar para cima já avança um
+           vídeo inteiro sem nenhum JS de gesto. overscroll-behavior impede
+           que o gesto "vaze" e role a página atrás do player. */
+        .shorts-viewport {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-snap-type: y mandatory;
+            overscroll-behavior: contain;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .shorts-viewport::-webkit-scrollbar { width: 0; height: 0; }
+        .shorts-viewport:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+        .shorts-slide {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Coluna 9:16 do vídeo. Tudo que é sobreposto ao vídeo é filho dela,
+           para acompanhar a largura real do quadro no desktop. */
+        .shorts-frame {
+            position: relative;
+            height: 100%;
+            width: var(--shorts-w);
+            max-width: 100%;
+            background: #000;
+            overflow: hidden;
+            box-shadow: 0 18px 50px -12px rgba(0,0,0,0.75);
+        }
+        .shorts-frame iframe {
+            width: 100% !important;
+            height: 100% !important;
+            border: none;
+            display: block;
+            pointer-events: none; /* o toque é tratado por .shorts-tap */
+        }
+
+        /* Área de toque play/pausa. Cobre o quadro inteiro, abaixo dos
+           controles (que têm z-index maior). */
+        .shorts-tap {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .shorts-play-badge {
+            width: 68px; height: 68px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(9,15,26,0.62);
+            backdrop-filter: blur(3px);
+            color: #fff; font-size: 24px;
+            opacity: 0;
+            transform: scale(0.86);
+            transition: opacity 0.18s, transform 0.18s;
+            pointer-events: none;
+        }
+        .shorts-slide.is-paused .shorts-play-badge { opacity: 1; transform: scale(1); }
+
+        /* Progresso do vídeo atual. É uma div, não um input range: sem
+           arrastar, sem pular — mesma regra anti-pulo do atalho do PDF. */
+        .shorts-progress {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 3px;
+            background: rgba(255,255,255,0.18);
+            z-index: 3;
+            pointer-events: none; /* o toque de play/pausa cobre o quadro todo */
+        }
+        .shorts-progress > span {
+            display: block;
+            height: 100%;
+            width: 0;
+            background: var(--accent);
+            transition: width 0.2s linear;
+        }
+
+        .shorts-slide-label {
+            position: absolute;
+            left: 14px; bottom: 16px;
+            z-index: 3;
+            max-width: calc(100% - 100px);
+            font-size: 0.78em;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 1px 6px rgba(0,0,0,0.65);
+            display: flex; align-items: center; gap: 7px;
+            pointer-events: none;
+        }
+        .shorts-slide-index {
+            background: rgba(255,255,255,0.16);
+            border-radius: 999px;
+            padding: 2px 9px;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+        .shorts-slide-title {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .shorts-mute {
+            position: absolute;
+            right: 12px; bottom: 14px;
+            z-index: 4;
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(9,15,26,0.55);
+            backdrop-filter: blur(3px);
+            color: #fff; font-size: 14px;
+            cursor: pointer;
+            transition: background 0.16s, transform 0.12s;
+        }
+        .shorts-mute:hover { background: rgba(9,15,26,0.8); transform: scale(1.06); }
+
+        /* Selo de "assistido": aparece uma vez, no momento em que o vídeo
+           passa dos 90%. */
+        .shorts-check {
+            position: absolute;
+            top: 50%; left: 50%;
+            z-index: 5;
+            transform: translate(-50%, -50%) scale(0.4);
+            opacity: 0;
+            color: var(--success);
+            font-size: 62px;
+            pointer-events: none;
+            filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+        }
+        .shorts-slide.is-just-watched .shorts-check { animation: shorts-check-pop 1.1s ease forwards; }
+
+        /* ─── Sobreposições do palco (fora dos slides) ─── */
+
+        /* Um segmento por vídeo: deixa explícito quantos existem e quais já
+           foram vistos, sem precisar rolar a lista. */
+        .shorts-segments {
+            position: absolute;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            width: min(100% - 24px, calc(var(--shorts-w) - 24px));
+            display: flex;
+            gap: 4px;
+            pointer-events: none;
+        }
+        .shorts-segment {
+            flex: 1;
+            height: 3px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.26);
+            overflow: hidden;
+        }
+        .shorts-segment > span {
+            display: block;
+            height: 100%;
+            width: 0;
+            background: #fff;
+            border-radius: 999px;
+        }
+        .shorts-segment.is-watched { background: var(--success); }
+        .shorts-segment.is-watched > span { width: 100%; background: var(--success); }
+
+        .shorts-counter {
+            position: absolute;
+            top: 22px;
+            right: max(12px, calc(50% - var(--shorts-w) / 2 + 12px));
+            z-index: 6;
+            padding: 4px 11px;
+            border-radius: 999px;
+            background: rgba(9,15,26,0.6);
+            backdrop-filter: blur(3px);
+            color: #fff;
+            font-size: 0.72em;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.02em;
+            pointer-events: none;
+        }
+
+        .shorts-nav {
+            position: absolute;
+            right: max(12px, calc(50% - var(--shorts-w) / 2 - 52px));
+            z-index: 6;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.12);
+            color: #fff; font-size: 14px;
+            cursor: pointer;
+            transition: background 0.16s, transform 0.12s, opacity 0.16s;
+        }
+        .shorts-nav:hover:not(:disabled) { background: rgba(255,255,255,0.24); transform: scale(1.08); }
+        .shorts-nav:disabled { opacity: 0.25; cursor: default; }
+        .shorts-nav-prev { top: calc(50% - 48px); }
+        .shorts-nav-next { top: calc(50% + 8px); }
+
+        /* Instrução temporária: só aparece quando é útil (abertura do módulo
+           e depois de terminar um vídeo sem avançar) e some sozinha. */
+        .shorts-hint {
+            position: absolute;
+            left: 50%; bottom: 26px;
+            z-index: 7;
+            transform: translateX(-50%);
+            display: flex; align-items: center; gap: 9px;
+            padding: 9px 16px;
+            border-radius: 999px;
+            background: rgba(9,15,26,0.74);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: #fff;
+            font-size: 0.78em;
+            font-weight: 600;
+            white-space: nowrap;
+            pointer-events: none;
+            animation: shorts-hint-in 0.28s ease;
+        }
+        .shorts-hint[hidden] { display: none; }
+        .shorts-hint i { animation: shorts-hint-float 1.5s ease-in-out infinite; }
+
+        /* Aviso de avanço automático — clicável para permanecer no vídeo. */
+        .shorts-autonext {
+            position: absolute;
+            left: 50%; bottom: 26px;
+            z-index: 8;
+            transform: translateX(-50%);
+            display: flex; align-items: center; gap: 11px;
+            padding: 9px 16px 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(9,15,26,0.82);
+            backdrop-filter: blur(4px);
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.78em;
+            font-weight: 700;
+            cursor: pointer;
+            animation: shorts-hint-in 0.24s ease;
+        }
+        .shorts-autonext[hidden] { display: none; }
+        .shorts-autonext-ring {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .shorts-autonext-fill {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            transform: scale(0);
+        }
+        .shorts-autonext.is-running .shorts-autonext-fill {
+            animation: shorts-autonext-grow 1s linear forwards;
+        }
+        .shorts-autonext-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+        .shorts-autonext-text small { font-size: 0.85em; font-weight: 500; opacity: 0.7; }
+
+        /* Estado final: todos os vídeos vistos. */
+        .shorts-stage.is-complete .shorts-segments { filter: drop-shadow(0 0 6px rgba(16,185,129,0.55)); }
+
+        /* ─── Barra de progresso total (dentro de .module-info) ─── */
+        .shorts-total {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin-bottom: 14px;
+        }
+        .shorts-total-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 9px;
+        }
+        .shorts-total-label {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            display: flex; align-items: center; gap: 7px;
+        }
+        .shorts-total-label i { color: var(--accent); }
+        .shorts-total-label strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+        .shorts-total-pct {
+            font-size: 0.82em; font-weight: 700; color: var(--accent);
+            font-variant-numeric: tabular-nums;
+        }
+        .shorts-total-track {
+            height: 6px;
+            border-radius: 999px;
+            background: var(--surface-2);
+            overflow: hidden;
+        }
+        .shorts-total-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 999px;
+            background: var(--accent);
+            transition: width 0.35s ease;
+        }
+        .shorts-total.is-complete .shorts-total-pct { color: var(--success); }
+        .shorts-total.is-complete .shorts-total-fill { background: var(--success); }
+
+        /* Contagem de vídeos no item da barra lateral (renderModuleTitle). */
+        .module-count-tag {
+            margin-left: auto;
+            flex-shrink: 0;
+            font-size: 0.72em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--surface-2);
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+        .module.completed .module-count-tag { background: rgba(16,185,129,0.14); color: var(--success-hover); }
+
+        @keyframes shorts-hint-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes shorts-hint-float {
+            0%, 100% { transform: translateY(2px); opacity: 0.65; }
+            50%      { transform: translateY(-3px); opacity: 1; }
+        }
+        @keyframes shorts-check-pop {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+            35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+            65%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+        @keyframes shorts-autonext-grow {
+            from { transform: scale(0); }
+            to   { transform: scale(0.72); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .shorts-viewport { scroll-behavior: auto; }
+            .shorts-hint, .shorts-hint i, .shorts-autonext,
+            .shorts-autonext .shorts-autonext-fill,
+            .shorts-slide.is-just-watched .shorts-check { animation: none; }
+            .shorts-slide.is-just-watched .shorts-check { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            .shorts-progress > span, .shorts-total-fill { transition: none; }
+        }

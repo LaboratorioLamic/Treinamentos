@@ -466,6 +466,216 @@ document.getElementById('cfg-module-save')?.addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// Seletor de tipo de conteúdo do módulo (Vídeo / PDF / Vídeos curtos)
+// ══════════════════════════════════════════════════════════════════
+// Os três tipos são exclusivos: só o campo do tipo escolhido fica
+// visível, e js/admin.js lê o tipo do hidden #cfg-module-type na hora
+// de salvar. Este arquivo é a única fonte de verdade da UI do seletor.
+const CTYPES = {
+    video:  { icon: 'fa-play',          badge: 'is-video',  label: 'Vídeo (YouTube)', desc: 'Aula em vídeo horizontal' },
+    pdf:    { icon: 'fa-file-pdf',      badge: 'is-pdf',    label: 'PDF / Slides',    desc: 'Documento hospedado no Dropbox' },
+    shorts: { icon: 'fa-mobile-screen', badge: 'is-shorts', label: 'Vídeos curtos',   desc: 'Vários vídeos verticais em carrossel' }
+};
+
+const ctypeInput = document.getElementById('cfg-module-type');
+const ctypeBtn = document.getElementById('cfg-module-ctype-btn');
+const ctypePopover = document.getElementById('cfg-module-ctype-popover');
+const ctypeBadge = document.getElementById('cfg-module-ctype-badge');
+const ctypeIcon = document.getElementById('cfg-module-ctype-icon');
+const ctypeSummary = document.getElementById('cfg-module-ctype-summary');
+const ctypeDesc = document.getElementById('cfg-module-ctype-desc');
+const shortsDataInput = document.getElementById('cfg-module-shorts-data');
+const shortsListEl = document.getElementById('cfg-module-shorts-list');
+const shortsLinkInput = document.getElementById('cfg-module-shorts-link');
+const shortsTitleInput = document.getElementById('cfg-module-shorts-title');
+const shortsAddBtn = document.getElementById('cfg-module-shorts-add');
+const shortsErrorEl = document.getElementById('cfg-module-shorts-error');
+
+// Extrai o ID de 11 caracteres de qualquer formato aceito: link de
+// shorts, link curto youtu.be, watch?v= ou o ID digitado puro.
+function extractYouTubeId(raw) {
+    const value = (raw || '').trim();
+    if (!value) return null;
+    if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value;
+    const patterns = [
+        /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/i,
+        /youtu\.be\/([A-Za-z0-9_-]{11})/i,
+        /[?&]v=([A-Za-z0-9_-]{11})/i,
+        /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/i
+    ];
+    for (const pattern of patterns) {
+        const match = value.match(pattern);
+        if (match) return match[1];
+    }
+    return null;
+}
+
+// ── Lista de vídeos curtos: estado em memória + espelho em JSON no hidden.
+// admin.js lê só o hidden na hora de salvar — não precisa conhecer esta UI.
+let shortsItems = [];
+
+function readShortsData() {
+    try {
+        const parsed = JSON.parse(shortsDataInput?.value || '[]');
+        return Array.isArray(parsed) ? parsed.filter(item => item && item.id) : [];
+    } catch { return []; }
+}
+
+function writeShortsData() {
+    if (shortsDataInput) shortsDataInput.value = JSON.stringify(shortsItems);
+}
+
+function setShortsError(message) {
+    if (!shortsErrorEl) return;
+    shortsErrorEl.textContent = message || '';
+    shortsErrorEl.style.display = message ? '' : 'none';
+}
+
+function renderShortsList() {
+    if (!shortsListEl) return;
+    if (!shortsItems.length) {
+        shortsListEl.innerHTML = '<p class="shorts-list-empty">Nenhum vídeo adicionado ainda.</p>';
+        return;
+    }
+    shortsListEl.innerHTML = shortsItems.map((item, index) => `
+        <div class="shorts-list-item" data-index="${index}">
+            <span class="shorts-list-item-index">${index + 1}</span>
+            <span class="shorts-list-item-text">
+                <strong>${escapeHtml(item.title || item.id)}</strong>
+                ${item.title ? `<small>${escapeHtml(item.id)}</small>` : ''}
+            </span>
+            <button type="button" class="shorts-list-item-remove" data-index="${index}" aria-label="Remover vídeo">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>`).join('');
+}
+
+function setShortsItems(items) {
+    shortsItems = Array.isArray(items) ? items.filter(item => item && item.id) : [];
+    writeShortsData();
+    renderShortsList();
+}
+
+function addShortFromInputs() {
+    const id = extractYouTubeId(shortsLinkInput?.value);
+    if (!id) {
+        setShortsError('Link não reconhecido. Use um link de shorts, youtu.be, watch?v= ou o ID do vídeo.');
+        shortsLinkInput?.focus();
+        return;
+    }
+    setShortsError('');
+    const title = (shortsTitleInput?.value || '').trim();
+    shortsItems.push(title ? { id, title } : { id });
+    writeShortsData();
+    renderShortsList();
+    if (shortsLinkInput) shortsLinkInput.value = '';
+    if (shortsTitleInput) shortsTitleInput.value = '';
+    shortsLinkInput?.focus();
+}
+
+shortsAddBtn?.addEventListener('click', addShortFromInputs);
+[shortsLinkInput, shortsTitleInput].forEach(input => {
+    input?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        addShortFromInputs();
+    });
+});
+shortsLinkInput?.addEventListener('input', () => setShortsError(''));
+
+shortsListEl?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.shorts-list-item-remove[data-index]');
+    if (!btn) return;
+    const index = Number(btn.dataset.index);
+    if (Number.isNaN(index)) return;
+    shortsItems.splice(index, 1);
+    writeShortsData();
+    renderShortsList();
+});
+
+function setModuleType(kind) {
+    const type = CTYPES[kind] ? kind : 'video';
+    const meta = CTYPES[type];
+    if (ctypeInput) ctypeInput.value = type;
+    if (ctypeIcon) ctypeIcon.className = `fas ${meta.icon}`;
+    if (ctypeBadge) ctypeBadge.className = `ctype-picker-icon ${meta.badge}`;
+    if (ctypeSummary) ctypeSummary.textContent = meta.label;
+    if (ctypeDesc) ctypeDesc.textContent = meta.desc;
+    document.querySelectorAll('#cfg-module-form-modal .ctype-panel').forEach(panel => {
+        panel.hidden = panel.dataset.ctype !== type;
+    });
+    ctypePopover?.querySelectorAll('.ctype-popover-option').forEach(option => {
+        const on = option.dataset.ctype === type;
+        option.classList.toggle('is-selected', on);
+        option.setAttribute('aria-checked', String(on));
+    });
+    if (type === 'shorts') renderShortsList();
+}
+
+// Mesmo tratamento do popover de funções (js/admin.js): .modal-content
+// tem overflow:hidden, então o popover é movido para o fim de #cfg-root
+// e posicionado em coordenadas de viewport, virando para cima quando
+// não há espaço abaixo.
+function positionCtypePopover() {
+    if (!ctypePopover || ctypePopover.hidden) return;
+    const rect = ctypeBtn.getBoundingClientRect();
+    const gap = 6, margin = 10;
+    ctypePopover.style.width = `${rect.width}px`;
+    ctypePopover.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - rect.width - margin))}px`;
+    ctypePopover.style.top = '0px';
+    const height = ctypePopover.offsetHeight;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+    const openUp = spaceBelow < height && rect.top - gap - margin > spaceBelow;
+    const finalHeight = Math.min(height, Math.max(160, openUp ? rect.top - gap - margin : spaceBelow));
+    ctypePopover.style.top = openUp ? `${rect.top - gap - finalHeight}px` : `${rect.bottom + gap}px`;
+}
+
+function closeCtypePopover() {
+    if (!ctypePopover || ctypePopover.hidden) return;
+    ctypePopover.hidden = true;
+    ctypeBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onCtypeOutsideClick, true);
+    window.removeEventListener('resize', positionCtypePopover);
+    window.removeEventListener('scroll', positionCtypePopover, true);
+}
+function onCtypeOutsideClick(event) {
+    if (!ctypePopover.contains(event.target) && !ctypeBtn.contains(event.target)) closeCtypePopover();
+}
+
+ctypeBtn?.addEventListener('click', () => {
+    if (!ctypePopover.hidden) { closeCtypePopover(); return; }
+    const cfgRoot = document.getElementById('cfg-root') || document.body;
+    if (ctypePopover.parentElement !== cfgRoot) cfgRoot.appendChild(ctypePopover);
+    ctypePopover.hidden = false;
+    ctypeBtn.setAttribute('aria-expanded', 'true');
+    positionCtypePopover();
+    document.addEventListener('click', onCtypeOutsideClick, true);
+    window.addEventListener('resize', positionCtypePopover);
+    window.addEventListener('scroll', positionCtypePopover, true);
+});
+
+ctypePopover?.addEventListener('click', (event) => {
+    const option = event.target.closest('.ctype-popover-option[data-ctype]');
+    if (!option) return;
+    setModuleType(option.dataset.ctype);
+    closeCtypePopover();
+});
+
+// Escape com o popover aberto fecha só ele — sem o stopPropagation o
+// ModalStack fecharia o modal de módulo inteiro junto.
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && ctypePopover && !ctypePopover.hidden) {
+        event.stopPropagation();
+        closeCtypePopover();
+    }
+}, true);
+
+// O popover vive fora do modal (foi reparentado para #cfg-root): fechar o
+// modal por qualquer caminho não pode deixá-lo órfão flutuando na tela.
+document.getElementById('cfg-module-form-close')?.addEventListener('click', closeCtypePopover);
+document.getElementById('cfg-module-save')?.addEventListener('click', closeCtypePopover);
+
+// ══════════════════════════════════════════════════════════════════
 // Modal de formulário de Avaliação (empilhado sobre o drawer)
 // ══════════════════════════════════════════════════════════════════
 const quizFormModal = document.getElementById('cfg-quiz-form-modal');
@@ -627,6 +837,8 @@ function refresh() {
     if (currentDetailSubjectId && currentDetailThemeId) refreshDetailTabCounts();
 }
 
-window.UniAdminCourses = { refresh, openCourseDetail, openThemeFormModal, ModalStack };
+window.UniAdminCourses = { refresh, openCourseDetail, openThemeFormModal, ModalStack,
+    // Consumidos por js/admin.js (populateModules / resetModuleForm / save do modulo).
+    setModuleType, setShortsItems, readShortsData, closeCtypePopover };
 
 })();
