@@ -18,13 +18,13 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css?v=202609091400">
-    <link rel="stylesheet" href="css/admin.css?v=202609091400">
-    <link rel="stylesheet" href="css/admin-courses.css?v=202609091400">
-    <link rel="stylesheet" href="css/auth.css?v=202609091400">
-    <link rel="stylesheet" href="css/certificate.css?v=202609091400">
+    <link rel="stylesheet" href="css/main.css?v=202609091500">
+    <link rel="stylesheet" href="css/admin.css?v=202609091500">
+    <link rel="stylesheet" href="css/admin-courses.css?v=202609091500">
+    <link rel="stylesheet" href="css/auth.css?v=202609091500">
+    <link rel="stylesheet" href="css/certificate.css?v=202609091500">
     <!-- Camada de override mobile: precisa ser SEMPRE a ultima folha. -->
-    <link rel="stylesheet" href="css/mobile.css?v=202609091400">
+    <link rel="stylesheet" href="css/mobile.css?v=202609091500">
 </head>
 <body>
 
@@ -1943,8 +1943,10 @@
                     <label class="form-label">Vídeos curtos</label>
                     <!-- Lista construída por js/admin-courses.js — cada item vem de
                          #cfg-module-shorts-link + #cfg-module-shorts-title, adicionado
-                         pelo botão abaixo. #cfg-module-shorts-data é o hidden com o
-                         JSON efetivamente salvo (fonte de verdade lida por admin.js). -->
+                         (ou salvo, se em edição) pelo botão abaixo. #cfg-module-shorts-data
+                         é o hidden com o JSON efetivamente salvo (fonte de verdade lida
+                         por admin.js). O clique no lápis de um item recarrega os campos
+                         para edição em vez de remover + adicionar de novo. -->
                     <input type="hidden" id="cfg-module-shorts-data" value="[]">
                     <div class="shorts-list" id="cfg-module-shorts-list"></div>
                     <div class="shorts-add-row">
@@ -1954,6 +1956,10 @@
                                placeholder="Título (opcional)">
                         <button type="button" class="btn btn-ghost shorts-add-btn" id="cfg-module-shorts-add">
                             <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-icon shorts-cancel-edit-btn" id="cfg-module-shorts-cancel-edit"
+                                title="Cancelar edição" style="display:none;">
+                            <i class="fas fa-xmark"></i>
                         </button>
                     </div>
                     <small class="form-hint" id="cfg-module-shorts-error" style="display:none;color:var(--danger);"></small>
@@ -2382,30 +2388,30 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-    <script src="js/course-image.js?v=202609091400"></script>
-    <script src="js/main.js?v=202609091400"></script>
-    <script src="js/firebase-config.js?v=202609091400"></script>
-    <script src="js/connection-guard.js?v=202609091400"></script>
-    <script src="js/db-sync.js?v=202609091400"></script>
-    <script src="js/crypto-utils.js?v=202609091400"></script>
-    <script src="js/deadlines.js?v=202609091400"></script>
-    <script src="js/attempts.js?v=202609091400"></script>
-    <script src="js/certificate.js?v=202609091400"></script>
-    <script src="js/colaboradores-sync.js?v=202609091400"></script>
-    <script src="js/ui.js?v=202609091400"></script>
-    <script src="js/auth.js?v=202609091400"></script>
-    <script src="js/student-auth.js?v=202609091400"></script>
-    <script src="js/admin.js?v=202609091400"></script>
-    <script src="js/admin-courses.js?v=202609091400"></script>
-    <script src="js/admin-colaboradores.js?v=202609091400"></script>
-    <script src="js/admin-users.js?v=202609091400"></script>
-    <script src="js/admin-excel.js?v=202609091400"></script>
-    <script src="js/admin-dashboard.js?v=202609091400"></script>
-    <script src="js/admin-history.js?v=202609091400"></script>
-    <script src="js/portal-auth.js?v=202609091400"></script>
-    <script src="js/student-profile.js?v=202609091400"></script>
-    <script src="js/student-header.js?v=202609091400"></script>
+    <script src="js/course-image.js?v=202609091500"></script>
+    <script src="js/main.js?v=202609091500"></script>
+    <script src="js/firebase-config.js?v=202609091500"></script>
+    <script src="js/connection-guard.js?v=202609091500"></script>
+    <script src="js/db-sync.js?v=202609091500"></script>
+    <script src="js/crypto-utils.js?v=202609091500"></script>
+    <script src="js/deadlines.js?v=202609091500"></script>
+    <script src="js/attempts.js?v=202609091500"></script>
+    <script src="js/certificate.js?v=202609091500"></script>
+    <script src="js/colaboradores-sync.js?v=202609091500"></script>
+    <script src="js/ui.js?v=202609091500"></script>
+    <script src="js/auth.js?v=202609091500"></script>
+    <script src="js/student-auth.js?v=202609091500"></script>
+    <script src="js/admin.js?v=202609091500"></script>
+    <script src="js/admin-courses.js?v=202609091500"></script>
+    <script src="js/admin-colaboradores.js?v=202609091500"></script>
+    <script src="js/admin-users.js?v=202609091500"></script>
+    <script src="js/admin-excel.js?v=202609091500"></script>
+    <script src="js/admin-dashboard.js?v=202609091500"></script>
+    <script src="js/admin-history.js?v=202609091500"></script>
+    <script src="js/portal-auth.js?v=202609091500"></script>
+    <script src="js/student-profile.js?v=202609091500"></script>
+    <script src="js/student-header.js?v=202609091500"></script>
     <!-- Depois de admin-history.js (U.getHistoryRows) e student-auth.js (sessão). -->
-    <script src="js/ranking.js?v=202609091400"></script>
+    <script src="js/ranking.js?v=202609091500"></script>
 </body>
 </html>

@@ -489,6 +489,7 @@ const shortsListEl = document.getElementById('cfg-module-shorts-list');
 const shortsLinkInput = document.getElementById('cfg-module-shorts-link');
 const shortsTitleInput = document.getElementById('cfg-module-shorts-title');
 const shortsAddBtn = document.getElementById('cfg-module-shorts-add');
+const shortsCancelEditBtn = document.getElementById('cfg-module-shorts-cancel-edit');
 const shortsErrorEl = document.getElementById('cfg-module-shorts-error');
 
 // Extrai o ID de 11 caracteres de qualquer formato aceito: link de
@@ -513,6 +514,10 @@ function extractYouTubeId(raw) {
 // ── Lista de vídeos curtos: estado em memória + espelho em JSON no hidden.
 // admin.js lê só o hidden na hora de salvar — não precisa conhecer esta UI.
 let shortsItems = [];
+// Índice do item em edição (clique no lápis), ou null quando os campos de
+// baixo estão em modo "adicionar". Os mesmos dois inputs + botão servem
+// para os dois fluxos, só o rótulo/ação do botão mudam.
+let shortsEditingIndex = null;
 
 function readShortsData() {
     try {
@@ -538,12 +543,15 @@ function renderShortsList() {
         return;
     }
     shortsListEl.innerHTML = shortsItems.map((item, index) => `
-        <div class="shorts-list-item" data-index="${index}">
+        <div class="shorts-list-item ${index === shortsEditingIndex ? 'is-editing' : ''}" data-index="${index}">
             <span class="shorts-list-item-index">${index + 1}</span>
             <span class="shorts-list-item-text">
                 <strong>${escapeHtml(item.title || item.id)}</strong>
                 ${item.title ? `<small>${escapeHtml(item.id)}</small>` : ''}
             </span>
+            <button type="button" class="shorts-list-item-edit" data-index="${index}" aria-label="Editar vídeo">
+                <i class="fas fa-pencil-alt"></i>
+            </button>
             <button type="button" class="shorts-list-item-remove" data-index="${index}" aria-label="Remover vídeo">
                 <i class="fas fa-trash"></i>
             </button>
@@ -552,10 +560,45 @@ function renderShortsList() {
 
 function setShortsItems(items) {
     shortsItems = Array.isArray(items) ? items.filter(item => item && item.id) : [];
+    cancelShortsEdit();
     writeShortsData();
     renderShortsList();
 }
 
+// Troca o rótulo/ícone do botão entre "Adicionar" e "Salvar edição", e
+// mostra/esconde o X de cancelar ao lado.
+function updateShortsAddBtnLabel() {
+    if (!shortsAddBtn) return;
+    const editing = shortsEditingIndex !== null;
+    shortsAddBtn.innerHTML = editing
+        ? '<i class="fas fa-check"></i> Salvar edição'
+        : '<i class="fas fa-plus"></i> Adicionar';
+    if (shortsCancelEditBtn) shortsCancelEditBtn.style.display = editing ? '' : 'none';
+}
+
+function startShortsEdit(index) {
+    const item = shortsItems[index];
+    if (!item) return;
+    shortsEditingIndex = index;
+    if (shortsLinkInput) shortsLinkInput.value = item.id;
+    if (shortsTitleInput) shortsTitleInput.value = item.title || '';
+    setShortsError('');
+    updateShortsAddBtnLabel();
+    renderShortsList();
+    shortsLinkInput?.focus();
+}
+
+function cancelShortsEdit() {
+    shortsEditingIndex = null;
+    if (shortsLinkInput) shortsLinkInput.value = '';
+    if (shortsTitleInput) shortsTitleInput.value = '';
+    setShortsError('');
+    updateShortsAddBtnLabel();
+    renderShortsList();
+}
+
+// Mesmos dois campos servem para adicionar (índice null) e para salvar a
+// edição de um item existente (shortsEditingIndex definido pelo lápis).
 function addShortFromInputs() {
     const id = extractYouTubeId(shortsLinkInput?.value);
     if (!id) {
@@ -565,8 +608,15 @@ function addShortFromInputs() {
     }
     setShortsError('');
     const title = (shortsTitleInput?.value || '').trim();
-    shortsItems.push(title ? { id, title } : { id });
+    const item = title ? { id, title } : { id };
+    if (shortsEditingIndex !== null && shortsItems[shortsEditingIndex]) {
+        shortsItems[shortsEditingIndex] = item;
+    } else {
+        shortsItems.push(item);
+    }
+    shortsEditingIndex = null;
     writeShortsData();
+    updateShortsAddBtnLabel();
     renderShortsList();
     if (shortsLinkInput) shortsLinkInput.value = '';
     if (shortsTitleInput) shortsTitleInput.value = '';
@@ -574,20 +624,29 @@ function addShortFromInputs() {
 }
 
 shortsAddBtn?.addEventListener('click', addShortFromInputs);
+shortsCancelEditBtn?.addEventListener('click', cancelShortsEdit);
 [shortsLinkInput, shortsTitleInput].forEach(input => {
     input?.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        addShortFromInputs();
+        if (event.key === 'Enter') { event.preventDefault(); addShortFromInputs(); return; }
+        if (event.key === 'Escape' && shortsEditingIndex !== null) { event.preventDefault(); cancelShortsEdit(); }
     });
 });
 shortsLinkInput?.addEventListener('input', () => setShortsError(''));
 
 shortsListEl?.addEventListener('click', (event) => {
-    const btn = event.target.closest('.shorts-list-item-remove[data-index]');
-    if (!btn) return;
-    const index = Number(btn.dataset.index);
+    const editBtn = event.target.closest('.shorts-list-item-edit[data-index]');
+    if (editBtn) {
+        const index = Number(editBtn.dataset.index);
+        if (!Number.isNaN(index)) startShortsEdit(index);
+        return;
+    }
+    const removeBtn = event.target.closest('.shorts-list-item-remove[data-index]');
+    if (!removeBtn) return;
+    const index = Number(removeBtn.dataset.index);
     if (Number.isNaN(index)) return;
+    // Remover o item em edição (ou um antes dele) invalidaria o índice
+    // guardado: mais simples cancelar a edição em curso.
+    if (shortsEditingIndex !== null) cancelShortsEdit();
     shortsItems.splice(index, 1);
     writeShortsData();
     renderShortsList();

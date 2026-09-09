@@ -1234,7 +1234,9 @@
                 videoId: shortsList[index].id,
                 playerVars: {
                     controls: 0, modestbranding: 1, rel: 0, playsinline: 1,
-                    iv_load_policy: 3, fs: 0, disablekb: 1
+                    iv_load_policy: 3, fs: 0, disablekb: 1,
+                    // Sem legendas automáticas nos vídeos curtos.
+                    cc_load_policy: 0
                 },
                 events: {
                     onReady: (event) => {
@@ -1253,6 +1255,10 @@
             const slide = shortsSlideAt(index);
             if (event.data === YT_STATE.PLAYING) {
                 slide?.classList.remove('is-paused');
+                // Dar play de novo (replay) esconde o selo de "assistido":
+                // ele é um aviso do instante em que passou dos 90%, não um
+                // selo permanente sobre o vídeo.
+                slide?.classList.remove('is-just-watched');
                 // Um player fora de foco só pode ter voltado a tocar sozinho
                 // (pré-carga): silencia para o áudio não se sobrepor.
                 if (index !== shortsActive) { try { event.target.pauseVideo(); } catch { /* indisponível */ } return; }

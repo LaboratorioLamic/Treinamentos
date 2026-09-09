@@ -3213,20 +3213,22 @@
         }
         .shorts-mute:hover { background: rgba(9,15,26,0.8); transform: scale(1.06); }
 
-        /* Selo de "assistido": aparece uma vez, no momento em que o vídeo
-           passa dos 90%. */
+        /* Selo de "assistido": pisca discreto no canto superior direito ao
+           passar dos 90%, e some sozinho — nunca fica plantado sobre o vídeo.
+           Reiniciar o play (replay) remove a classe no JS (onShortsStateChange),
+           então o selo não reaparece por engano numa nova passada. */
         .shorts-check {
             position: absolute;
-            top: 50%; left: 50%;
+            top: 14px; right: 14px;
             z-index: 5;
-            transform: translate(-50%, -50%) scale(0.4);
+            transform: scale(0.5);
             opacity: 0;
             color: var(--success);
-            font-size: 62px;
+            font-size: 22px;
             pointer-events: none;
-            filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.55));
         }
-        .shorts-slide.is-just-watched .shorts-check { animation: shorts-check-pop 1.1s ease forwards; }
+        .shorts-slide.is-just-watched .shorts-check { animation: shorts-check-pop 1.4s ease forwards; }
 
         /* ─── Sobreposições do palco (fora dos slides) ─── */
 
@@ -3420,10 +3422,11 @@
             50%      { transform: translateY(-3px); opacity: 1; }
         }
         @keyframes shorts-check-pop {
-            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-            35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
-            65%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+            0%   { opacity: 0; transform: scale(0.5); }
+            20%  { opacity: 1; transform: scale(1.15); }
+            35%  { opacity: 1; transform: scale(1); }
+            80%  { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1); }
         }
         @keyframes shorts-autonext-grow {
             from { transform: scale(0); }
@@ -3435,6 +3438,6 @@
             .shorts-hint, .shorts-hint i, .shorts-autonext,
             .shorts-autonext .shorts-autonext-fill,
             .shorts-slide.is-just-watched .shorts-check { animation: none; }
-            .shorts-slide.is-just-watched .shorts-check { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            .shorts-slide.is-just-watched .shorts-check { opacity: 1; transform: scale(1); }
             .shorts-progress > span, .shorts-total-fill { transition: none; }
         }

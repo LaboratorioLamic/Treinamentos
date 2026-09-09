@@ -419,19 +419,30 @@ body.cfg-mstack-open { overflow: hidden; }
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 #cfg-root .shorts-list-item-text small { font-size: 11px; color: var(--text-3); }
+/* O item em edição fica destacado até o admin salvar ou cancelar (Esc,
+   botão X ou clicar em editar outro item). */
+#cfg-root .shorts-list-item.is-editing {
+    border-color: var(--cfg-primary); background: var(--cfg-primary-light, #eff6ff);
+}
+#cfg-root .shorts-list-item-edit,
 #cfg-root .shorts-list-item-remove {
     flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
-    border: none; background: transparent; color: var(--danger);
-    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
     transition: background 0.16s;
 }
+#cfg-root .shorts-list-item-edit { color: var(--cfg-primary); }
+#cfg-root .shorts-list-item-edit:hover { background: var(--cfg-primary-light, #eff6ff); }
+#cfg-root .shorts-list-item-remove { color: var(--danger); }
 #cfg-root .shorts-list-item-remove:hover { background: #fef2f2; }
 
-/* Formulário de adicionar: link + título opcional + botão. Empilha em telas
-   estreitas (o modal tem max-width: 560px — ver admin-courses.css). */
+/* Formulário de adicionar/editar: link + título opcional + botão. Empilha em
+   telas estreitas (o modal tem max-width: 560px — ver admin-courses.css). O
+   X de cancelar só aparece durante uma edição (ver updateShortsAddBtnLabel). */
 #cfg-root .shorts-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
 #cfg-root .shorts-add-row .form-control { flex: 1 1 160px; min-width: 0; }
 #cfg-root .shorts-add-btn { flex-shrink: 0; white-space: nowrap; }
+#cfg-root .shorts-cancel-edit-btn { flex-shrink: 0; }
 
 /* Selo de tipo no card do módulo (populateModules em js/admin.js). */
 #cfg-root .module-type-tag {
