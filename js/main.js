@@ -2790,10 +2790,35 @@
             ratingContainer.style.display = 'block';
             commentToggleBtn.style.display = 'inline-flex';
             commentSection.style.display = 'block';
+            setupEmojiRating();
             commentToggleBtn.innerHTML = '<i class="fas fa-times" style="margin-right:6px;"></i>Fechar Comentário';
             document.getElementById('comment').value = '';
 
             newSubmitButton.onclick = function(e) { e.preventDefault(); submitForm(score, erros, answerSnapshot, false, durationSeconds); };
+        }
+
+        // Avaliação por emoji (1 Péssimo .. 5 Ótimo). Os inputs continuam
+        // radio[name="rating"] com value 1..5 — só a legenda é dinâmica aqui;
+        // o estado visual (cor/animação) é puro CSS via input:checked + label.
+        function setupEmojiRating() {
+            const group = document.getElementById('emoji-rating');
+            const caption = document.getElementById('emoji-rating-caption');
+            if (!group || !caption) return;
+
+            // Limpa a nota da tentativa anterior ao reabrir o formulário.
+            group.querySelectorAll('input[name="rating"]').forEach(input => { input.checked = false; });
+            caption.textContent = 'Toque em um emoji para avaliar';
+            caption.classList.remove('is-selected');
+
+            if (group.dataset.bound === '1') return;
+            group.dataset.bound = '1';
+            group.addEventListener('change', function(e) {
+                const input = e.target.closest('input[name="rating"]');
+                if (!input) return;
+                const label = group.querySelector(`label[for="${input.id}"]`);
+                caption.textContent = label?.dataset.label || '';
+                caption.classList.add('is-selected');
+            });
         }
 
         function submitForm(score, erros = '', answerSnapshot = [], skipLowRatingCheck = false, durationSeconds = null) {
@@ -2831,7 +2856,7 @@
 
             const rating = document.querySelector('input[name="rating"]:checked');
             if (!rating) {
-                showWarning('Por favor, avalie o curso com estrelas.');
+                showWarning('Por favor, avalie o curso escolhendo um emoji.');
                 ratingContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }

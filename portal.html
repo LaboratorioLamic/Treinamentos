@@ -330,13 +330,19 @@
 
                             <div class="rating-container" id="rating-container" style="display:none;">
                                 <label>Avalie o Curso</label>
-                                <div class="star-rating">
-                                    <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 estrelas">★</label>
-                                    <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 estrelas">★</label>
-                                    <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 estrelas">★</label>
-                                    <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 estrelas">★</label>
-                                    <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 estrela">★</label>
+                                <div class="emoji-rating" id="emoji-rating">
+                                    <input type="radio" id="star1" name="rating" value="1">
+                                    <label for="star1" title="Péssimo" data-label="Péssimo"><span class="emoji-face">😡</span></label>
+                                    <input type="radio" id="star2" name="rating" value="2">
+                                    <label for="star2" title="Ruim" data-label="Ruim"><span class="emoji-face">🙁</span></label>
+                                    <input type="radio" id="star3" name="rating" value="3">
+                                    <label for="star3" title="Regular" data-label="Regular"><span class="emoji-face">😐</span></label>
+                                    <input type="radio" id="star4" name="rating" value="4">
+                                    <label for="star4" title="Bom" data-label="Bom"><span class="emoji-face">😊</span></label>
+                                    <input type="radio" id="star5" name="rating" value="5">
+                                    <label for="star5" title="Ótimo" data-label="Ótimo"><span class="emoji-face">🤩</span></label>
                                 </div>
+                                <div class="emoji-rating-caption" id="emoji-rating-caption">Toque em um emoji para avaliar</div>
                             </div>
 
                             <button type="button" class="comment-toggle-btn" id="comment-toggle-btn" style="display:none;">

@@ -1418,7 +1418,11 @@
             box-shadow: 0 6px 20px rgba(26,43,73,0.25);
         }
 
-        /* ─── RATING STARS ─── */
+        /* ─── RATING EMOJIS ───
+           Substitui as estrelas antigas. Os inputs continuam sendo
+           radio[name="rating"] com value 1..5 (js/main.js lê via
+           input[name="rating"]:checked), só a representação visual mudou:
+           1 Péssimo, 2 Ruim, 3 Regular, 4 Bom, 5 Ótimo. */
         .rating-container {
             text-align: center;
             padding: 14px 0 4px;
@@ -1432,27 +1436,146 @@
             margin-bottom: 10px;
         }
 
-        .star-rating {
+        .emoji-rating {
             display: flex;
-            flex-direction: row-reverse;
+            flex-direction: row;
             justify-content: center;
-            gap: 6px;
+            align-items: flex-end;
+            gap: 10px;
         }
 
-        .star-rating input { display: none; }
+        .emoji-rating input { display: none; }
 
-        .star-rating label {
-            font-size: 2em;
-            color: var(--surface-2);
+        .emoji-rating label {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
             cursor: pointer;
-            transition: color 0.15s, transform 0.15s;
+            background: var(--surface-2);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        background 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease;
+            /* Emojis não selecionados ficam dessaturados para o escolhido saltar. */
+            filter: grayscale(1) opacity(0.55);
         }
 
-        .star-rating label:hover,
-        .star-rating label:hover ~ label,
-        .star-rating input:checked ~ label {
-            color: var(--warning);
-            transform: scale(1.1);
+        .emoji-rating .emoji-face {
+            font-size: 1.65em;
+            line-height: 1;
+            /* Emoji colorido mesmo em fontes de sistema variadas. */
+            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+            pointer-events: none;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Hover/foco: só o emoji sob o cursor reage (sem o efeito cascata das
+           estrelas, porque aqui cada emoji é uma nota independente). */
+        .emoji-rating label:hover {
+            filter: none;
+            transform: translateY(-4px) scale(1.12);
+            background: var(--surface-1, #fff);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }
+
+        .emoji-rating label:hover .emoji-face {
+            animation: emojiWiggle 0.6s ease-in-out infinite;
+        }
+
+        .emoji-rating input:focus-visible + label {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            filter: none;
+        }
+
+        /* Selecionado: fica colorido, maior e com pulso contínuo. */
+        .emoji-rating input:checked + label {
+            filter: none;
+            transform: translateY(-5px) scale(1.2);
+            background: var(--surface-1, #fff);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.16);
+        }
+
+        .emoji-rating input:checked + label .emoji-face {
+            animation: emojiPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                       emojiBreathe 2.4s ease-in-out 0.45s infinite;
+        }
+
+        /* Anel de destaque no emoji escolhido. */
+        .emoji-rating input:checked + label::after {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid var(--warning);
+            animation: emojiRing 0.5s ease-out;
+        }
+
+        @keyframes emojiPop {
+            0%   { transform: scale(0.6) rotate(-12deg); }
+            60%  { transform: scale(1.25) rotate(6deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        @keyframes emojiBreathe {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.1); }
+        }
+
+        @keyframes emojiWiggle {
+            0%, 100% { transform: rotate(-8deg); }
+            50%      { transform: rotate(8deg); }
+        }
+
+        @keyframes emojiRing {
+            0%   { transform: scale(0.7); opacity: 0; }
+            50%  { opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Legenda da nota escolhida (preenchida por js/main.js). */
+        .emoji-rating-caption {
+            margin-top: 10px;
+            min-height: 1.1em;
+            font-size: 0.8em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: color 0.2s ease;
+        }
+
+        .emoji-rating-caption.is-selected { color: var(--warning); }
+
+        @media (hover: none) {
+            /* Em toque o :hover fica "preso" depois do tap; só o checked anima. */
+            .emoji-rating label:hover {
+                filter: grayscale(1) opacity(0.55);
+                transform: none;
+                background: var(--surface-2);
+                box-shadow: none;
+            }
+            .emoji-rating label:hover .emoji-face { animation: none; }
+            .emoji-rating input:checked + label {
+                filter: none;
+                transform: translateY(-5px) scale(1.2);
+                background: var(--surface-1, #fff);
+                box-shadow: 0 8px 20px rgba(0,0,0,0.16);
+            }
+        }
+
+        @media (max-width: 380px) {
+            .emoji-rating { gap: 6px; }
+            .emoji-rating label { width: 40px; height: 40px; }
+            .emoji-rating .emoji-face { font-size: 1.4em; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .emoji-rating label,
+            .emoji-rating .emoji-face { transition: none; }
+            .emoji-rating label:hover .emoji-face,
+            .emoji-rating input:checked + label .emoji-face,
+            .emoji-rating input:checked + label::after { animation: none; }
         }
 
         /* ─── COMMENT TOGGLE ─── */
