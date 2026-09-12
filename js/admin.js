@@ -1492,7 +1492,8 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         // O mesmo helper existe em js/main.js — os dois arquivos nao
         // compartilham escopo.
         function moduleKind(mod) {
-            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts') return mod.type;
+            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts' || mod?.type === 'quiz') return mod.type;
+            if (Array.isArray(mod?.questions) && mod.questions.length) return 'quiz';
             if (Array.isArray(mod?.shorts) && mod.shorts.length) return 'shorts';
             if (mod?.pdfUrl) return 'pdf';
             return 'video';
@@ -1503,6 +1504,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
         // atualizado (#cfg-module-shorts-data).
         function currentModuleShorts() {
             return window.UniAdminCourses?.readShortsData?.() || [];
+        }
+
+        // Idem para as perguntas do módulo de quiz (#cfg-module-quiz-data).
+        function currentModuleQuestions() {
+            return window.UniAdminCourses?.readQuizData?.() || [];
         }
 
         function populateModuleThemes() {
@@ -1541,11 +1547,14 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const isLast = index === orderedModules.length - 1;
                 const kind = moduleKind(mod);
                 const shortsCount = Array.isArray(mod.shorts) ? mod.shorts.length : 0;
+                const questionCount = Array.isArray(mod.questions) ? mod.questions.length : 0;
                 const typeTag = kind === 'pdf'
                     ? '<span class="module-type-tag is-pdf"><i class="fas fa-file-pdf"></i> PDF</span>'
                     : kind === 'shorts'
                         ? `<span class="module-type-tag is-shorts"><i class="fas fa-mobile-screen"></i> ${shortsCount} ${shortsCount === 1 ? 'video curto' : 'videos curtos'}</span>`
-                        : '<span class="module-type-tag"><i class="fas fa-play"></i> Video</span>';
+                        : kind === 'quiz'
+                            ? `<span class="module-type-tag is-quiz"><i class="fas fa-bolt"></i> Quiz · ${questionCount} ${questionCount === 1 ? 'pergunta' : 'perguntas'}</span>`
+                            : '<span class="module-type-tag"><i class="fas fa-play"></i> Video</span>';
                 card.innerHTML = `
                     ${typeTag}
                     <h3>${mod.title}</h3>
@@ -1575,6 +1584,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     moduleVideoInput.value = mod.videoId || '';
                     modulePdfInput.value = mod.pdfUrl || '';
                     window.UniAdminCourses?.setShortsItems?.(mod.shorts || []);
+                    window.UniAdminCourses?.setQuizItems?.(mod.questions || []);
                     moduleAttachmentsInput.value = mod.attachments?.map(a => `${a.title};${a.url}`).join('\n') || '';
                     window.UniAdminCourses?.setModuleType?.(moduleKind(mod));
                     moduleDeleteBtn.style.display = 'flex';
@@ -1603,6 +1613,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                                 modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
                                 window.UniAdminCourses?.setModuleType?.('video');
                                 window.UniAdminCourses?.setShortsItems?.([]);
+                                window.UniAdminCourses?.setQuizItems?.([]);
                                 moduleDeleteBtn.style.display = 'none';
                                 populateModules(); showWarning('Módulo excluído com sucesso!');
                             } else { populateModules(); }
@@ -1640,6 +1651,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 showWarning('Adicione ao menos um video curto (um link por linha).');
                 return;
             }
+            const questions = kind === 'quiz' ? currentModuleQuestions() : [];
+            if (kind === 'quiz' && questions.length === 0) {
+                showWarning('Adicione ao menos uma pergunta ao quiz.');
+                return;
+            }
             const module = {
                 title,
                 type: kind,
@@ -1647,6 +1663,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 ...(kind === 'video' && moduleVideoInput.value.trim() && { videoId: moduleVideoInput.value.trim() }),
                 ...(kind === 'pdf' && modulePdfInput.value.trim() && { pdfUrl: modulePdfInput.value.trim() }),
                 ...(kind === 'shorts' && { shorts }),
+                ...(kind === 'quiz' && { questions }),
                 attachments: attachments.length ? attachments : []
             };
             showSpinner('cfg-module-loading', true);
@@ -1668,6 +1685,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
                     window.UniAdminCourses?.setModuleType?.('video');
                     window.UniAdminCourses?.setShortsItems?.([]);
+                    window.UniAdminCourses?.setQuizItems?.([]);
                     moduleDeleteBtn.style.display = 'none';
                     populateModules(); showWarning('Módulo salvo com sucesso!');
                 } else { populateModules(); }
@@ -2011,6 +2029,7 @@ window.UniAdminCoursesData = {
         modulePdfInput.value = ''; moduleAttachmentsInput.value = '';
         window.UniAdminCourses?.setModuleType?.('video');
         window.UniAdminCourses?.setShortsItems?.([]);
+        window.UniAdminCourses?.setQuizItems?.([]);
         window.UniAdminCourses?.closeCtypePopover?.();
         moduleDeleteBtn.style.display = 'none';
     },

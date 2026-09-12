@@ -477,7 +477,8 @@ document.getElementById('cfg-module-save')?.addEventListener('click', () => {
 const CTYPES = {
     video:  { icon: 'fa-play',          badge: 'is-video',  label: 'Vídeo (YouTube)', desc: 'Aula em vídeo horizontal' },
     pdf:    { icon: 'fa-file-pdf',      badge: 'is-pdf',    label: 'PDF / Slides',    desc: 'Documento hospedado no Dropbox' },
-    shorts: { icon: 'fa-mobile-screen', badge: 'is-shorts', label: 'Vídeos curtos',   desc: 'Vários vídeos verticais em carrossel' }
+    shorts: { icon: 'fa-mobile-screen', badge: 'is-shorts', label: 'Vídeos curtos',   desc: 'Vários vídeos verticais em carrossel' },
+    quiz:   { icon: 'fa-bolt',          badge: 'is-quiz',   label: 'Quiz',            desc: 'Cards de perguntas rápidas com resposta na hora' }
 };
 
 const ctypeInput = document.getElementById('cfg-module-type');
@@ -655,6 +656,245 @@ shortsListEl?.addEventListener('click', (event) => {
     renderShortsList();
 });
 
+// ── Perguntas do módulo de Quiz ──────────────────────────────────
+// Mesma mecânica da lista de vídeos curtos: estado em memória espelhado
+// em JSON no hidden #cfg-module-quiz-data, que é o que admin.js lê ao
+// salvar. Cada item: { question, options: [A,B,C,D], correct: 0..3, image? }.
+const mquizDataInput = document.getElementById('cfg-module-quiz-data');
+const mquizListEl = document.getElementById('cfg-module-quiz-list');
+const mquizQuestionInput = document.getElementById('cfg-module-quiz-question');
+const mquizExplanationInput = document.getElementById('cfg-module-quiz-explanation');
+const mquizOptionInputs = Array.from(document.querySelectorAll('.mquiz-option-input'));
+const mquizAddBtn = document.getElementById('cfg-module-quiz-add');
+const mquizCancelBtn = document.getElementById('cfg-module-quiz-cancel');
+const mquizErrorEl = document.getElementById('cfg-module-quiz-error');
+const mquizEditorTitle = document.getElementById('cfg-module-quiz-editor-title');
+const mquizImageFile = document.getElementById('cfg-module-quiz-image-file');
+const mquizImageClear = document.getElementById('cfg-module-quiz-image-clear');
+const mquizImagePreview = document.getElementById('cfg-module-quiz-image-preview');
+const mquizImageInfo = document.getElementById('cfg-module-quiz-image-info');
+const MQUIZ_IMAGE_EMPTY_HINT = 'Opcional — o card mostra só o texto.';
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+
+let mquizItems = [];
+let mquizEditingIndex = null;
+let mquizPendingImage = null;
+
+function readQuizData() {
+    try {
+        const parsed = JSON.parse(mquizDataInput?.value || '[]');
+        return Array.isArray(parsed) ? parsed.filter(isValidQuizItem) : [];
+    } catch { return []; }
+}
+
+function isValidQuizItem(item) {
+    return !!item
+        && typeof item.question === 'string' && item.question.trim() !== ''
+        && Array.isArray(item.options) && item.options.length === 4
+        && item.options.every(option => typeof option === 'string' && option.trim() !== '')
+        && Number.isInteger(item.correct) && item.correct >= 0 && item.correct <= 3;
+}
+
+function writeQuizData() {
+    if (mquizDataInput) mquizDataInput.value = JSON.stringify(mquizItems);
+}
+
+function setQuizError(message) {
+    if (!mquizErrorEl) return;
+    mquizErrorEl.textContent = message || '';
+    mquizErrorEl.style.display = message ? '' : 'none';
+}
+
+function renderQuizImagePreview(dataUrl, infoText) {
+    if (!mquizImagePreview) return;
+    mquizImagePreview.innerHTML = dataUrl
+        ? `<img src="${escapeHtml(dataUrl)}" alt="Prévia da imagem da pergunta">`
+        : '<span class="image-initials"><i class="fas fa-image"></i></span>';
+    if (mquizImageInfo) mquizImageInfo.textContent = infoText;
+}
+
+function renderQuizList() {
+    if (!mquizListEl) return;
+    if (!mquizItems.length) {
+        mquizListEl.innerHTML = '<p class="mquiz-list-empty">Nenhuma pergunta adicionada ainda.</p>';
+        return;
+    }
+    mquizListEl.innerHTML = mquizItems.map((item, index) => `
+        <div class="mquiz-list-item ${index === mquizEditingIndex ? 'is-editing' : ''}" data-index="${index}">
+            <span class="mquiz-list-item-index">${index + 1}</span>
+            ${item.image ? `<img class="mquiz-list-item-thumb" src="${escapeHtml(item.image)}" alt="">` : ''}
+            <span class="mquiz-list-item-text">
+                <strong>${escapeHtml(item.question)}</strong>
+                <small>
+                    Correta: ${OPTION_LETTERS[item.correct]} — ${escapeHtml(item.options[item.correct])}
+                    ${item.explanation ? '<i class="fas fa-lightbulb mquiz-list-item-hasexp" title="Tem explicação"></i>' : ''}
+                </small>
+            </span>
+            <button type="button" class="mquiz-list-item-edit" data-index="${index}" aria-label="Editar pergunta">
+                <i class="fas fa-pencil-alt"></i>
+            </button>
+            <button type="button" class="mquiz-list-item-remove" data-index="${index}" aria-label="Remover pergunta">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>`).join('');
+}
+
+function setQuizItems(items) {
+    mquizItems = Array.isArray(items) ? items.filter(isValidQuizItem) : [];
+    cancelQuizEdit();
+    writeQuizData();
+    renderQuizList();
+}
+
+function selectedCorrectIndex() {
+    const checked = document.querySelector('input[name="cfg-module-quiz-correct"]:checked');
+    return checked ? Number(checked.value) : 0;
+}
+
+function setCorrectIndex(index) {
+    const radio = document.querySelector(`input[name="cfg-module-quiz-correct"][value="${index}"]`);
+    if (radio) radio.checked = true;
+}
+
+function updateQuizEditorLabel() {
+    const editing = mquizEditingIndex !== null;
+    if (mquizEditorTitle) {
+        mquizEditorTitle.innerHTML = editing
+            ? `<i class="fas fa-pen"></i> Editando pergunta ${mquizEditingIndex + 1}`
+            : '<i class="fas fa-circle-plus"></i> Nova pergunta';
+    }
+    if (mquizAddBtn) {
+        mquizAddBtn.innerHTML = editing
+            ? '<i class="fas fa-check"></i> Salvar pergunta'
+            : '<i class="fas fa-plus"></i> Adicionar pergunta';
+    }
+    if (mquizCancelBtn) mquizCancelBtn.style.display = editing ? '' : 'none';
+}
+
+function clearQuizEditorFields() {
+    if (mquizQuestionInput) mquizQuestionInput.value = '';
+    if (mquizExplanationInput) mquizExplanationInput.value = '';
+    mquizOptionInputs.forEach(input => { input.value = ''; });
+    setCorrectIndex(0);
+    if (mquizImageFile) mquizImageFile.value = '';
+    mquizPendingImage = null;
+    renderQuizImagePreview(null, MQUIZ_IMAGE_EMPTY_HINT);
+    setQuizError('');
+}
+
+function cancelQuizEdit() {
+    mquizEditingIndex = null;
+    clearQuizEditorFields();
+    updateQuizEditorLabel();
+    renderQuizList();
+}
+
+function startQuizEdit(index) {
+    const item = mquizItems[index];
+    if (!item) return;
+    mquizEditingIndex = index;
+    if (mquizQuestionInput) mquizQuestionInput.value = item.question;
+    if (mquizExplanationInput) mquizExplanationInput.value = item.explanation || '';
+    mquizOptionInputs.forEach((input, i) => { input.value = item.options[i] || ''; });
+    setCorrectIndex(item.correct);
+    mquizPendingImage = item.image || null;
+    if (mquizImageFile) mquizImageFile.value = '';
+    renderQuizImagePreview(mquizPendingImage, mquizPendingImage ? 'Imagem atual da pergunta.' : MQUIZ_IMAGE_EMPTY_HINT);
+    setQuizError('');
+    updateQuizEditorLabel();
+    renderQuizList();
+    mquizQuestionInput?.focus();
+}
+
+function addQuizFromInputs() {
+    const question = (mquizQuestionInput?.value || '').trim();
+    if (!question) {
+        setQuizError('Digite a pergunta.');
+        mquizQuestionInput?.focus();
+        return;
+    }
+    const options = mquizOptionInputs.map(input => input.value.trim());
+    const missing = options.findIndex(option => !option);
+    if (missing !== -1) {
+        setQuizError(`Preencha a alternativa ${OPTION_LETTERS[missing]}.`);
+        mquizOptionInputs[missing].focus();
+        return;
+    }
+    setQuizError('');
+    const explanation = (mquizExplanationInput?.value || '').trim();
+    const item = {
+        question,
+        options,
+        correct: selectedCorrectIndex(),
+        ...(explanation && { explanation }),
+        ...(mquizPendingImage && { image: mquizPendingImage })
+    };
+    if (mquizEditingIndex !== null && mquizItems[mquizEditingIndex]) {
+        mquizItems[mquizEditingIndex] = item;
+    } else {
+        mquizItems.push(item);
+    }
+    mquizEditingIndex = null;
+    writeQuizData();
+    clearQuizEditorFields();
+    updateQuizEditorLabel();
+    renderQuizList();
+    mquizQuestionInput?.focus();
+}
+
+mquizAddBtn?.addEventListener('click', addQuizFromInputs);
+mquizCancelBtn?.addEventListener('click', cancelQuizEdit);
+mquizQuestionInput?.addEventListener('input', () => setQuizError(''));
+[mquizQuestionInput, ...mquizOptionInputs].forEach(input => {
+    input?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') { event.preventDefault(); addQuizFromInputs(); return; }
+        if (event.key === 'Escape' && mquizEditingIndex !== null) { event.preventDefault(); cancelQuizEdit(); }
+    });
+});
+// A explicação é textarea: Enter quebra linha, só o Esc cancela a edição.
+mquizExplanationInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && mquizEditingIndex !== null) { event.preventDefault(); cancelQuizEdit(); }
+});
+
+mquizImageFile?.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        if (mquizImageInfo) mquizImageInfo.textContent = 'Processando imagem...';
+        const result = await window.UniAdminImages.processQuestionFile(file);
+        mquizPendingImage = result.dataUrl;
+        renderQuizImagePreview(result.dataUrl, `${result.width}×${result.height} • ${(result.bytes / 1024).toFixed(1)} KB • ${result.mime}`);
+    } catch (error) {
+        mquizImageFile.value = '';
+        renderQuizImagePreview(mquizPendingImage, mquizPendingImage ? 'Imagem atual mantida.' : MQUIZ_IMAGE_EMPTY_HINT);
+        setQuizError(error.message || 'Não foi possível processar a imagem.');
+    }
+});
+
+mquizImageClear?.addEventListener('click', () => {
+    if (mquizImageFile) mquizImageFile.value = '';
+    mquizPendingImage = null;
+    renderQuizImagePreview(null, MQUIZ_IMAGE_EMPTY_HINT);
+});
+
+mquizListEl?.addEventListener('click', (event) => {
+    const editBtn = event.target.closest('.mquiz-list-item-edit[data-index]');
+    if (editBtn) {
+        const index = Number(editBtn.dataset.index);
+        if (!Number.isNaN(index)) startQuizEdit(index);
+        return;
+    }
+    const removeBtn = event.target.closest('.mquiz-list-item-remove[data-index]');
+    if (!removeBtn) return;
+    const index = Number(removeBtn.dataset.index);
+    if (Number.isNaN(index)) return;
+    // Remover o item em edição (ou um antes dele) invalidaria o índice guardado.
+    if (mquizEditingIndex !== null) cancelQuizEdit();
+    mquizItems.splice(index, 1);
+    writeQuizData();
+    renderQuizList();
+});
+
 function setModuleType(kind) {
     const type = CTYPES[kind] ? kind : 'video';
     const meta = CTYPES[type];
@@ -672,6 +912,7 @@ function setModuleType(kind) {
         option.setAttribute('aria-checked', String(on));
     });
     if (type === 'shorts') renderShortsList();
+    if (type === 'quiz') renderQuizList();
 }
 
 // Mesmo tratamento do popover de funções (js/admin.js): .modal-content
@@ -901,6 +1142,7 @@ function refresh() {
 
 window.UniAdminCourses = { refresh, openCourseDetail, openThemeFormModal, ModalStack,
     // Consumidos por js/admin.js (populateModules / resetModuleForm / save do modulo).
-    setModuleType, setShortsItems, readShortsData, closeCtypePopover };
+    setModuleType, setShortsItems, readShortsData, closeCtypePopover,
+    setQuizItems, readQuizData };
 
 })();

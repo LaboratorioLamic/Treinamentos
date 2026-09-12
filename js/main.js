@@ -275,7 +275,8 @@
         // videoId). O mesmo helper existe em js/admin.js — os dois arquivos
         // não compartilham escopo.
         function moduleKind(mod) {
-            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts') return mod.type;
+            if (mod?.type === 'video' || mod?.type === 'pdf' || mod?.type === 'shorts' || mod?.type === 'quiz') return mod.type;
+            if (Array.isArray(mod?.questions) && mod.questions.length) return 'quiz';
             if (Array.isArray(mod?.shorts) && mod.shorts.length) return 'shorts';
             if (mod?.pdfUrl) return 'pdf';
             return 'video';
@@ -285,10 +286,11 @@
             return moduleKind(mod) === 'shorts' && Array.isArray(mod?.shorts) ? mod.shorts.length : 0;
         }
 
-        // Trava por inatividade: 5 min sem interação de estudo (play de vídeo
-        // ou virada de página do PDF) param a contagem. Fica separada de
-        // moduleTimerGate porque as duas travas somam — o tempo só corre com o
-        // gate liberado E sem inatividade. Só as duas interações acima soltam a
+        // Trava por inatividade: 5 min sem interação de estudo param a
+        // contagem. Contam como estudo o play do vídeo, a virada de página do
+        // PDF e, no módulo de quiz, responder ou trocar de card. Fica separada
+        // de moduleTimerGate porque as duas travas somam — o tempo só corre com
+        // o gate liberado E sem inatividade. Só essas interações soltam a
         // trava: mexer o mouse ou voltar para a aba não conta como estudo.
         const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
         let idlePaused = false;
@@ -1988,6 +1990,18 @@
             else this.classList.remove('invalid');
         });
 
+        // Nome do estagiário sempre em caixa alta. O CSS só muda a aparência —
+        // aqui o valor é convertido de fato, para gravar em maiúsculas no banco.
+        // O cursor é reposicionado porque reescrever `value` o joga para o fim.
+        document.getElementById('name').addEventListener('input', function() {
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            const upper = this.value.toUpperCase();
+            if (upper === this.value) return;
+            this.value = upper;
+            this.setSelectionRange(start, end);
+        });
+
         function showWarning(message) {
             warningText.textContent = message;
             warningMessage.style.display = 'flex';
@@ -2536,6 +2550,158 @@
                 : '<i class="fas fa-clipboard-list" style="color:#92400e;margin-right:8px;"></i>Avaliação Final';
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // QUIZ DE CARDS — perguntas rápidas (módulos type:'quiz')
+        // ═══════════════════════════════════════════════════════════════
+        // Um card por vez: o aluno responde e a correção aparece na hora,
+        // sem nota nem envio. Serve como fixação dentro do conteúdo, então
+        // não tem relação com a Avaliação Final (quizData/PASSING_SCORE).
+        // O módulo conclui quando todas as perguntas foram respondidas.
+        const mquizStage = document.getElementById('mquiz-stage');
+        const mquizCardArea = document.getElementById('mquiz-card-area');
+        const mquizDotsEl = document.getElementById('mquiz-dots');
+        const mquizPrevBtn = document.getElementById('mquiz-prev');
+        const mquizNextBtn = document.getElementById('mquiz-next');
+        const mquizProgressFill = document.getElementById('mquiz-progress-fill');
+        const mquizProgressCount = document.getElementById('mquiz-progress-count');
+        const MQUIZ_LETTERS = ['A', 'B', 'C', 'D'];
+
+        // O texto das perguntas vem do cadastro do admin e é injetado via
+        // innerHTML abaixo — sem escapar, um "<" no enunciado quebraria o card.
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        let mquizQuestions = [];
+        let mquizIndex = 0;
+        // Resposta escolhida em cada card (null = ainda não respondeu). Vive só
+        // enquanto o módulo está aberto: reabrir o módulo começa de novo.
+        let mquizAnswers = [];
+
+        function hideModuleQuiz() {
+            if (!mquizStage) return;
+            mquizStage.style.display = 'none';
+            if (mquizCardArea) mquizCardArea.innerHTML = '';
+            mquizQuestions = [];
+            mquizAnswers = [];
+            mquizIndex = 0;
+        }
+
+        function renderModuleQuiz(questions) {
+            if (!mquizStage) return;
+            mquizQuestions = Array.isArray(questions) ? questions : [];
+            mquizAnswers = mquizQuestions.map(() => null);
+            mquizIndex = 0;
+            mquizStage.style.display = 'flex';
+            if (mquizQuestions.length === 0) {
+                mquizCardArea.innerHTML = '<p class="mquiz-empty">Nenhuma pergunta cadastrada neste módulo.</p>';
+                // Sem perguntas não há o que responder: o módulo já conta como visto.
+                markCurrentModuleCompleted();
+                return;
+            }
+            paintModuleQuiz();
+        }
+
+        function paintModuleQuiz() {
+            const question = mquizQuestions[mquizIndex];
+            if (!question) return;
+            const answered = mquizAnswers[mquizIndex];
+            const total = mquizQuestions.length;
+
+            const optionsHtml = question.options.map((option, i) => {
+                const isCorrect = i === question.correct;
+                // Depois de responder, o card fica travado: a correta sempre
+                // aparece e a errada escolhida fica destacada ao lado dela.
+                const state = answered === null
+                    ? ''
+                    : isCorrect ? 'is-correct' : (i === answered ? 'is-wrong' : 'is-muted');
+                return `
+                    <button type="button" class="mquiz-answer ${state}" data-option="${i}" ${answered === null ? '' : 'disabled'}>
+                        <span class="mquiz-answer-letter">${MQUIZ_LETTERS[i]}</span>
+                        <span class="mquiz-answer-text">${escapeHtml(option)}</span>
+                        ${answered !== null && isCorrect ? '<i class="fas fa-circle-check mquiz-answer-icon"></i>' : ''}
+                        ${answered !== null && !isCorrect && i === answered ? '<i class="fas fa-circle-xmark mquiz-answer-icon"></i>' : ''}
+                    </button>`;
+            }).join('');
+
+            const gotItRight = answered === question.correct;
+            const feedbackText = gotItRight
+                ? 'Resposta correta!'
+                : `Resposta correta: <strong>${MQUIZ_LETTERS[question.correct]}</strong> — ${escapeHtml(question.options[question.correct])}`;
+            const explanationHtml = question.explanation
+                ? `<div class="mquiz-explanation">
+                       <span class="mquiz-explanation-label"><i class="fas fa-lightbulb"></i> Explicação</span>
+                       <p>${escapeHtml(question.explanation)}</p>
+                   </div>`
+                : '';
+            const feedbackHtml = answered === null ? '' : `
+                <div class="mquiz-feedback ${gotItRight ? 'is-right' : 'is-wrong'}">
+                    <i class="fas ${gotItRight ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+                    <span>${feedbackText}</span>
+                </div>
+                ${explanationHtml}`;
+
+            const imageHtml = question.image
+                ? `<div class="mquiz-card-image"><img src="${escapeHtml(question.image)}" alt=""></div>`
+                : '';
+            mquizCardArea.innerHTML = `
+                <div class="mquiz-card" data-index="${mquizIndex}">
+                    <span class="mquiz-card-badge">Pergunta ${mquizIndex + 1} de ${total}</span>
+                    ${imageHtml}
+                    <h3 class="mquiz-card-question">${escapeHtml(question.question)}</h3>
+                    <div class="mquiz-answers">${optionsHtml}</div>
+                    ${feedbackHtml}
+                </div>`;
+
+            mquizCardArea.querySelectorAll('.mquiz-answer[data-option]').forEach(btn => {
+                btn.onclick = () => answerModuleQuiz(Number(btn.dataset.option));
+            });
+
+            const answeredCount = mquizAnswers.filter(a => a !== null).length;
+            if (mquizProgressFill) mquizProgressFill.style.width = `${(answeredCount / total) * 100}%`;
+            if (mquizProgressCount) mquizProgressCount.textContent = `${answeredCount} / ${total} respondidas`;
+
+            if (mquizDotsEl) {
+                mquizDotsEl.innerHTML = mquizQuestions.map((_, i) => {
+                    const done = mquizAnswers[i] !== null;
+                    const right = done && mquizAnswers[i] === mquizQuestions[i].correct;
+                    const cls = i === mquizIndex ? 'is-active' : done ? (right ? 'is-right' : 'is-wrong') : '';
+                    return `<button type="button" class="mquiz-dot ${cls}" data-goto="${i}" aria-label="Pergunta ${i + 1}"></button>`;
+                }).join('');
+                mquizDotsEl.querySelectorAll('.mquiz-dot[data-goto]').forEach(dot => {
+                    dot.onclick = () => goToModuleQuizCard(Number(dot.dataset.goto));
+                });
+            }
+
+            if (mquizPrevBtn) mquizPrevBtn.disabled = mquizIndex === 0;
+            if (mquizNextBtn) mquizNextBtn.disabled = mquizIndex >= total - 1;
+        }
+
+        function answerModuleQuiz(option) {
+            if (mquizAnswers[mquizIndex] !== null) return;
+            mquizAnswers[mquizIndex] = option;
+            // Responder é interação de estudo: rearma a janela de 5 min.
+            registerStudyActivity();
+            paintModuleQuiz();
+            if (mquizAnswers.every(a => a !== null)) markCurrentModuleCompleted();
+        }
+
+        // Trocar de card também é estudo (o aluno pode só estar lendo as
+        // perguntas). Como a janela de inatividade é rearmada a cada
+        // interação e nada mais acontece dentro de um card, na prática cada
+        // card contribui no máximo IDLE_TIMEOUT_MS (5 min) para o contador.
+        function goToModuleQuizCard(index) {
+            if (index < 0 || index >= mquizQuestions.length || index === mquizIndex) return;
+            mquizIndex = index;
+            registerStudyActivity();
+            paintModuleQuiz();
+        }
+
+        mquizPrevBtn?.addEventListener('click', () => goToModuleQuizCard(mquizIndex - 1));
+        mquizNextBtn?.addEventListener('click', () => goToModuleQuizCard(mquizIndex + 1));
+
         function renderModuleTitle(title, completed, shortsCount) {
             // Deixa claro, já na lista, quantos vídeos o módulo tem.
             const countTag = shortsCount > 1
@@ -2587,6 +2753,16 @@
                 // currentModuleIndex já está definido acima: renderShorts o usa
                 // para montar a chave do progresso local dos vídeos.
                 renderShorts(mod.shorts || []);
+            } else if (currentModuleKind === 'quiz') {
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+                pdfContainer.style.display = 'none';
+                video.style.display = 'none';
+                customPlayerContainer.style.display = 'none';
+                // Não há play para destravar: a contagem começa ao abrir e é
+                // a trava de inatividade que a limita — parada em um card por
+                // 5 min sem responder nem navegar, o contador pausa.
+                setModuleTimerGate('free');
+                renderModuleQuiz(mod.questions || []);
             } else {
                 initOrLoadVideo(mod.videoId);
                 customPlayerContainer.style.display = 'block';
@@ -3263,6 +3439,7 @@
             // Sem isso o áudio de um curto continuaria tocando ao trocar de
             // módulo (os players vivem fora de ytPlayer).
             destroyShorts();
+            hideModuleQuiz();
             video.src = '';
             video.style.display = 'none';
             pdfContainer.style.display = 'none';

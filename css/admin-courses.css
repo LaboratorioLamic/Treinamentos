@@ -352,6 +352,8 @@ body.cfg-mstack-open { overflow: hidden; }
 #cfg-root .ctype-popover-option-mark.is-pdf { background: linear-gradient(135deg, #d97706, #fbbf24); }
 #cfg-root .ctype-picker-icon.is-shorts,
 #cfg-root .ctype-popover-option-mark.is-shorts { background: linear-gradient(135deg, #db2777, #a855f7); }
+#cfg-root .ctype-picker-icon.is-quiz,
+#cfg-root .ctype-popover-option-mark.is-quiz { background: linear-gradient(135deg, #0d9488, #34d399); }
 
 /* O card do formulário tem overflow:hidden e cortaria a lista: o popover é
    movido para o fim de #cfg-root e posicionado em coordenadas de viewport
@@ -453,6 +455,100 @@ body.cfg-mstack-open { overflow: hidden; }
 }
 #cfg-root .module-type-tag.is-pdf { background: #fef3c7; color: #b45309; }
 #cfg-root .module-type-tag.is-shorts { background: #fce7f3; color: #be185d; }
+#cfg-root .module-type-tag.is-quiz { background: #d1fae5; color: #047857; }
+
+/* ─── Perguntas do módulo de Quiz ───
+   Mesma mecânica da lista de vídeos curtos: lista acima, editor abaixo
+   (o mesmo editor serve para adicionar e para editar um item existente). */
+#cfg-root .mquiz-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+#cfg-root .mquiz-list-empty { font-size: 12px; color: var(--text-3); margin: 0; padding: 2px; }
+#cfg-root .mquiz-list-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 10px;
+    border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+}
+#cfg-root .mquiz-list-item.is-editing {
+    border-color: #0d9488; background: #ecfdf5;
+}
+#cfg-root .mquiz-list-item-index {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #d1fae5; color: #047857;
+    font-size: 11px; font-weight: 700;
+}
+#cfg-root .mquiz-list-item-thumb {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px;
+    object-fit: cover; border: 1px solid var(--cfg-border);
+}
+#cfg-root .mquiz-list-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#cfg-root .mquiz-list-item-text strong {
+    font-size: 12.5px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cfg-root .mquiz-list-item-text small {
+    font-size: 11px; color: var(--text-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cfg-root .mquiz-list-item-hasexp { color: var(--cfg-primary); margin-left: 4px; }
+#cfg-root .mquiz-list-item-edit,
+#cfg-root .mquiz-list-item-remove {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+    border: none; background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.16s;
+}
+#cfg-root .mquiz-list-item-edit { color: var(--cfg-primary); }
+#cfg-root .mquiz-list-item-edit:hover { background: var(--cfg-primary-light, #eff6ff); }
+#cfg-root .mquiz-list-item-remove { color: var(--danger); }
+#cfg-root .mquiz-list-item-remove:hover { background: #fef2f2; }
+
+#cfg-root .mquiz-editor {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 12px; border-radius: 12px;
+    border: 1.5px dashed var(--cfg-border); background: var(--bg);
+}
+#cfg-root .mquiz-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#cfg-root .mquiz-editor-title {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 700; color: #047857;
+    text-transform: uppercase; letter-spacing: 0.3px;
+}
+#cfg-root .mquiz-editor-cancel {
+    width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+    border: 1px solid var(--cfg-border); background: #fff; color: var(--text-3);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+#cfg-root .mquiz-editor-cancel:hover { color: var(--danger); border-color: var(--danger); }
+
+#cfg-root .mquiz-image-row { display: flex; gap: 12px; align-items: flex-start; }
+#cfg-root .mquiz-image-preview {
+    width: 66px; height: 66px; flex-shrink: 0; border-radius: 10px;
+    border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    color: var(--text-3);
+}
+#cfg-root .mquiz-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+#cfg-root .mquiz-image-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#cfg-root .mquiz-image-actions .form-hint { flex-basis: 100%; margin: 0; }
+
+/* Alternativas A–D: o rádio marca a correta, e a letra fica verde quando
+   selecionada — o admin vê a resposta certa sem precisar ler o rótulo. */
+#cfg-root .mquiz-options { display: flex; flex-direction: column; gap: 7px; }
+#cfg-root .mquiz-option { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+#cfg-root .mquiz-option input[type="radio"] { flex-shrink: 0; accent-color: #0d9488; width: 16px; height: 16px; cursor: pointer; }
+#cfg-root .mquiz-option-letter {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--cfg-surface); border: 1.5px solid var(--cfg-border);
+    font-size: 11.5px; font-weight: 700; color: var(--text-3);
+    transition: all 0.16s;
+}
+#cfg-root .mquiz-option input[type="radio"]:checked ~ .mquiz-option-letter {
+    background: #d1fae5; border-color: #0d9488; color: #047857;
+}
+#cfg-root .mquiz-option-input { flex: 1; min-width: 0; }
+#cfg-root .mquiz-explanation-input { min-height: 68px; resize: vertical; }
+#cfg-root .mquiz-add-btn { align-self: flex-start; }
 
 @media (max-width: 640px) {
     #cfg-root .ctype-picker-text small,

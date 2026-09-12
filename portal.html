@@ -281,6 +281,25 @@
                                     <span class="shorts-autonext-text">Próximo vídeo<small>Toque para ficar neste</small></span>
                                 </button>
                             </div>
+                            <!-- Cards de perguntas rápidas (módulos type:'quiz').
+                                 Um card por vez, montado por renderModuleQuiz()
+                                 em js/main.js; responder revela na hora a correta. -->
+                            <div id="mquiz-stage" class="mquiz-stage" style="display:none;">
+                                <div class="mquiz-progress">
+                                    <div class="mquiz-progress-track"><div class="mquiz-progress-fill" id="mquiz-progress-fill"></div></div>
+                                    <span class="mquiz-progress-count" id="mquiz-progress-count">1 / 1</span>
+                                </div>
+                                <div class="mquiz-card-area" id="mquiz-card-area"></div>
+                                <div class="mquiz-nav">
+                                    <button type="button" class="mquiz-nav-btn" id="mquiz-prev">
+                                        <i class="fas fa-chevron-left"></i> Anterior
+                                    </button>
+                                    <div class="mquiz-dots" id="mquiz-dots"></div>
+                                    <button type="button" class="mquiz-nav-btn" id="mquiz-next">
+                                        Próximo <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="module-info">
@@ -313,7 +332,7 @@
                                  e sem lista de colaboradores cadastrados. -->
                             <div id="form-name-free-group">
                                 <label for="name">Nome completo do estagiário</label>
-                                <input type="text" id="name" placeholder="Digite seu nome completo" autocomplete="off">
+                                <input type="text" id="name" placeholder="Digite seu nome completo" autocomplete="off" style="text-transform:uppercase;">
                                 <label for="email">Email</label>
                                 <input type="email" id="email" placeholder="seu@email.com">
                             </div>
@@ -1936,6 +1955,14 @@
                                 </span>
                                 <i class="fas fa-check ctype-popover-option-check"></i>
                             </button>
+                            <button type="button" class="ctype-popover-option" data-ctype="quiz" role="radio" aria-checked="false">
+                                <span class="ctype-popover-option-mark is-quiz"><i class="fas fa-bolt"></i></span>
+                                <span class="ctype-popover-option-text">
+                                    <strong>Quiz</strong>
+                                    <small>Cards de perguntas rápidas com resposta na hora</small>
+                                </span>
+                                <i class="fas fa-check ctype-popover-option-check"></i>
+                            </button>
                             <p class="ctype-popover-hint">Cada módulo tem um tipo só — trocar limpa o campo do tipo anterior.</p>
                         </div>
                     </div>
@@ -1973,6 +2000,81 @@
                 <div class="ctype-panel form-group" data-ctype="pdf" hidden>
                     <label class="form-label" for="cfg-module-pdf">Diretório do PDF</label>
                     <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Código após dropbox.com/scl/fi/…">
+                </div>
+                <div class="ctype-panel form-group" data-ctype="quiz" hidden>
+                    <label class="form-label">Perguntas do quiz</label>
+                    <!-- Mesmo padrão dos vídeos curtos: a lista é montada por
+                         js/admin-courses.js e espelhada em JSON no hidden abaixo,
+                         que é o que js/admin.js lê ao salvar o módulo. O editor
+                         logo abaixo serve tanto para adicionar quanto para editar
+                         (o lápis de um item recarrega os campos). -->
+                    <input type="hidden" id="cfg-module-quiz-data" value="[]">
+                    <div class="mquiz-list" id="cfg-module-quiz-list"></div>
+
+                    <div class="mquiz-editor">
+                        <div class="mquiz-editor-head">
+                            <span class="mquiz-editor-title" id="cfg-module-quiz-editor-title">
+                                <i class="fas fa-circle-plus"></i> Nova pergunta
+                            </span>
+                            <button type="button" class="mquiz-editor-cancel" id="cfg-module-quiz-cancel"
+                                    title="Cancelar edição" style="display:none;">
+                                <i class="fas fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <input class="form-control" type="text" id="cfg-module-quiz-question"
+                               placeholder="Digite a pergunta">
+
+                        <div class="mquiz-image-row">
+                            <div class="mquiz-image-preview" id="cfg-module-quiz-image-preview">
+                                <span class="image-initials"><i class="fas fa-image"></i></span>
+                            </div>
+                            <div class="mquiz-image-actions">
+                                <label class="btn btn-ghost btn-sm" for="cfg-module-quiz-image-file">
+                                    <i class="fas fa-image"></i> Escolher imagem
+                                </label>
+                                <input type="file" id="cfg-module-quiz-image-file" accept="image/*" hidden>
+                                <button type="button" class="btn btn-ghost btn-sm" id="cfg-module-quiz-image-clear">
+                                    <i class="fas fa-times"></i> Remover
+                                </button>
+                                <small class="form-hint" id="cfg-module-quiz-image-info">Opcional — o card mostra só o texto.</small>
+                            </div>
+                        </div>
+
+                        <!-- Alternativas A–D: o rádio à esquerda marca qual é a correta. -->
+                        <div class="mquiz-options" id="cfg-module-quiz-options">
+                            <label class="mquiz-option">
+                                <input type="radio" name="cfg-module-quiz-correct" value="0" checked>
+                                <span class="mquiz-option-letter">A</span>
+                                <input class="form-control mquiz-option-input" type="text" data-option="0" placeholder="Alternativa A">
+                            </label>
+                            <label class="mquiz-option">
+                                <input type="radio" name="cfg-module-quiz-correct" value="1">
+                                <span class="mquiz-option-letter">B</span>
+                                <input class="form-control mquiz-option-input" type="text" data-option="1" placeholder="Alternativa B">
+                            </label>
+                            <label class="mquiz-option">
+                                <input type="radio" name="cfg-module-quiz-correct" value="2">
+                                <span class="mquiz-option-letter">C</span>
+                                <input class="form-control mquiz-option-input" type="text" data-option="2" placeholder="Alternativa C">
+                            </label>
+                            <label class="mquiz-option">
+                                <input type="radio" name="cfg-module-quiz-correct" value="3">
+                                <span class="mquiz-option-letter">D</span>
+                                <input class="form-control mquiz-option-input" type="text" data-option="3" placeholder="Alternativa D">
+                            </label>
+                        </div>
+
+                        <textarea class="form-control mquiz-explanation-input" id="cfg-module-quiz-explanation"
+                                  placeholder="Explicação (opcional) — aparece no card assim que o aluno responde"></textarea>
+
+                        <small class="form-hint" id="cfg-module-quiz-error" style="display:none;color:var(--danger);"></small>
+
+                        <button type="button" class="btn btn-ghost mquiz-add-btn" id="cfg-module-quiz-add">
+                            <i class="fas fa-plus"></i> Adicionar pergunta
+                        </button>
+                    </div>
+                    <small class="form-hint">O aluno vê um card por vez e a resposta certa aparece assim que ele responde.</small>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="cfg-module-attachments">
