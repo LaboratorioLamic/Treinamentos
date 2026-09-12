@@ -1352,6 +1352,30 @@
             transform: translateY(-1px);
         }
 
+        /* Reiniciar curso (só Estágios): secundário, para não competir com a
+           mensagem de aprovação nem com o botão de certificado. */
+        .restart-course-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--card);
+            color: var(--text-secondary);
+            font-size: 0.88em;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .restart-course-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: rgba(59,130,246,0.06);
+            transform: translateY(-1px);
+        }
+
         .incorrect-answers {
             width: 100%;
             max-width: 640px;

@@ -3096,6 +3096,50 @@
             resultContainer.appendChild(btn);
         }
 
+        // ─── REINICIAR CURSO (só Estágios) ───
+        // Em Estágios a progressão é toda local (não há conta para sincronizar),
+        // então zerar o curso é apagar as chaves de localStorage dele e reabrir.
+        // Os resultados já enviados em results/estagiosLivre são preservados: o
+        // histórico do admin continua mostrando cada conclusão.
+        function resetCourseProgress(subjectId, themeId) {
+            const theme = trainingData[subjectId]?.themes?.[themeId];
+
+            if (completionStatus[subjectId]) delete completionStatus[subjectId][themeId];
+            if (assessmentResults[subjectId]) delete assessmentResults[subjectId][themeId];
+            finishedCourseTimers.delete(courseTimerKey(subjectId, themeId));
+            if (remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId][themeId] = 0;
+            if (activeCourseTimer.subjectId === subjectId && activeCourseTimer.themeId === themeId) {
+                activeCourseTimer = { subjectId: null, themeId: null, sessionStartedAt: null };
+            }
+
+            clearQuizAttempt(subjectId, themeId);
+            // Sub-progresso dos módulos de curtos vive numa chave por módulo.
+            (theme?.modules || []).forEach((mod, index) => {
+                try { localStorage.removeItem(shortsStorageKey(subjectId, themeId, index)); }
+                catch (error) { /* indisponível */ }
+            });
+
+            saveProgression();
+        }
+
+        function appendRestartCourseButton() {
+            if (!isFreeNameCategory()) return;
+            const subjectId = currentTrainingId;
+            const themeId = currentThemeId;
+            if (!subjectId || themeId == null) return;
+
+            const btn = document.createElement('button');
+            btn.className = 'restart-course-btn';
+            btn.innerHTML = '<i class="fas fa-rotate-left"></i> Reiniciar curso';
+            btn.onclick = () => {
+                const themeName = themeBtn.textContent;
+                resetCourseProgress(subjectId, themeId);
+                resetContent();
+                openCourse(subjectId, themeId, themeName);
+            };
+            resultContainer.appendChild(btn);
+        }
+
         function showResult(score, attemptsState = null) {
             const locked = !!attemptsState?.locked;
             resetContent();
@@ -3143,6 +3187,7 @@
                 resultContainer.appendChild(successDiv);
 
                 appendCertificateButton(score);
+                appendRestartCourseButton();
 
                 const errors = getDetailedIncorrectAnswers(currentTrainingId, currentThemeId);
                 if (errors) {
@@ -3209,6 +3254,7 @@
             successDiv.innerHTML = '<i class="fas fa-trophy"></i> Parabéns pela aprovação!';
             resultContainer.appendChild(successDiv);
             appendCertificateButton(score);
+            appendRestartCourseButton();
             resultContainer.style.display = 'flex';
         }
 
