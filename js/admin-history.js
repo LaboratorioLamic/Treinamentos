@@ -439,6 +439,15 @@
         { key: 'subject', label: 'Tema', colClass: 'hc-subject', render: r => tagHtml(r.subject, 'theme') },
         { key: 'theme', label: 'Assunto', colClass: 'hc-theme', render: r => tagHtml(r.theme, 'subject') },
         { key: 'fullName', label: 'Nome', colClass: 'hc-name', render: r => `<span class="hist-name">${escapeHtml(r.fullName)}</span>` },
+        // Só em Estágios: sem conta vinculada, o email digitado no formulário é
+        // o único canal de contato do estagiário (ver estagiosOnly abaixo).
+        {
+            key: 'email', label: 'Email', colClass: 'hc-email', estagiosOnly: true,
+            render: r => (r.email
+                ? `<span class="hist-email"><span class="hist-email-text" title="${escapeHtml(r.email)}">${escapeHtml(r.email)}</span>`
+                    + `<button type="button" class="email-copy-btn" data-copy-email="${escapeHtml(r.email)}" title="Copiar email"><i class="fas fa-copy"></i></button></span>`
+                : '<span class="stars-empty">—</span>')
+        },
         { key: 'score', label: 'Nota', colClass: 'hc-score', render: scoreHtml },
         { key: 'durationSeconds', label: 'Tempo', colClass: 'hc-duration', render: r => `<span class="hist-duration">${formatDuration(r.durationSeconds)}</span>` },
         // Tempo ATIVO com o curso aberto até a aprovação (ver formatHHMMSS) —
@@ -453,6 +462,29 @@
         { key: 'approved', label: 'Situação', colClass: 'hc-approved', render: r => `<span class="history-status-pill ${r.approved ? 'is-approved' : 'is-reproved'}">${r.approved ? 'Aprovado' : 'Reprovado'}</span>` },
         { key: '__actions', label: 'Ações', colClass: 'hc-actions', sortable: false, render: actionsCellHtml }
     ];
+
+    function visibleColumns() {
+        const isEstagios = U.currentCategorySlug === 'estagios';
+        return COLUMNS.filter(col => !col.estagiosOnly || isEstagios);
+    }
+
+    // Atalho de copiar email, usado na coluna da tabela e no modal de detalhe.
+    // O clique não pode borbulhar: na tabela ele abriria o detalhe da linha.
+    function handleEmailCopyClick(event) {
+        const btn = event.target.closest('[data-copy-email]');
+        if (!btn) return;
+        event.stopPropagation();
+        navigator.clipboard.writeText(btn.dataset.copyEmail)
+            .then(() => {
+                btn.classList.add('is-copied');
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    btn.classList.remove('is-copied');
+                    btn.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 1400);
+            })
+            .catch(() => showWarning('Não foi possível copiar o email.'));
+    }
 
     function renderTable() {
         const container = document.getElementById('cfg-history-table-wrap');
@@ -471,9 +503,10 @@
         const pageStart = (currentPage - 1) * PAGE_SIZE;
         const pageRows = rows.slice(pageStart, pageStart + PAGE_SIZE);
 
-        const colgroupHtml = `<colgroup>${COLUMNS.map(col => `<col class="${col.colClass}">`).join('')}</colgroup>`;
+        const columns = visibleColumns();
+        const colgroupHtml = `<colgroup>${columns.map(col => `<col class="${col.colClass}">`).join('')}</colgroup>`;
 
-        const headerHtml = COLUMNS.map(col => {
+        const headerHtml = columns.map(col => {
             if (col.sortable === false) return `<th style="cursor:default;">${col.label}</th>`;
             const isActive = sortKey === col.key;
             const icon = isActive ? (sortDir === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : 'fa-sort';
@@ -485,7 +518,7 @@
         // mesmo a linha pertencendo a uma página diferente da primeira.
         const bodyHtml = pageRows.map((r, i) => `
             <tr data-index="${pageStart + i}">
-                ${COLUMNS.map(col => `<td>${col.render(r, pageStart + i)}</td>`).join('')}
+                ${columns.map(col => `<td>${col.render(r, pageStart + i)}</td>`).join('')}
             </tr>
         `).join('');
 
@@ -505,7 +538,7 @@
         // controles próprios da linha (comentário / editar / excluir).
         container.querySelectorAll('tbody tr').forEach(tr => {
             tr.addEventListener('click', (event) => {
-                if (event.target.closest('.hist-actions, .hist-comment-btn.is-on')) return;
+                if (event.target.closest('.hist-actions, .hist-comment-btn.is-on, [data-copy-email]')) return;
                 openDetail(rows[Number(tr.dataset.index)]);
             });
         });
@@ -800,11 +833,14 @@
         // Cabeçalhos seguem a nomenclatura da tela (Assunto = curso, Tema =
         // tema-pai). O import aceita as duas ordens, então planilhas antigas
         // (formato do Google Sheets) continuam válidas — ver parseImportRows.
+        // A coluna Email acompanha a tabela: só sai em Estágios.
+        const exportEmail = U.currentCategorySlug === 'estagios';
         const sheetRows = rows.map(r => ({
             'Data/Hora': r.submittedAt ? new Date(r.submittedAt).toLocaleString('pt-BR') : '',
             'Assunto': r.theme,
             'Tema': r.subject,
             'Nome': r.fullName,
+            ...(exportEmail && { 'Email': r.email || '' }),
             'Nota': r.score,
             'Tempo': formatDuration(r.durationSeconds),
             'Conclusão': formatHHMMSS(r.activeMs),
@@ -1722,6 +1758,10 @@
             ${(row.deadlineStatus && row.deadlineStatus !== 'livre' && row.deadlineStatus !== 'on_time' && row.deadlineStatus !== 'not_started') ? `<div class="history-detail-summary-item"><span class="label">Prazo</span><span class="value">${escapeHtml(U.Deadlines?.STATUS_LABELS?.[row.deadlineStatus] || row.deadlineStatus)}</span></div>` : ''}
             ${row.unit ? `<div class="history-detail-summary-item"><span class="label">Unidade</span><span class="value">${escapeHtml(row.unit)}</span></div>` : ''}
             ${row.role ? `<div class="history-detail-summary-item"><span class="label">Cargo</span><span class="value">${escapeHtml(row.role)}</span></div>` : ''}
+            ${row.email ? `<div class="history-detail-summary-item is-email"><span class="label">Email</span><span class="value">
+                <span class="email-text" title="${escapeHtml(row.email)}">${escapeHtml(row.email)}</span>
+                <button type="button" class="email-copy-btn" data-copy-email="${escapeHtml(row.email)}" title="Copiar email"><i class="fas fa-copy"></i></button>
+            </span></div>` : ''}
         `;
 
         renderDetailCertificateButton(row);
@@ -1743,6 +1783,12 @@
     }
 
     function closeDetail() { detailModal.style.display = 'none'; }
+
+    // Um listener só para os dois pontos onde o botão aparece (a tabela é
+    // remontada a cada render, então o handler fica no container, em captura,
+    // para rodar antes do clique de linha que abre o detalhe).
+    detailSummary?.addEventListener('click', handleEmailCopyClick);
+    document.getElementById('cfg-history-table-wrap')?.addEventListener('click', handleEmailCopyClick, true);
 
     // Popovers "Aprovações"/"Reprovações" da barra de tentativas: um único
     // listener global (os botões são remontados a cada troca de tentativa,

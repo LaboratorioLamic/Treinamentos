@@ -1144,6 +1144,9 @@
         #cfg-root .history-table-wrap col.hc-subject { width: 8%; }
         #cfg-root .history-table-wrap col.hc-theme { width: 8%; }
         #cfg-root .history-table-wrap col.hc-name { width: 10%; }
+        /* Só renderizada em Estágios (ver visibleColumns), onde Unidade e Cargo
+           vêm sempre vazios e sobra largura para o email. */
+        #cfg-root .history-table-wrap col.hc-email { width: 12%; }
         #cfg-root .history-table-wrap col.hc-score { width: 6%; }
         #cfg-root .history-table-wrap col.hc-duration { width: 6%; }
         #cfg-root .history-table-wrap col.hc-conclusion { width: 7%; }
@@ -1155,6 +1158,14 @@
         #cfg-root .history-table-wrap col.hc-comment { width: 4%; }
         #cfg-root .history-table-wrap col.hc-approved { width: 6%; }
         #cfg-root .history-table-wrap col.hc-actions { width: 6%; }
+
+        #cfg-root .hist-email {
+            display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+        }
+        #cfg-root .hist-email-text {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-size: 11.5px; color: var(--text-2);
+        }
 
         #cfg-root .history-status-pill {
             display: inline-flex; align-items: center; gap: 4px;
@@ -1525,6 +1536,31 @@
             text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px;
         }
         .history-detail-summary-item .value { font-size: 13.5px; font-weight: 600; color: var(--text); }
+
+        /* Email do estagiário: ocupa a linha toda (endereços longos não cabem
+           numa coluna de 140px) e traz o atalho de copiar ao lado. */
+        .history-detail-summary-item.is-email { grid-column: 1 / -1; }
+        .history-detail-summary-item.is-email .value {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .history-detail-summary-item.is-email .email-text {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .email-copy-btn {
+            flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; padding: 0;
+            border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 7px;
+            background: #fff; color: var(--text-3);
+            font-size: 11px; cursor: pointer; transition: all 0.15s;
+        }
+        .email-copy-btn:hover {
+            color: var(--cfg-primary); border-color: var(--cfg-primary);
+            background: rgba(59, 130, 246, 0.08);
+        }
+        .email-copy-btn.is-copied {
+            color: #047857; border-color: rgba(16, 185, 129, 0.5);
+            background: rgba(16, 185, 129, 0.12);
+        }
 
         .history-detail-satisfaction {
             margin-bottom: 18px; padding: 14px; border-radius: 10px;
