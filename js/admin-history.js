@@ -1043,7 +1043,7 @@
                 subject: courseMatch.subject,
                 theme: courseMatch.theme,
                 score,
-                approved: situacao ? situacao.startsWith('aprov') : score >= 8,
+                approved: situacao ? situacao.startsWith('aprov') : U.isApproved(score, courseMatch.slug),
                 rating,
                 errorsText,
                 answers,
@@ -1454,7 +1454,9 @@
         if (conclusionText && parseHHMMSSValue(conclusionText) === null) { showWarning('Informe a conclusão no formato HH:MM:SS.'); return; }
         const activeMs = conclusionText ? parseHHMMSSValue(conclusionText) : null;
 
-        const approved = formApproved.value === 'auto' ? score >= 8 : formApproved.value === '1';
+        const approved = formApproved.value === 'auto'
+            ? U.isApproved(score, formCategory.value)
+            : formApproved.value === '1';
         const rating = formRating.value ? Number(formRating.value) : null;
         const deadlineStatus = formDeadline?.value || 'livre';
         const comment = formComment.value.trim();

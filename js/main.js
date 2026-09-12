@@ -2,7 +2,6 @@
         let quizData = {};
         let orderData = {};
         let quizStatus = {};
-        let nameOptions = [];
 
         // Formata nota com 1 casa decimal (vírgula), ex.: 8,2/10
         function formatScore(score) {
@@ -28,36 +27,6 @@
 
         const currentCategory = resolveCategory();
         const currentCategorySlug = CATEGORY_PATHS[currentCategory];
-
-        async function fetchNames() {
-            // URL centralizada em js/colaboradores-sync.js (mesma fonte usada
-            // para sincronizar /uniadmin/colaboradores) — evita duas cópias.
-            const url = window.UniAdmin?.ColaboradoresSync?.SHEETS_NAMES_URL;
-            if (!url) return;
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                const payload = await response.json();
-                // A planilha devolve objetos ({colunaB: nome, ...}); o combobox
-                // só usa o nome — normalização compartilhada com o sync.
-                const normalize = window.UniAdmin.ColaboradoresSync.normalizeEntry;
-                const names = (Array.isArray(payload) ? payload : [])
-                    .map(entry => normalize(entry)?.name)
-                    .filter(Boolean);
-                nameOptions = names;
-                const select = document.getElementById('name');
-                if (select) {
-                    names.forEach(name => {
-                        const option = document.createElement('option');
-                        option.value = name;
-                        option.textContent = name;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Erro ao carregar nomes da planilha:', error);
-            }
-        }
 
         function sortItems(items, orderConfig, itemKey = 'id') {
             if (!orderConfig || !Array.isArray(orderConfig)) {
@@ -281,7 +250,11 @@
 
         // Nota mínima de aprovação — mesma regra exibida na intro da avaliação
         // (ver loadQuiz) e usada para decidir se o contador já foi encerrado.
-        const PASSING_SCORE = 8;
+        // Varia por categoria (Estágios aprova com 7). Lida sob demanda porque
+        // este arquivo é carregado antes de js/firebase-config.js.
+        function getPassingScore() {
+            return window.UniAdmin?.getPassingScore?.(currentCategory) ?? 8;
+        }
 
         // Trava por vídeo: em módulo de vídeo o tempo só corre com o vídeo
         // tocando (deixar a aula aberta sem assistir não conta). Em módulo sem
@@ -558,7 +531,7 @@
         function isCourseTimerFinished(subjectId, themeId) {
             if (finishedCourseTimers.has(courseTimerKey(subjectId, themeId))) return true;
             const score = assessmentResults[subjectId]?.[themeId];
-            return score !== undefined && score !== null && score >= PASSING_SCORE;
+            return score !== undefined && score !== null && score >= getPassingScore();
         }
 
         // Encerra de vez o contador do curso aprovado — soma a sessão corrente
@@ -1677,7 +1650,6 @@
             resetContent();
             document.getElementById('loading-overlay').style.display = 'flex';
             fetchFirebaseData();
-            fetchNames();
             courseGallery.style.display = 'none';
             courseGrid.innerHTML = '';
             themeBtn.textContent = 'Escolha um Assunto';
@@ -2110,6 +2082,137 @@
                 }
             };
             pdfNavigation.appendChild(lastBtn);
+
+            // Em apostilas longas, avançar de 3 em 3 botões é inviável: acima de
+            // PAGE_JUMP_MIN_PAGES aparece um seletor com a lista de páginas.
+            if (totalPages > PAGE_JUMP_MIN_PAGES) pdfNavigation.appendChild(buildPageJumpPicker());
+        }
+
+        // Seletor "Página X de N" — popover com busca e a lista completa de
+        // páginas, ancorado no botão pela posição na viewport (a barra do PDF
+        // tem overflow próprio e cortaria um popover posicionado por dentro).
+        const PAGE_JUMP_MIN_PAGES = 20;
+
+        function buildPageJumpPicker() {
+            const wrap = document.createElement('div');
+            wrap.className = 'pdf-jump';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pdf-jump-btn';
+            btn.setAttribute('aria-haspopup', 'true');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = `<i class="fas fa-list-ol"></i><span>Página ${currentPage} de ${totalPages}</span><i class="fas fa-chevron-up pdf-jump-arrow"></i>`;
+
+            const popover = document.createElement('div');
+            popover.className = 'pdf-jump-popover';
+            popover.hidden = true;
+            popover.innerHTML = `
+                <div class="pdf-jump-head">
+                    <input type="number" class="pdf-jump-search" min="1" max="${totalPages}" placeholder="Ir para a página..." autocomplete="off">
+                </div>
+                <div class="pdf-jump-list"></div>`;
+
+            const searchInput = popover.querySelector('.pdf-jump-search');
+            const listEl = popover.querySelector('.pdf-jump-list');
+
+            function renderList() {
+                const term = searchInput.value.trim();
+                const pages = [];
+                for (let i = 1; i <= totalPages; i++) {
+                    if (!term || String(i).startsWith(term)) pages.push(i);
+                }
+                if (pages.length === 0) {
+                    listEl.innerHTML = '<p class="pdf-jump-empty">Nenhuma página encontrada.</p>';
+                    return;
+                }
+                listEl.innerHTML = pages.map(i => `
+                    <button type="button" class="pdf-jump-option ${i === currentPage ? 'is-current' : ''}" data-page="${i}">
+                        <span>Página ${i}</span>
+                        ${i === currentPage ? '<i class="fas fa-check"></i>' : ''}
+                    </button>`).join('');
+                listEl.querySelectorAll('.pdf-jump-option').forEach(option => {
+                    option.onclick = () => {
+                        const page = Number(option.dataset.page);
+                        close();
+                        if (page !== currentPage) renderPage(page);
+                    };
+                });
+            }
+
+            function position() {
+                if (popover.hidden) return;
+                const rect = btn.getBoundingClientRect();
+                const gap = 6;
+                const margin = 10;
+                const width = Math.max(rect.width, 190);
+                popover.style.width = `${width}px`;
+                popover.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin))}px`;
+                // A barra de navegação fica no rodapé, então o padrão é abrir
+                // para cima; só cai para baixo se não couber acima.
+                popover.style.top = '0px';
+                const spaceAbove = rect.top - gap - margin;
+                const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+                const openUp = spaceAbove >= spaceBelow;
+                const available = Math.max(160, openUp ? spaceAbove : spaceBelow);
+                const chrome = popover.offsetHeight - listEl.offsetHeight;
+                listEl.style.maxHeight = `${Math.max(120, available - chrome)}px`;
+                popover.style.top = openUp
+                    ? `${rect.top - gap - Math.min(popover.offsetHeight, available)}px`
+                    : `${rect.bottom + gap}px`;
+            }
+
+            function onOutsideClick(event) {
+                if (!popover.contains(event.target) && !btn.contains(event.target)) close();
+            }
+            function onKeydown(event) {
+                if (event.key === 'Escape') close();
+            }
+
+            function close() {
+                if (popover.hidden) return;
+                popover.hidden = true;
+                btn.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', onOutsideClick, true);
+                document.removeEventListener('keydown', onKeydown);
+                window.removeEventListener('resize', position);
+                window.removeEventListener('scroll', position, true);
+                popover.remove();
+            }
+
+            btn.onclick = () => {
+                if (!popover.hidden) { close(); return; }
+                document.body.appendChild(popover);
+                popover.hidden = false;
+                btn.setAttribute('aria-expanded', 'true');
+                searchInput.value = '';
+                renderList();
+                position();
+                // Rolar até a página atual evita abrir a lista no topo quando o
+                // aluno já está na página 80 de 120.
+                const currentOption = listEl.querySelector('.pdf-jump-option.is-current');
+                if (currentOption) {
+                    listEl.scrollTop = currentOption.offsetTop - (listEl.clientHeight / 2) + (currentOption.offsetHeight / 2);
+                }
+                document.addEventListener('click', onOutsideClick, true);
+                document.addEventListener('keydown', onKeydown);
+                window.addEventListener('resize', position);
+                window.addEventListener('scroll', position, true);
+                setTimeout(() => searchInput.focus(), 40);
+            };
+
+            searchInput.oninput = () => { renderList(); position(); };
+            searchInput.onkeydown = (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                const page = Number(searchInput.value);
+                if (!Number.isInteger(page) || page < 1 || page > totalPages) return;
+                close();
+                if (page !== currentPage) renderPage(page);
+            };
+
+            wrap.appendChild(btn);
+            return wrap;
         }
 
         function loadPDF(pdfPath) {
@@ -2560,7 +2663,7 @@
 
             const header = document.createElement('div');
             header.className = 'quiz-header-section';
-            header.innerHTML = `<h2><i class="fas fa-clipboard-list" style="margin-right:10px;"></i>Avaliação Final</h2><p>${questions.length} questões &bull; Mínimo 8,0 para aprovação</p>`;
+            header.innerHTML = `<h2><i class="fas fa-clipboard-list" style="margin-right:10px;"></i>Avaliação Final</h2><p>${questions.length} questões &bull; Mínimo ${formatScore(getPassingScore())} para aprovação</p>`;
             quizContainer.appendChild(header);
 
             questions.forEach((q, index) => {
@@ -2755,8 +2858,9 @@
             return incorrect.length > 0 ? incorrect.join('\n') : '';
         }
 
-        // Estágios usa o nome digitado livremente (select alimentado por fetchNames);
-        // as demais categorias exigem sessão e mostram o nome já travado, sem input.
+        // Estágios usa o nome digitado livremente, sem vínculo com conta nem com a
+        // planilha de colaboradores; as demais categorias exigem sessão e mostram o
+        // nome já travado, sem input.
         function isFreeNameCategory() {
             return currentCategory === 'Estágios';
         }
@@ -2887,7 +2991,7 @@
 
             const resultPayload = {
                 score,
-                approved: score >= 8,
+                approved: score >= getPassingScore(),
                 rating: ratingValue,
                 comment: commentValue,
                 errors: erros || '',
@@ -2903,7 +3007,7 @@
             const updateAttemptsCounter = async () => {
                 if (freeName || !session || !window.UniAdmin?.Attempts) return { locked: false };
                 const A = window.UniAdmin.Attempts;
-                if (score >= 8) { await A.resetOnPass(session.userId, currentCategorySlug, currentTrainingId, currentThemeId); return { locked: false }; }
+                if (score >= getPassingScore()) { await A.resetOnPass(session.userId, currentCategorySlug, currentTrainingId, currentThemeId); return { locked: false }; }
                 return A.registerFailedAttempt(session.userId, currentCategorySlug, currentTrainingId, currentThemeId);
             };
 
@@ -3004,8 +3108,8 @@
             h2.textContent = `${formatScore(score)}/10`;
             scoreCard.appendChild(h2);
             const scoreLabel = document.createElement('p');
-            scoreLabel.textContent = score >= 8 ? 'Aprovado' : 'Reprovado';
-            scoreLabel.style.color = score >= 8 ? 'var(--success)' : 'var(--danger)';
+            scoreLabel.textContent = score >= getPassingScore() ? 'Aprovado' : 'Reprovado';
+            scoreLabel.style.color = score >= getPassingScore() ? 'var(--success)' : 'var(--danger)';
             scoreLabel.style.fontWeight = '600';
             scoreCard.appendChild(scoreLabel);
             resultContainer.appendChild(scoreCard);

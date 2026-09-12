@@ -24,6 +24,22 @@ var UniAdmin = window.UniAdmin || {};
         'Estágios': 'estagios'
     };
 
+    // Nota mínima de aprovação. Estágios tem corte próprio (7); as demais
+    // categorias usam 8. Aceita nome da categoria ou slug do banco, porque o
+    // portal trabalha com o nome e os relatórios do admin, com o slug.
+    UniAdmin.DEFAULT_PASSING_SCORE = 8;
+    UniAdmin.PASSING_SCORE_BY_SLUG = { estagios: 7 };
+
+    UniAdmin.getPassingScore = function (categoryOrSlug) {
+        var slug = UniAdmin.categoryPaths[categoryOrSlug] || categoryOrSlug;
+        var score = UniAdmin.PASSING_SCORE_BY_SLUG[slug];
+        return typeof score === 'number' ? score : UniAdmin.DEFAULT_PASSING_SCORE;
+    };
+
+    UniAdmin.isApproved = function (score, categoryOrSlug) {
+        return Number(score) >= UniAdmin.getPassingScore(categoryOrSlug);
+    };
+
     UniAdmin.getCategoryDbPath = function (category) {
         var slug = UniAdmin.categoryPaths[category] || category.toLowerCase().replace(/[^a-z0-9]+/gi, '_');
         return '/' + UniAdmin.dbRoot + '/' + slug;

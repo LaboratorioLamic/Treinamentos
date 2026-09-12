@@ -706,6 +706,90 @@
         .pdf-navigation button:disabled { opacity: 0.35; cursor: not-allowed; }
         .pdf-navigation button.active { background: var(--accent); font-weight: 700; }
 
+        /* ─── SELETOR DE PÁGINA (PDFs longos) ─── */
+        .pdf-jump { display: flex; }
+
+        .pdf-navigation .pdf-jump-btn {
+            background: rgba(255,255,255,0.12);
+            padding: 7px 12px;
+            gap: 7px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .pdf-navigation .pdf-jump-btn[aria-expanded="true"] { background: rgba(255,255,255,0.26); }
+        .pdf-jump-arrow { font-size: 0.72em; opacity: 0.75; transition: transform 0.2s; }
+        .pdf-jump-btn[aria-expanded="true"] .pdf-jump-arrow { transform: rotate(180deg); }
+
+        .pdf-jump-popover {
+            position: fixed;
+            z-index: 3000;
+            background: var(--card);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 18px 44px -16px rgba(15,34,68,0.45);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+        }
+        .pdf-jump-popover[hidden] { display: none; }
+
+        .pdf-jump-search {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.86em;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--surface-2);
+        }
+        .pdf-jump-search:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: var(--card);
+        }
+
+        .pdf-jump-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .pdf-jump-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            padding: 8px 10px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.86em;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .pdf-jump-option:hover { background: var(--surface-2); }
+        .pdf-jump-option.is-current {
+            background: rgba(59,130,246,0.12);
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .pdf-jump-empty {
+            margin: 0;
+            padding: 10px;
+            font-size: 0.82em;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
         /* ─── SIDEBAR ─── */
         /* O sticky vive na coluna, não no card: com o painel de tempo acima
            dele, os dois precisam grudar juntos ao rolar. */

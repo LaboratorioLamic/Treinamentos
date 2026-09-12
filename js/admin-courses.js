@@ -316,11 +316,17 @@ function renderCourseInfo(subjectId, themeId, theme) {
         ? `<div class="course-info-subrow"><span>Tempo esperado</span><strong>${formatMsAsHHMMSS(expectedMs)}</strong></div>`
         : '';
 
-    // Funções com acesso
+    // Funções com acesso. Estágios não tem conta logada (logo, nenhum cargo de
+    // sessão para comparar), então o bloco inteiro sai da tela.
     const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
     const rolesHtml = roles.length
         ? `<div class="course-info-pills">${roles.map(r => `<span class="course-info-pill">${escapeHtml(r)}</span>`).join('')}</div>`
         : '<p class="course-info-muted">Visível para todas as funções.</p>';
+    const rolesCard = C().getCurrentCategory?.() === 'Estágios' ? '' : `
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-user-tag"></i> Funções que veem este curso</div>
+            ${rolesHtml}
+        </div>`;
 
     // Certificado
     const certTopics = theme.certificateEnabled ? (window.UniAdmin?.Certificate?.parseTopics?.(theme.certificateTopics) || []) : [];
@@ -362,10 +368,7 @@ function renderCourseInfo(subjectId, themeId, theme) {
             <div class="course-info-subrow"><span>Avaliação</span><strong>${quizCount ? `${quizCount} questão(ões) — ${quizEnabled ? 'habilitada' : 'desabilitada'}` : 'Sem questões cadastradas'}</strong></div>
         </div>
 
-        <div class="course-info-card">
-            <div class="course-info-card-head"><i class="fas fa-user-tag"></i> Funções que veem este curso</div>
-            ${rolesHtml}
-        </div>
+        ${rolesCard}
 
         <div class="course-info-card">
             <div class="course-info-card-head"><i class="fas fa-award"></i> Certificado</div>

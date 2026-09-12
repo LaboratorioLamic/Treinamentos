@@ -963,16 +963,29 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (event.key === 'Escape') closeRolesPopover();
         });
 
+        // Estágios não usa conta logada, então não existe cargo de sessão para
+        // filtrar: a seção some do formulário e nenhum `roles` é gravado.
+        function rolesApplyToCategory() {
+            return currentCategory !== 'Estágios';
+        }
+
+        function refreshRolesVisibility() {
+            const group = document.getElementById('cfg-theme-roles-group');
+            if (group) group.style.display = rolesApplyToCategory() ? '' : 'none';
+        }
+
         function resetRolesConfig() {
             selectedRoles = new Set();
             closeRolesPopover();
             renderRolesList();
+            refreshRolesVisibility();
         }
 
         function loadRolesConfig(theme) {
             selectedRoles = new Set(Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : []);
             closeRolesPopover();
             renderRolesList();
+            refreshRolesVisibility();
         }
 
         // ─── Certificado do assunto (modal de configuração) ───
@@ -1195,7 +1208,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const deadlineBadge = theme.deadline
                     ? `<span class="deadline-badge deadline-${deadlineStatus}">${U.Deadlines.STATUS_LABELS[deadlineStatus]}</span>`
                     : '';
-                const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
+                const roles = rolesApplyToCategory() && Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
                 const rolesBadge = roles.length
                     ? `<span class="roles-badge" title="Visível apenas para: ${escapeHtml(roles.join(', '))}"><i class="fas fa-user-tag"></i> ${roles.length} função(ões)</span>`
                     : '';
@@ -1419,7 +1432,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 ...(expectedCompletionMs && { expectedCompletionMs }),
                 // Sem funções escolhidas o campo nem é gravado — assunto sem
                 // `roles` é visível para todos (comportamento dos já existentes).
-                ...(selectedRoles.size > 0 && { roles: [...selectedRoles] }),
+                ...(rolesApplyToCategory() && selectedRoles.size > 0 && { roles: [...selectedRoles] }),
                 ...(certConfig.enabled && {
                     certificateEnabled: true,
                     ...(certConfig.title && { certificateTitle: certConfig.title }),

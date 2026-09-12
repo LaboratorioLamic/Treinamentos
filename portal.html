@@ -309,12 +309,11 @@
                         <div class="form-title"><i class="fas fa-certificate" style="color:var(--accent);margin-right:8px;"></i>Registrar Conclusão</div>
 
                         <div class="form-fields">
-                            <!-- Estágios: nome digitado livremente, sem exigir conta -->
+                            <!-- Estágios: nome digitado livremente, sem exigir conta
+                                 e sem lista de colaboradores cadastrados. -->
                             <div id="form-name-free-group">
-                                <label for="name">Nome</label>
-                                <select id="name">
-                                    <option value="">Selecione seu nome</option>
-                                </select>
+                                <label for="name">Nome completo do estagiário</label>
+                                <input type="text" id="name" placeholder="Digite seu nome completo" autocomplete="off">
                                 <label for="email">Email</label>
                                 <input type="email" id="email" placeholder="seu@email.com">
                             </div>
@@ -1748,7 +1747,7 @@
                 </div>
                 <!-- Funções (cargos) que enxergam o curso. Vazio = todas.
                      A lista vem dos cargos das contas cadastradas. -->
-                <div class="form-group">
+                <div class="form-group" id="cfg-theme-roles-group">
                     <label class="form-label">Funções que veem este curso</label>
                     <div class="roles-picker" id="cfg-theme-roles-picker">
                         <button type="button" class="roles-picker-btn" id="cfg-theme-roles-btn"
