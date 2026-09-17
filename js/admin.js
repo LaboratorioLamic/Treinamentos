@@ -1146,6 +1146,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             resetCertConfig();
             themeDeleteBtn.style.display = 'none';
             document.getElementById('cfg-theme-migrate-container').classList.remove('active');
+            document.getElementById('cfg-theme-duplicate-container').classList.remove('active');
         }
 
         themeDescriptionInput.addEventListener('input', updateDescCount);
@@ -1269,6 +1270,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                             newSubjectSelect.appendChild(option);
                         }
                     });
+                    openDuplicatePanel();
                 });
             });
             themesContainer.querySelectorAll('.delete-theme').forEach(btn => {
@@ -1382,6 +1384,214 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             }
             return false;
         }
+
+        // ─── Duplicar assunto ──────────────────────────────────────────────
+        // Migrar move o assunto dentro da categoria aberta; duplicar copia
+        // para qualquer categoria (inclusive outra) e mantém o original.
+        //
+        // Categorias distintas podem apontar para o MESMO caminho do banco
+        // (ver sharedCategories()), então a lista de destinos é montada por
+        // slug: duas entradas para o mesmo slug seriam o mesmo destino.
+        const dupCategorySelect = document.getElementById('cfg-theme-dup-category');
+        const dupSubjectSelect = document.getElementById('cfg-theme-dup-subject');
+        const dupNameInput = document.getElementById('cfg-theme-dup-name');
+        const dupBtn = document.getElementById('cfg-theme-duplicate');
+        // Conteúdo lido de outra categoria, por slug. Evita reler o banco a
+        // cada troca do seletor de tema.
+        const dupRemoteCache = new Map();
+
+        function dupCategoryOptions() {
+            const paths = U.categoryPaths || {};
+            const seen = new Set();
+            const options = [];
+            Object.keys(paths).forEach(name => {
+                const slug = paths[name];
+                if (seen.has(slug)) return;
+                seen.add(slug);
+                options.push({ name, slug });
+            });
+            return options;
+        }
+
+        function populateDupCategories() {
+            dupCategorySelect.innerHTML = '';
+            dupCategoryOptions().forEach(({ name, slug }) => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name + (slug === (U.categoryPaths || {})[currentCategory] ? ' (atual)' : '');
+                dupCategorySelect.appendChild(option);
+            });
+            dupCategorySelect.value = currentCategory || dupCategorySelect.options[0]?.value || '';
+        }
+
+        // Árvore da categoria escolhida no seletor: se for a que está aberta,
+        // usa `data` (inclui edições ainda não recarregadas); senão, lê do banco.
+        async function dupTargetData(category) {
+            const paths = U.categoryPaths || {};
+            if (paths[category] && paths[category] === paths[currentCategory]) return data;
+            const path = getCategoryDbPath(category);
+            if (dupRemoteCache.has(path)) return dupRemoteCache.get(path);
+            const snapshot = await get(ref(db, path));
+            const remote = snapshot.exists() ? snapshot.val() : {};
+            const normalized = {
+                trainingData: remote.trainingData && typeof remote.trainingData === 'object' ? remote.trainingData : {},
+                quizData: remote.quizData && typeof remote.quizData === 'object' ? remote.quizData : {},
+                order: remote.order && typeof remote.order === 'object' ? remote.order : { subjects: [], themes: {}, modules: {} }
+            };
+            dupRemoteCache.set(path, normalized);
+            return normalized;
+        }
+
+        async function populateDupSubjects() {
+            const category = dupCategorySelect.value;
+            dupSubjectSelect.innerHTML = '<option value="">Carregando temas...</option>';
+            dupSubjectSelect.disabled = true;
+            try {
+                const target = await dupTargetData(category);
+                dupSubjectSelect.innerHTML = '<option value="">Selecione o tema</option>';
+                validKeys(target.trainingData).forEach(id => {
+                    const option = document.createElement('option');
+                    option.value = id; option.textContent = target.trainingData[id].name;
+                    dupSubjectSelect.appendChild(option);
+                });
+                // Destino mais provável: o mesmo tema de onde veio o assunto.
+                if (category === currentCategory && themeSubjectSelect.value) {
+                    dupSubjectSelect.value = themeSubjectSelect.value;
+                }
+            } catch (error) {
+                dupSubjectSelect.innerHTML = '<option value="">Erro ao carregar temas</option>';
+                showWarning(`Não foi possível ler os temas de "${category}": ${error.message}`);
+            } finally {
+                dupSubjectSelect.disabled = false;
+            }
+        }
+
+        // Abre o bloco de duplicar já preenchido para o assunto em edição.
+        function openDuplicatePanel() {
+            document.getElementById('cfg-theme-duplicate-container').classList.add('active');
+            dupRemoteCache.clear();
+            populateDupCategories();
+            const editing = data.trainingData[themeSubjectSelect.value]?.themes?.[currentThemeId];
+            dupNameInput.value = editing ? `${editing.name} (cópia)` : '';
+            populateDupSubjects();
+        }
+
+        dupCategorySelect.addEventListener('change', populateDupSubjects);
+
+        /**
+         * Copia o assunto `themeId` (de `srcSubjectId`, categoria aberta) para
+         * `targetSubjectId` da categoria `targetCategory`.
+         *
+         * Dentro da categoria aberta a cópia entra em `data` e vai pelo
+         * saveData() normal. Para outra categoria não dá para usar esse
+         * caminho — `baseline` só descreve a categoria atual —, então escreve
+         * direto nos nós criados, que são novos e não colidem com edições
+         * alheias.
+         */
+        async function duplicateTheme(srcSubjectId, themeId, targetCategory, targetSubjectId, newName) {
+            const source = data.trainingData[srcSubjectId]?.themes?.[themeId];
+            if (!source) { showWarning('Assunto não encontrado.'); return false; }
+            const paths = U.categoryPaths || {};
+            const sameCategory = paths[targetCategory] && paths[targetCategory] === paths[currentCategory];
+            let target;
+            try {
+                target = await dupTargetData(targetCategory);
+            } catch (error) {
+                showWarning(`Não foi possível ler a categoria de destino: ${error.message}`);
+                return false;
+            }
+            if (!target.trainingData?.[targetSubjectId]) { showWarning('Tema de destino não encontrado.'); return false; }
+
+            if (!await showConfirm({
+                title: 'Duplicar assunto',
+                message: `Uma cópia de "${source.name}" será criada em "${targetCategory} › ${target.trainingData[targetSubjectId].name}".`,
+                icon: 'fa-copy',
+                tone: 'neutral',
+                details: [
+                    'Os módulos e as avaliações são copiados junto.',
+                    'O assunto original continua onde está.',
+                    'O progresso dos colaboradores não é copiado.'
+                ],
+                confirmText: 'Duplicar'
+            })) return false;
+
+            showSpinner('cfg-theme-loading', true);
+            try {
+                const newThemeId = getNextId(target.trainingData[targetSubjectId].themes);
+                // Clone profundo: sem ele a cópia compartilharia os arrays de
+                // módulos com o original, e editar um mexeria no outro.
+                const copy = U.deepClone(source);
+                copy.id = newThemeId;
+                copy.name = newName;
+                const srcQuizKey = `${srcSubjectId}_${themeId}`;
+                const newQuizKey = `${targetSubjectId}_${newThemeId}`;
+                const quizCopy = Array.isArray(data.quizData?.[srcQuizKey]) ? U.deepClone(data.quizData[srcQuizKey]) : null;
+                const moduleOrder = data.order?.modules?.[srcSubjectId]?.[themeId];
+                const orderCopy = Array.isArray(moduleOrder) ? [...moduleOrder] : null;
+
+                if (sameCategory) {
+                    if (!target.trainingData[targetSubjectId].themes) target.trainingData[targetSubjectId].themes = {};
+                    target.trainingData[targetSubjectId].themes[newThemeId] = copy;
+                    if (!data.order) data.order = { subjects: [], themes: {}, modules: {} };
+                    if (!data.order.themes[targetSubjectId]) data.order.themes[targetSubjectId] = [];
+                    data.order.themes[targetSubjectId].push(newThemeId);
+                    if (quizCopy) data.quizData[newQuizKey] = quizCopy;
+                    if (orderCopy) {
+                        if (!data.order.modules[targetSubjectId]) data.order.modules[targetSubjectId] = {};
+                        data.order.modules[targetSubjectId][newThemeId] = orderCopy;
+                    }
+                    if (!await saveData()) return false;
+                } else {
+                    const basePath = getCategoryDbPath(targetCategory);
+                    const existingOrder = Array.isArray(target.order?.themes?.[targetSubjectId])
+                        ? target.order.themes[targetSubjectId]
+                        : [];
+                    const updates = {
+                        [`${basePath}/trainingData/${targetSubjectId}/themes/${newThemeId}`]: copy,
+                        [`${basePath}/order/themes/${targetSubjectId}`]: [...existingOrder, newThemeId]
+                    };
+                    if (quizCopy) updates[`${basePath}/quizData/${newQuizKey}`] = quizCopy;
+                    if (orderCopy) updates[`${basePath}/order/modules/${targetSubjectId}/${newThemeId}`] = orderCopy;
+                    await db.ref().update(updates);
+                    // Cache local acompanha o que acabou de ir ao banco, para o
+                    // próximo getNextId() não reaproveitar o id recém-criado.
+                    if (!target.trainingData[targetSubjectId].themes) target.trainingData[targetSubjectId].themes = {};
+                    target.trainingData[targetSubjectId].themes[newThemeId] = copy;
+                    if (!target.order) target.order = { subjects: [], themes: {}, modules: {} };
+                    if (!target.order.themes) target.order.themes = {};
+                    target.order.themes[targetSubjectId] = [...existingOrder, newThemeId];
+                }
+
+                showWarning(`Assunto duplicado em "${targetCategory} › ${target.trainingData[targetSubjectId].name}"!`);
+                if (sameCategory) {
+                    resetThemeForm();
+                    populateSubjectSelects(); populateModuleThemes(); populateQuizThemes(); populateThemes();
+                }
+                return true;
+            } catch (error) {
+                showWarning(`Erro ao duplicar assunto: ${error.message}`);
+                return false;
+            } finally {
+                showSpinner('cfg-theme-loading', false);
+            }
+        }
+
+        dupBtn.addEventListener('click', async () => {
+            const srcSubjectId = themeSubjectSelect.value;
+            if (!srcSubjectId || !currentThemeId) { showWarning('Selecione um assunto para duplicar.'); return; }
+            const targetCategory = dupCategorySelect.value;
+            const targetSubjectId = dupSubjectSelect.value;
+            if (!targetCategory) { showWarning('Selecione a categoria de destino.'); return; }
+            if (!targetSubjectId) { showWarning('Selecione o tema de destino.'); return; }
+            const newName = dupNameInput.value.trim();
+            if (!newName) { showWarning('Informe o nome da cópia.'); return; }
+            dupBtn.disabled = true;
+            try {
+                await duplicateTheme(srcSubjectId, currentThemeId, targetCategory, targetSubjectId, newName);
+            } finally {
+                dupBtn.disabled = false;
+            }
+        });
 
         themeSaveBtn.addEventListener('click', async () => {
             const subjectId = themeSubjectSelect.value;

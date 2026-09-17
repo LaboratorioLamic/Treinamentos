@@ -1824,6 +1824,34 @@
                         </button>
                     </div>
                 </div>
+                <!-- Duplicar: copia o assunto (módulos + avaliações) para qualquer
+                     categoria/tema, inclusive a própria. Diferente de Migrar, o
+                     original continua onde está. -->
+                <div id="cfg-theme-duplicate-container" class="duplicate-container">
+                    <div class="duplicate-header">
+                        <i class="fas fa-copy"></i>
+                        <h3>Duplicar Assunto</h3>
+                    </div>
+                    <div class="duplicate-content">
+                        <div class="duplicate-select-wrapper">
+                            <label for="cfg-theme-dup-category">Categoria de destino</label>
+                            <select id="cfg-theme-dup-category"></select>
+                        </div>
+                        <div class="duplicate-select-wrapper">
+                            <label for="cfg-theme-dup-subject">Tema de destino</label>
+                            <select id="cfg-theme-dup-subject">
+                                <option value="">Selecione o tema</option>
+                            </select>
+                        </div>
+                        <div class="duplicate-select-wrapper">
+                            <label for="cfg-theme-dup-name">Nome da cópia</label>
+                            <input type="text" id="cfg-theme-dup-name" maxlength="120" placeholder="Nome do novo assunto">
+                        </div>
+                        <button id="cfg-theme-duplicate" class="duplicate-btn">
+                            <i class="fas fa-copy"></i> Duplicar (com Módulos e Avaliações)
+                        </button>
+                    </div>
+                </div>
                 <div id="cfg-theme-loading" class="cfg-loading-spinner"></div>
             </div>
         </div>

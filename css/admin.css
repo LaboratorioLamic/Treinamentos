@@ -1922,6 +1922,42 @@
         }
         #cfg-root .migrate-btn:hover { background: #b45309; box-shadow: 0 4px 10px rgba(217,119,6,0.28); }
 
+        /* === DUPLICATE ===
+           Mesma anatomia do bloco Migrar, em verde: migrar move o assunto,
+           duplicar deixa o original no lugar — a cor separa as duas ações. */
+        #cfg-root .duplicate-container {
+            display: none; margin-top: 14px; padding: 14px;
+            background: #ecfdf5; border: 1.5px solid #6ee7b7;
+            border-radius: var(--r);
+        }
+        #cfg-root .duplicate-container.active { display: block; animation: fadeSlide 0.2s ease; }
+
+        #cfg-root .duplicate-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        #cfg-root .duplicate-header i { color: #059669; font-size: 13px; }
+        #cfg-root .duplicate-header h3 { font-size: 12.5px; font-weight: 600; color: #065f46; }
+
+        #cfg-root .duplicate-content { display: flex; flex-direction: column; gap: 9px; }
+
+        #cfg-root .duplicate-select-wrapper { display: flex; flex-direction: column; gap: 4px; }
+        #cfg-root .duplicate-select-wrapper label { font-size: 11.5px; font-weight: 600; color: #065f46; }
+        #cfg-root .duplicate-select-wrapper select,
+        #cfg-root .duplicate-select-wrapper input {
+            padding: 7px 10px; border: 1.5px solid #6ee7b7; border-radius: 6px;
+            font-size: 13px; font-family: inherit; background: #fff; color: var(--text);
+        }
+        #cfg-root .duplicate-select-wrapper select:focus,
+        #cfg-root .duplicate-select-wrapper input:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,0.13); }
+
+        #cfg-root .duplicate-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 8px 15px; background: #059669; color: #fff;
+            border: none; border-radius: 6px;
+            font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        #cfg-root .duplicate-btn:hover { background: #047857; box-shadow: 0 4px 10px rgba(5,150,105,0.28); }
+        #cfg-root .duplicate-btn:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+
         /* === QUIZ TOGGLE === */
         #cfg-root .quiz-toggle-container {
             display: flex; align-items: center; gap: 12px;
