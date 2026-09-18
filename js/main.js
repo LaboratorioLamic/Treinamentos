@@ -231,6 +231,56 @@
         // entre syncs e somado à sessão em andamento (ver activeCourseTimer).
         let remoteProgressActiveMs = {};
 
+        // ─── Persistência local do tempo ativo ───
+        // A sincronização em nuvem (progress/byUser) exige conta logada, então
+        // em Estágios — e em qualquer visita sem sessão — o acumulado só vivia
+        // em memória e voltava a zero ao recarregar a página. O mesmo
+        // localStorage que já guarda completionStatus/assessmentResults guarda
+        // o contador, por categoria (o par subjectId/themeId se repete entre
+        // categorias e misturá-las somaria tempo de cursos diferentes).
+        const ACTIVE_MS_STORAGE_KEY = `uniadmin.activeMs.${currentCategorySlug}`;
+
+        // Só quando não há gravação em nuvem para o caso (Estágios, ou visita
+        // sem conta): com conta logada a nuvem continua sendo a única fonte,
+        // para que o "Resetar curso" do administrador — que apaga o nó em
+        // progress/byUser — continue zerando o contador do aluno.
+        function usesLocalActiveMs() {
+            return !isProgressSyncEligible();
+        }
+
+        function loadLocalActiveMs() {
+            if (!usesLocalActiveMs()) return;
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem(ACTIVE_MS_STORAGE_KEY) || 'null'); }
+            catch (error) { /* indisponível ou corrompido */ }
+            if (!saved || typeof saved !== 'object') return;
+            Object.keys(saved).forEach(subjectId => {
+                const themes = saved[subjectId];
+                if (!themes || typeof themes !== 'object') return;
+                Object.keys(themes).forEach(themeId => {
+                    const ms = Number(themes[themeId]);
+                    if (!Number.isFinite(ms) || ms < 0) return;
+                    if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+                    remoteProgressActiveMs[subjectId][themeId] = ms;
+                });
+            });
+        }
+
+        function saveLocalActiveMs() {
+            if (!usesLocalActiveMs()) return;
+            try { localStorage.setItem(ACTIVE_MS_STORAGE_KEY, JSON.stringify(remoteProgressActiveMs)); }
+            catch (error) { /* storage cheio/bloqueado */ }
+        }
+
+        // Soma tempo ao acumulado do curso e o persiste na mesma operação —
+        // todo ponto que faz a soma precisa das duas coisas, e separá-las era
+        // o que deixava o contador escapar da gravação local.
+        function addActiveMs(subjectId, themeId, elapsed) {
+            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
+            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            saveLocalActiveMs();
+        }
+
         // "Contador oculto" do tempo com o curso aberto: soma só o tempo em
         // que a aba está visível com o curso carregado (loadTraining) — pausa
         // ao trocar de curso, sair para a galeria, trocar de aba/minimizar ou
@@ -356,8 +406,7 @@
             const elapsed = now - sessionStartedAt;
             if (elapsed <= 0) return;
             activeCourseTimer.sessionStartedAt = now;
-            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
-            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            addActiveMs(subjectId, themeId, elapsed);
             syncCourseProgressToCloud(subjectId, themeId);
         }
 
@@ -494,8 +543,7 @@
             const elapsed = Date.now() - sessionStartedAt;
             if (!forget) activeCourseTimer.sessionStartedAt = null;
             if (elapsed <= 0) { paintExpectedTimePanel(); return; }
-            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
-            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            addActiveMs(subjectId, themeId, elapsed);
             // Args explícitos: currentTrainingId/currentThemeId podem já
             // apontar para outro curso neste momento (ex.: loadTraining seta
             // o novo curso antes de pausar o anterior via resumeActiveCourseTimer).
@@ -598,12 +646,14 @@
             const savedAssessments = localStorage.getItem('assessmentResults');
             if (savedCompletion) Object.assign(completionStatus, JSON.parse(savedCompletion));
             if (savedAssessments) Object.assign(assessmentResults, JSON.parse(savedAssessments));
+            loadLocalActiveMs();
             loadRemoteProgression();
         }
 
         function saveProgression() {
             localStorage.setItem('completionStatus', JSON.stringify(completionStatus));
             localStorage.setItem('assessmentResults', JSON.stringify(assessmentResults));
+            saveLocalActiveMs();
             syncCourseProgressToCloud();
         }
 
@@ -668,10 +718,12 @@
             const elapsed = Date.now() - sessionStartedAt;
             if (elapsed <= 0) return false;
 
-            if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
-            remoteProgressActiveMs[subjectId][themeId] = (remoteProgressActiveMs[subjectId][themeId] || 0) + elapsed;
+            addActiveMs(subjectId, themeId, elapsed);
             activeCourseTimer.sessionStartedAt = null;
 
+            // Sem conta logada (Estágios) não há registro em nuvem para enviar,
+            // mas o tempo da sessão já entrou no acumulado local acima — é o
+            // que preserva o cronômetro ao fechar e reabrir a página.
             const built = buildCourseProgressRecord(subjectId, themeId);
             if (!built) return false;
             const url = `${PROGRESS_REST_BASE}${built.path}.json?x-http-method-override=PUT`;
@@ -779,7 +831,14 @@
                         }
                         if (Number.isFinite(entry?.activeMs)) {
                             if (!remoteProgressActiveMs[subjectId]) remoteProgressActiveMs[subjectId] = {};
-                            remoteProgressActiveMs[subjectId][themeId] = entry.activeMs;
+                            // Maior dos dois, como faz a transação da nuvem: o
+                            // acumulado local pode incluir uma sessão que ainda
+                            // não subiu (queda de conexão, aba fechada antes do
+                            // beacon), e sobrescrever puxaria o contador para trás.
+                            remoteProgressActiveMs[subjectId][themeId] = Math.max(
+                                entry.activeMs,
+                                remoteProgressActiveMs[subjectId][themeId] || 0
+                            );
                         }
                         // Curso aprovado no histórico (inclusive o importado
                         // por planilha, que não gera registro em
@@ -1771,6 +1830,12 @@
         // (a função vem da conta, sincronizada da planilha via Colaboradores).
         // Gestor (isManager na conta) ignora essa restrição e vê tudo.
         function themeVisibleForSession(theme) {
+            // Categoria sem conta logada (Estágios) não tem cargo de sessão
+            // para comparar: um `roles` herdado de uma duplicação esconderia o
+            // curso de todo mundo, sem ninguém que pudesse satisfazê-lo. O
+            // campo é ignorado aqui, e não só deixado de gravar no painel,
+            // para que os cursos já duplicados voltem a aparecer.
+            if (window.UniAdmin?.categoryUsesRoles?.(currentCategory) === false) return true;
             const roles = Array.isArray(theme?.roles) ? theme.roles.filter(Boolean) : [];
             if (roles.length === 0) return true;
             const session = window.UniAdmin?.StudentAuth?.getSession();

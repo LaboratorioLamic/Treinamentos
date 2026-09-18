@@ -40,6 +40,18 @@ var UniAdmin = window.UniAdmin || {};
         return Number(score) >= UniAdmin.getPassingScore(categoryOrSlug);
     };
 
+    // Categorias sem conta logada não têm cargo de sessão, então a restrição
+    // de visibilidade por função (`roles` do assunto) não se aplica a elas: se
+    // um assunto com `roles` acabar ali (por duplicação vinda de outra
+    // categoria, por exemplo), ninguém consegue vê-lo no portal. O painel não
+    // grava `roles` nessas categorias e o portal ignora o campo.
+    UniAdmin.ROLE_FREE_SLUGS = ['estagios'];
+
+    UniAdmin.categoryUsesRoles = function (categoryOrSlug) {
+        var slug = UniAdmin.categoryPaths[categoryOrSlug] || categoryOrSlug;
+        return UniAdmin.ROLE_FREE_SLUGS.indexOf(slug) === -1;
+    };
+
     UniAdmin.getCategoryDbPath = function (category) {
         var slug = UniAdmin.categoryPaths[category] || category.toLowerCase().replace(/[^a-z0-9]+/gi, '_');
         return '/' + UniAdmin.dbRoot + '/' + slug;

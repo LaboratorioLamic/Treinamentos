@@ -18,6 +18,15 @@
 
 function C() { return window.UniAdminCoursesData; }
 
+// A categoria aberta filtra cursos por função? Estágios não (não há conta
+// logada, logo nenhum cargo de sessão para comparar), então tudo que trata de
+// `roles` some da tela — inclusive o selo do card, que antes aparecia ali em
+// cursos duplicados de outra categoria sem forma de removê-lo.
+function categoryUsesRoles() {
+    const category = C()?.getCurrentCategory?.();
+    return window.UniAdmin?.categoryUsesRoles ? window.UniAdmin.categoryUsesRoles(category) : true;
+}
+
 // ─── Modal Stack: empilhamento de modais com fechar-só-o-topo ───
 const ModalStack = (() => {
     const stack = []; // [{ el, onClose }]
@@ -322,7 +331,7 @@ function renderCourseInfo(subjectId, themeId, theme) {
     const rolesHtml = roles.length
         ? `<div class="course-info-pills">${roles.map(r => `<span class="course-info-pill">${escapeHtml(r)}</span>`).join('')}</div>`
         : '<p class="course-info-muted">Visível para todas as funções.</p>';
-    const rolesCard = C().getCurrentCategory?.() === 'Estágios' ? '' : `
+    const rolesCard = !categoryUsesRoles() ? '' : `
         <div class="course-info-card">
             <div class="course-info-card-head"><i class="fas fa-user-tag"></i> Funções que veem este curso</div>
             ${rolesHtml}
@@ -1030,7 +1039,7 @@ function buildCourseCard(subjectId, subjectName, themeId, theme, index, total, c
     const deadlineBadge = theme.deadline && deadlineStatus
         ? `<span class="deadline-badge deadline-${deadlineStatus}">${window.UniAdmin.Deadlines.STATUS_LABELS[deadlineStatus]}</span>`
         : '';
-    const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
+    const roles = categoryUsesRoles() && Array.isArray(theme.roles) ? theme.roles.filter(Boolean) : [];
     const rolesBadge = roles.length
         ? `<span class="roles-badge" title="Visível apenas para: ${escapeHtml(roles.join(', '))}"><i class="fas fa-user-tag"></i> ${roles.length}</span>`
         : '';

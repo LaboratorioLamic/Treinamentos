@@ -979,8 +979,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
 
         // Estágios não usa conta logada, então não existe cargo de sessão para
         // filtrar: a seção some do formulário e nenhum `roles` é gravado.
-        function rolesApplyToCategory() {
-            return currentCategory !== 'Estágios';
+        // A regra vive em U.categoryUsesRoles (por slug) porque duas categorias
+        // podem apontar para o mesmo caminho do banco e a duplicação de
+        // assuntos (duplicateTheme) precisa da mesma resposta para o destino.
+        function rolesApplyToCategory(category = currentCategory) {
+            return U.categoryUsesRoles ? U.categoryUsesRoles(category) : true;
         }
 
         function refreshRolesVisibility() {
@@ -1537,6 +1540,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const copy = U.deepClone(source);
                 copy.id = newThemeId;
                 copy.name = newName;
+                // A cópia não leva `roles` para uma categoria que não filtra
+                // por função (Estágios): lá não há conta logada, e um assunto
+                // com `roles` ficaria invisível para todos no portal — sem
+                // campo no formulário para desfazer a restrição.
+                if (!rolesApplyToCategory(targetCategory)) delete copy.roles;
                 const srcQuizKey = `${srcSubjectId}_${themeId}`;
                 const newQuizKey = `${targetSubjectId}_${newThemeId}`;
                 const quizCopy = Array.isArray(data.quizData?.[srcQuizKey]) ? U.deepClone(data.quizData[srcQuizKey]) : null;
