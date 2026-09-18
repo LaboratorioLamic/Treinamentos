@@ -315,20 +315,30 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             if (!data.order.modules || typeof data.order.modules !== 'object') { data.order.modules = {}; }
 
             const subjectIds = validKeys(data.trainingData);
-            if (data.order.subjects.length === 0) { data.order.subjects = subjectIds; }
+            if (data.order.subjects.length === 0 && subjectIds.length > 0) { data.order.subjects = subjectIds; }
 
             subjectIds.forEach(subjectId => {
                 const themes = data.trainingData[subjectId].themes;
                 const themeIds = validKeys(themes);
-                if (!data.order.themes[subjectId]) { data.order.themes[subjectId] = themeIds; }
+                // Lista vazia NÃO é gravada: o Realtime Database não guarda
+                // array/objeto vazio — ele apaga o nó. Criar `order.themes[7] = []`
+                // para um tema sem assuntos fazia `baseline` carregar uma entrada
+                // que o servidor nunca devolvia, e o listener de sessão passava a
+                // ver diferença em TODO snapshot: toast "O conteúdo foi atualizado
+                // por outra sessão." + repopulação da tela em laço, sem fim.
+                if (themeIds.length > 0 && !data.order.themes[subjectId]) {
+                    data.order.themes[subjectId] = themeIds;
+                }
                 themeIds.forEach(themeId => {
                     // Conserta o `id` interno de cursos migrados antes da
                     // correção do migrateTheme: a chave do mapa é a verdade,
                     // um id divergente aponta para outro curso do tema.
                     if (themes[themeId].id !== themeId) { themes[themeId].id = themeId; }
+                    const moduleCount = themes[themeId].modules?.length || 0;
+                    // Mesma razão de acima: curso sem módulo não ganha `[]`.
+                    if (moduleCount === 0) return;
                     if (!data.order.modules[subjectId]) { data.order.modules[subjectId] = {}; }
                     if (!data.order.modules[subjectId][themeId]) {
-                        const moduleCount = themes[themeId].modules?.length || 0;
                         data.order.modules[subjectId][themeId] = Array.from({length: moduleCount}, (_, i) => i);
                     }
                 });
@@ -399,7 +409,11 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 const remote = snapshot.exists() ? snapshot.val() : { trainingData: {}, quizData: {} };
                 // Eco da nossa própria escrita: `baseline` já foi adiantado
                 // para este valor no fim do save, então não há o que reaplicar.
-                if (U.deepEqual(remote, baseline)) return;
+                // A comparação é na semântica do banco (U.deepEqualDb): array
+                // vs objeto de chaves numéricas e containers vazios que o RTDB
+                // descarta são o mesmo dado, e tratá-los como diferença fazia
+                // este listener acusar alteração remota em todo snapshot.
+                if (U.deepEqualDb(remote, baseline)) return;
                 applyRemoteState(remote, { deferRender: true });
                 showWarning('O conteúdo foi atualizado por outra sessão.');
             });

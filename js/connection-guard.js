@@ -128,14 +128,26 @@
 
     // A aba volta do segundo plano com dados possivelmente parados há horas —
     // o mesmo tratamento de uma reconexão.
+    //
+    // Mas só depois de um tempo real fora. Antes o evento saía a CADA foco da
+    // aba: um Alt-Tab derrubava o cache do Histórico e fazia o Dashboard
+    // rebaixar a base inteira (~4 MB), sem nada ter mudado. Enquanto a aba
+    // está aberta os listeners ao vivo já mantêm tudo em dia — o refetch só
+    // se justifica quando a aba ficou escondida tempo suficiente para que
+    // esses listeners tenham sido estrangulados pelo navegador.
+    var STALE_AFTER_HIDDEN_MS = 5 * 60 * 1000;
+    var hiddenSince = 0;
+
     document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState !== 'visible') return;
+        if (document.visibilityState !== 'visible') { hiddenSince = Date.now(); return; }
+        var hiddenMs = hiddenSince ? Date.now() - hiddenSince : 0;
+        hiddenSince = 0;
         evaluate();
-        if (!isBlocked) {
-            document.dispatchEvent(new CustomEvent('uniadmin:connection-restored', {
-                detail: { downtimeMs: 0, reason: 'visibility' }
-            }));
-        }
+        if (isBlocked) return;
+        if (hiddenMs < STALE_AFTER_HIDDEN_MS) return;
+        document.dispatchEvent(new CustomEvent('uniadmin:connection-restored', {
+            detail: { downtimeMs: hiddenMs, reason: 'visibility' }
+        }));
     });
 
     U.Connection = {

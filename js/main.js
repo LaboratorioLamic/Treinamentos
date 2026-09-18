@@ -1646,7 +1646,15 @@
             document.title = `Universidade LAMIC - ${currentCategory}`;
         }
 
-        window.onload = () => {
+        // DOMContentLoaded, não `load`. `load` só dispara quando TODO recurso
+        // da página terminou — as cinco bibliotecas de CDN (~1,9 MB), as
+        // fontes, os ícones, as imagens. Só depois disso é que a leitura do
+        // conteúdo começava, e o ranking, que é o último elo da cadeia
+        // (conteúdo → primeiro snapshot → showWelcomeRanking), herdava a
+        // espera inteira. Com `defer` em todos os <script> do portal, neste
+        // ponto o DOM está completo e as bibliotecas já executaram — é o
+        // primeiro instante em que dá para começar, sem esperar o resto.
+        document.addEventListener('DOMContentLoaded', () => {
             applyCategoryToHeader();
             warningMessage.style.display = 'none';
             resetContent();
@@ -1655,7 +1663,12 @@
             courseGallery.style.display = 'none';
             courseGrid.innerHTML = '';
             themeBtn.textContent = 'Escolha um Assunto';
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+            // Guardado: uma falha de CDN aqui derrubava o resto do boot do
+            // portal (a fiação do comentário abaixo nunca era ligada) por
+            // causa de um módulo PDF que talvez nem seja aberto na sessão.
+            if (window.pdfjsLib) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+            }
 
             const commentToggleBtn = document.getElementById('comment-toggle-btn');
             const commentSection = document.getElementById('comment-section');
@@ -1668,7 +1681,7 @@
                         : '<i class="fas fa-times" style="margin-right:6px;"></i>Fechar Comentário';
                 };
             }
-        };
+        });
 
         function populateDropdown() {
             dropdownList.innerHTML = '';

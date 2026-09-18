@@ -163,16 +163,27 @@
         return index;
     }
 
+    // Ramos de /results que `flatten` consome. O espelho `byCourse` fica de
+    // fora de propósito: ele duplica `byUser` (~1,3 MB dos ~4 MB da árvore) e
+    // nenhuma listagem o lê — só existe para consulta pontual por curso
+    // (js/admin-dashboard.js). Baixar a raiz `/results` trazia essa cópia
+    // junto em toda abertura de Histórico, Dashboard, Usuários, Perfil do
+    // aluno e ranking do portal.
+    const RESULT_BRANCHES = ['byUser', 'estagiosLivre', 'imported'];
+
     async function fetchAllData() {
-        const [usersSnap, resultsSnap, progressSnap, courseNames] = await Promise.all([
+        const [usersSnap, progressSnap, courseNames, ...branchSnaps] = await Promise.all([
             get(ref(db, `/${dbRoot}/users`)),
-            get(ref(db, `/${dbRoot}/results`)),
             get(ref(db, `/${dbRoot}/progress/byUser`)),
-            fetchCourseNames()
+            fetchCourseNames(),
+            ...RESULT_BRANCHES.map(branch => get(ref(db, `/${dbRoot}/results/${branch}`)))
         ]);
         const users = usersSnap.exists() ? usersSnap.val() : {};
-        const results = resultsSnap.exists() ? resultsSnap.val() : {};
         const progress = progressSnap.exists() ? progressSnap.val() : {};
+        const results = {};
+        RESULT_BRANCHES.forEach((branch, i) => {
+            results[branch] = branchSnaps[i].exists() ? branchSnaps[i].val() : {};
+        });
         return { users, results, progress, courseNames };
     }
 
@@ -619,15 +630,34 @@
     }
     U.invalidateHistoryRows = invalidateRows;
 
+    // Recarga já agendada para depois da que está em voo. Vários `force`
+    // simultâneos compartilham esta — uma emenda basta para todos.
+    let queuedForcePromise = null;
+
+    function startLoad() {
+        rowsPromise = fetchAllData()
+            .then(data => { allRows = flatten(data); rowsLoadedAt = Date.now(); return allRows; })
+            .finally(() => { rowsPromise = null; });
+        return rowsPromise;
+    }
+
     function loadRows(force = false) {
         const isFresh = allRows.length > 0 && (Date.now() - rowsLoadedAt) < ROWS_TTL_MS;
         if (!force && isFresh) return Promise.resolve(allRows);
-        if (!rowsPromise) {
-            rowsPromise = fetchAllData()
-                .then(data => { allRows = flatten(data); rowsLoadedAt = Date.now(); return allRows; })
-                .finally(() => { rowsPromise = null; });
+        if (!rowsPromise) return startLoad();
+        // Leitura em andamento e o chamador quer dado novo. Pegar carona na
+        // que está em voo seria errado: ela pode ter começado ANTES da escrita
+        // que motivou o `force`, e devolvê-la como "atualizada" entrega
+        // exatamente o dado velho que o `force` existe para evitar. Emenda
+        // outra leitura no fim desta.
+        if (!force) return rowsPromise;
+        if (!queuedForcePromise) {
+            queuedForcePromise = rowsPromise
+                .catch(() => {})
+                .then(() => startLoad())
+                .finally(() => { queuedForcePromise = null; });
         }
-        return rowsPromise;
+        return queuedForcePromise;
     }
 
     // Qualquer gravação de resultado/progresso derruba o cache na hora, para
@@ -826,9 +856,17 @@
     });
 
     // ─── Exportar (visão atual, respeitando busca/filtro/ordenação) ───
-    function exportHistory() {
+    async function exportHistory() {
         const rows = applySort(applyFilters(rowsForCurrentCategory()));
         if (rows.length === 0) { showWarning('Nada para exportar com os filtros atuais.'); return; }
+
+        // A xlsx (881 KB) sai do HTML e é buscada aqui — ver js/vendor-loader.js.
+        try {
+            if (U.loadVendor) await U.loadVendor('xlsx');
+        } catch (error) {
+            showWarning('Não foi possível carregar a biblioteca de planilha. Verifique sua conexão e tente novamente.');
+            return;
+        }
 
         // Cabeçalhos seguem a nomenclatura da tela (Assunto = curso, Tema =
         // tema-pai). O import aceita as duas ordens, então planilhas antigas
@@ -1172,7 +1210,12 @@
 
         showSpinner(true);
         try {
-            const [buffer, courseIndex] = await Promise.all([file.arrayBuffer(), fetchCourseIndex()]);
+            const [buffer, courseIndex] = await Promise.all([
+                file.arrayBuffer(),
+                fetchCourseIndex(),
+                // Leitor de planilha sob demanda — ver js/vendor-loader.js.
+                U.loadVendor ? U.loadVendor('xlsx') : Promise.resolve()
+            ]);
             // cellDates: células de data chegam como Date em vez de serial.
             const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
             const sheet = wb.Sheets[wb.SheetNames[0]];

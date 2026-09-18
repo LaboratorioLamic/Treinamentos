@@ -133,6 +133,13 @@
     const AUDIENCE_EXEMPT_SLUGS = ['estagios'];
 
     let initialized = false;
+    // Falso até a primeira `loadBaseData()` terminar. Sem isto os cards
+    // renderizavam durante o carregamento com o estado ainda vazio e exibiam
+    // "Nenhum tema cadastrado nesta categoria." — a tela dizia que não havia
+    // conteúdo quando o que havia era espera. Em uma base de ~4 MB isso durava
+    // vários segundos e lia-se como dashboard quebrado.
+    let baseDataLoaded = false;
+    let baseLoadFailed = false;
     let allUsers = {};
     let allColaboradores = {};
     // Linhas do histórico (mesma fonte que a aba Histórico: results/byUser +
@@ -413,6 +420,13 @@
         const inUserMode = document.getElementById('cfg-dash-user-picker')?.style.display !== 'none';
         const empty = document.getElementById('cfg-dash-empty');
         if (!inUserMode) { userCardsBox.style.display = 'none'; return; }
+
+        if (!baseDataLoaded) {
+            userCardsBox.style.display = 'block';
+            if (empty) empty.style.display = 'none';
+            userCardsBox.innerHTML = pendingCardsHtml();
+            return;
+        }
 
         const term = normalizeName(userSearchTerm);
         const entries = Object.keys(allColaboradores)
@@ -911,6 +925,16 @@
         return card;
     }
 
+    // Mensagem exibida no lugar dos cards enquanto a base não chegou. Falha de
+    // carga tem texto próprio: deixar "Carregando…" para sempre esconderia o
+    // erro, e cair no vazio ("Nenhum tema cadastrado") afirmaria algo falso
+    // sobre o conteúdo.
+    function pendingCardsHtml() {
+        return baseLoadFailed
+            ? '<p class="dashboard-table-empty">Não foi possível carregar os dados do dashboard.</p>'
+            : '<p class="dashboard-table-empty">Carregando dados…</p>';
+    }
+
     function renderCourseCards() {
         if (!courseCardsBox) return;
         courseCardsBox.innerHTML = '';
@@ -918,6 +942,13 @@
         if (!selectedSubjectId || !inCourseMode) { courseCardsBox.style.display = 'none'; return; }
 
         const empty = document.getElementById('cfg-dash-empty');
+
+        if (!baseDataLoaded) {
+            courseCardsBox.style.display = 'block';
+            if (empty) empty.style.display = 'none';
+            courseCardsBox.innerHTML = pendingCardsHtml();
+            return;
+        }
 
         if (selectedSubjectId === ALL_SUBJECTS_ID) {
             const subjectIds = orderedSubjectIds();
@@ -3572,9 +3603,25 @@
             allUsers = snapshot.exists() ? snapshot.val() : {};
             scheduleLiveRender();
         });
-        // Só a raiz de /results — assinar cada categoria separadamente daria os
-        // mesmos eventos com mais assinaturas para administrar.
-        watch(`/${dbRoot}/results`, () => { reloadHistoryThenRender(); });
+        // Os três ramos de /results que o Histórico realmente lê. A raiz
+        // arrastaria junto o espelho `byCourse` (~1,3 MB), que nenhuma
+        // listagem consome — ele só é lido pontualmente, por curso.
+        //
+        // O primeiro `value` de cada ramo é o eco do attach: traz exatamente o
+        // que `loadBaseData()` acabou de ler. Atendê-lo disparava
+        // `reloadHistoryThenRender()`, que rebaixava e reprocessava a árvore de
+        // resultados inteira logo depois de ela ter sido lida — abrir o
+        // Dashboard custava duas descidas completas e três passagens de
+        // `flatten`. Cada ramo ignora o seu primeiro evento; do segundo em
+        // diante é mudança de verdade. Contagem em vez de temporizador: o eco
+        // depende de ida e volta à rede e não cabe numa janela fixa.
+        ['byUser', 'estagiosLivre', 'imported'].forEach(branch => {
+            let sawFirstEvent = false;
+            watch(`/${dbRoot}/results/${branch}`, () => {
+                if (!sawFirstEvent) { sawFirstEvent = true; return; }
+                reloadHistoryThenRender();
+            });
+        });
         Object.keys(CATEGORY_LABELS).forEach(slug => {
             watch(`/${dbRoot}/${slug}/trainingData`, snapshot => {
                 allTrainingData[slug] = snapshot.exists() ? snapshot.val() : {};
@@ -3595,21 +3642,37 @@
     }
     U.stopDashboardLiveSync = stopLiveSync;
 
+    // Carga em voo. `initDashboard` tem duas origens — o fim de fetchData
+    // (js/admin.js) e o clique na aba — e nada impedia as duas de correrem
+    // juntas: dois `loadBaseData()` em paralelo, tudo baixado e processado em
+    // dobro. Quem chega no meio espera a carga que já existe.
+    let baseLoad = null;
+
     async function initDashboard() {
         if (!initialized) {
             initialized = true;
             setDashMode('course');
         }
-        try {
-            await loadBaseData();
-            // Os cards leem allTrainingData/allQuizData, só disponíveis depois
-            // de loadBaseData() — renderizar antes deixava a lista vazia no
-            // primeiro carregamento (nada para escolher, dashboard em branco).
-            renderEverything();
-            startLiveSync();
-        } catch (error) {
-            showWarning('Erro ao carregar dados do dashboard: ' + error.message);
-        }
+        if (baseLoad) return baseLoad;
+        baseLoad = (async () => {
+            try {
+                await loadBaseData();
+                baseDataLoaded = true;
+                baseLoadFailed = false;
+                // Os cards leem allTrainingData/allQuizData, só disponíveis depois
+                // de loadBaseData() — renderizar antes deixava a lista vazia no
+                // primeiro carregamento (nada para escolher, dashboard em branco).
+                renderEverything();
+                startLiveSync();
+            } catch (error) {
+                baseLoadFailed = true;
+                renderEverything();
+                showWarning('Erro ao carregar dados do dashboard: ' + error.message);
+            } finally {
+                baseLoad = null;
+            }
+        })();
+        return baseLoad;
     }
     U.initDashboard = initDashboard;
 

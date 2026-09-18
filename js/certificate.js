@@ -303,6 +303,14 @@
     // `course` traz os campos gravados no cadastro do assunto
     // (certificateEnabled/certificateTitle/certificateHours/certificateTopics).
     async function download({ studentName, course, courseName, submittedAt }) {
+        // jsPDF e html2canvas (~560 KB) não vêm mais no HTML: são buscadas aqui,
+        // no único momento em que servem para alguma coisa. Ver js/vendor-loader.js.
+        try {
+            if (U.loadVendor) await U.loadVendor('pdf');
+        } catch (error) {
+            U.showWarning?.('Não foi possível carregar a biblioteca de PDF. Verifique sua conexão e tente novamente.');
+            return;
+        }
         if (!window.jspdf?.jsPDF || !window.html2canvas) {
             U.showWarning?.('Biblioteca de PDF não carregada. Recarregue a página e tente novamente.');
             return;

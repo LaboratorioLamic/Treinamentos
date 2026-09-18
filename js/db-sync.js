@@ -169,6 +169,52 @@
     }
     U.deepEqual = deepEqual;
 
+    /**
+     * Forma canônica de um valor "como o Realtime Database o guardaria".
+     *
+     * O RTDB não tem array nem container vazio: `[a, b]` vira `{0:a, 1:b}`,
+     * e `[]`/`{}`/`null` simplesmente não existem — gravar um apaga o nó. Na
+     * volta, um objeto de chaves numéricas contíguas é reconstruído como
+     * array, com buraco onde faltava chave. Resultado: o que a tela manda e o
+     * que o servidor devolve podem representar o MESMO dado em formas que
+     * `deepEqual` considera diferentes (`[null, x]` vs `{1:x}`, `len 7` vs
+     * `len 8` por causa de um `[]` no fim).
+     *
+     * Essa diferença fantasma fazia o listener de sessão acusar alteração
+     * remota em todo snapshot — toast "atualizado por outra sessão" e
+     * repopulação da tela em laço. Normalizar os dois lados antes de comparar
+     * elimina a classe inteira do problema, não só o caso conhecido.
+     */
+    function normalizeForCompare(value) {
+        if (value === null || value === undefined) return undefined;
+        if (Array.isArray(value)) {
+            var fromArray = {};
+            value.forEach(function (item, index) {
+                var norm = normalizeForCompare(item);
+                if (norm !== undefined) fromArray[String(index)] = norm;
+            });
+            return Object.keys(fromArray).length ? fromArray : undefined;
+        }
+        if (isPlainObject(value)) {
+            var fromObject = {};
+            Object.keys(value).forEach(function (key) {
+                var norm = normalizeForCompare(value[key]);
+                if (norm !== undefined) fromObject[key] = norm;
+            });
+            return Object.keys(fromObject).length ? fromObject : undefined;
+        }
+        return value;
+    }
+    U.normalizeForCompare = normalizeForCompare;
+
+    /**
+     * Igualdade na semântica do banco: use para decidir "o servidor mudou?".
+     * Para comparar dois valores em memória, `deepEqual` continua sendo o certo.
+     */
+    U.deepEqualDb = function (a, b) {
+        return deepEqual(normalizeForCompare(a), normalizeForCompare(b));
+    };
+
     U.deepClone = function (value) {
         if (value === undefined) return undefined;
         return JSON.parse(JSON.stringify(value));

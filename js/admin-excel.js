@@ -48,9 +48,18 @@
         return names;
     }
 
+    // Só os ramos que a planilha usa. A raiz `/results` traria junto o espelho
+    // `byCourse` (~1,3 MB), que é cópia de `byUser` e não vai para nenhuma aba.
     async function fetchAllResults() {
-        const snapshot = await get(ref(db, `/${dbRoot}/results`));
-        return snapshot.exists() ? snapshot.val() : {};
+        const branches = ['byUser', 'estagiosLivre'];
+        const snapshots = await Promise.all(
+            branches.map(branch => get(ref(db, `/${dbRoot}/results/${branch}`)))
+        );
+        const results = {};
+        branches.forEach((branch, i) => {
+            results[branch] = snapshots[i].exists() ? snapshots[i].val() : {};
+        });
+        return results;
     }
 
     function flattenByUserResults(byUser, users, courseNames) {
@@ -145,6 +154,9 @@
                 ...flattenByUserResults(results.byUser, users, courseNames),
                 ...flattenEstagiosResults(results.estagiosLivre, courseNames)
             ];
+
+            // A xlsx (881 KB) sai do HTML e é buscada aqui — ver js/vendor-loader.js.
+            if (U.loadVendor) await U.loadVendor('xlsx');
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(colaboradoresRows), 'Colaboradores');
