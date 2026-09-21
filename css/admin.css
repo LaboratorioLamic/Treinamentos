@@ -249,6 +249,27 @@
         #cfg-root .panel-header-hint i { font-size: 8px; opacity: 0.85; flex-shrink: 0; }
         #cfg-root .panel-header-hint + .panel-header-actions { margin-left: 10px; }
 
+        /* Selo de número à direita do título (ex.: a média das notas
+           filtradas no "Histórico de Notas") — mais forte que o
+           panel-header-hint, que é só uma dica de interação. A cor segue as
+           mesmas faixas de nota dos balões do Histórico. */
+        #cfg-root .panel-header-stat {
+            margin-left: auto;
+            flex-shrink: 0;
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 11px;
+            border-radius: 999px;
+            background: #eef2f7;
+            color: var(--text-2);
+            font-size: 12px; font-weight: 700; white-space: nowrap;
+        }
+        #cfg-root .panel-header-stat i { font-size: 10px; opacity: 0.9; }
+        #cfg-root .panel-header-stat small { font-weight: 500; opacity: 0.75; }
+        #cfg-root .panel-header-stat.is-high { background: var(--cfg-success-light, #dcfce7); color: var(--cfg-success); }
+        #cfg-root .panel-header-stat.is-mid { background: var(--cfg-warning-light, #fef3c7); color: var(--cfg-warning); }
+        #cfg-root .panel-header-stat.is-low { background: var(--cfg-danger-light, #fee2e2); color: var(--cfg-danger); }
+        #cfg-root .panel-header-stat + .panel-header-actions { margin-left: 10px; }
+
         #cfg-root .panel-body { padding: 18px 20px; }
 
         /* === FORM === */
@@ -727,8 +748,10 @@
         .cert-btn-primary:hover { filter: brightness(1.07); }
 
         /* === DASHBOARD === */
+        /* 540px, não 360: com três modos (curso/colaborador/unidade) os
+           rótulos com ícone se espremiam e quebravam em duas linhas. */
         #cfg-root .dashboard-mode-toggle {
-            display: flex; gap: 6px; max-width: 360px;
+            display: flex; gap: 6px; max-width: 540px;
             background: var(--bg); border: 1.5px solid var(--cfg-border);
             border-radius: 8px; padding: 3px; margin-bottom: 18px;
         }
@@ -828,7 +851,17 @@
         #cfg-root .dash-course-subject-tag {
             display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
             color: var(--cfg-primary); background: var(--cfg-primary-light); border-radius: 20px;
-            padding: 2px 8px; margin-bottom: 5px;
+            padding: 2px 8px; margin-bottom: 5px; margin-right: 6px;
+        }
+        /* Competência do recorte, ao lado da categoria: o cabeçalho conta
+           números filtrados, então precisa dizer de qual período eles são. */
+        #cfg-root .dash-course-subject-tag.is-period {
+            color: var(--text-2); background: var(--bg); border: 1px solid var(--cfg-border);
+        }
+        /* Recorte por função só aparece quando está ativo, então usa a cor de
+           destaque: é uma restrição aplicada, não um rótulo neutro. */
+        #cfg-root .dash-course-subject-tag.is-role {
+            color: var(--purple); background: var(--purple-light);
         }
         #cfg-root .dash-course-body h3 {
             font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 4px; line-height: 1.35;
@@ -927,6 +960,47 @@
         }
         #cfg-root .dash-user-card-stats span { display: inline-flex; align-items: center; gap: 4px; }
         #cfg-root .dash-user-card-stats span.is-warn { color: var(--cfg-warning); }
+
+        /* Grade de unidades — são poucas e cada card carrega mais métricas que
+           o de pessoa, então segue o auto-fill do grid de cursos em vez das 5
+           colunas fixas do grid de colaboradores. */
+        #cfg-root .dash-unit-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 14px; margin-bottom: 22px;
+        }
+        #cfg-root .dash-unit-card {
+            display: flex; align-items: center; gap: 14px; text-align: left;
+            padding: 16px; background: var(--cfg-surface);
+            border: 1.5px solid var(--cfg-border); border-radius: 14px;
+            font-family: inherit; cursor: pointer;
+            transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+        }
+        #cfg-root .dash-unit-card:hover {
+            transform: translateY(-2px); border-color: #c5d3e8; box-shadow: var(--cfg-shadow-sm);
+        }
+        #cfg-root .dash-unit-card.is-selected {
+            border-color: var(--accent, #4f8ef7); box-shadow: 0 0 0 3px rgba(79,142,247,0.15);
+        }
+        #cfg-root .dash-unit-card-icon {
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+            width: 46px; height: 46px; border-radius: 12px;
+            background: var(--cfg-primary-light); color: var(--cfg-primary); font-size: 18px;
+        }
+        #cfg-root .dash-unit-card-body { min-width: 0; flex: 1; }
+        #cfg-root .dash-unit-card-body h3 {
+            font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 6px; line-height: 1.3;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #cfg-root .dash-unit-card-stats {
+            display: flex; flex-wrap: wrap; gap: 4px 10px;
+            font-size: 10.5px; color: var(--text-3);
+        }
+        #cfg-root .dash-unit-card-stats span { display: inline-flex; align-items: center; gap: 4px; }
+        #cfg-root .dash-unit-card-stats span.is-warn { color: var(--cfg-warning); }
+        #cfg-root .hfilter-chip-note {
+            display: inline-flex; align-items: center; height: 30px;
+            font-size: 12px; color: var(--text-3);
+        }
 
         @media (max-width: 640px) {
             #cfg-root .dash-course-grid { grid-template-columns: 1fr; }
@@ -2217,104 +2291,180 @@
         #cfg-wipe-btn:hover { filter: brightness(1.08); }
         #cfg-wipe-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        /* === MODAL: DASHBOARD > CURSO (Informações / Gráficos + Resetar) === */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-content { max-width: 1100px; width: 92vw; max-height: 88vh; display: flex; flex-direction: column; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .modal-body.dash-course-modal-body { overflow-y: auto; flex: 1; }
+        /* === MODAL: DASHBOARD > CURSO / COLABORADOR / UNIDADE === */
+        /* Os três modais são irmãos de #cfg-root, não filhos — por isso nada
+           aqui pega por herança e cada regra precisa listar os três ids. Um
+           modal esquecido nessa lista não fica só "sem estilo": os cards de
+           gráfico perdem a altura fixa do .panel-body e o Chart.js, com
+           maintainAspectRatio:false, cresce em laço até a página travar. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-content { max-width: 1100px; width: 92vw; max-height: 88vh; display: flex; flex-direction: column; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .modal-body.dash-course-modal-body { overflow-y: auto; flex: 1; }
 
         /* --- Hero: thumb + título + resumo rápido --- */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero {
             display: flex; align-items: center; gap: 16px; padding: 20px 24px;
             background: linear-gradient(135deg, var(--cfg-primary-light), transparent 70%);
             border-bottom: 1px solid var(--cfg-border); position: relative;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-thumb {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-thumb {
             width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
             background: linear-gradient(135deg, var(--cfg-primary), #60a5fa);
             color: #fff; font-weight: 700; font-size: 16px;
             box-shadow: 0 4px 14px rgba(37,99,235,0.28);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-info { flex: 1; min-width: 0; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-info h2 {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-info { flex: 1; min-width: 0; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-info h2 {
             font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 6px;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero-stats { display: flex; flex-wrap: wrap; gap: 8px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .hero-stat {
             display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
             font-size: 11.5px; font-weight: 700; background: var(--cfg-surface); color: var(--text-2);
             border: 1px solid var(--cfg-border);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat i { font-size: 11px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat.is-ok { color: var(--cfg-success); border-color: var(--cfg-success-light); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .hero-stat.is-warn { color: var(--cfg-warning); border-color: var(--cfg-warning-light); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-hero .close { position: static; flex-shrink: 0; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .hero-stat i { font-size: 11px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .hero-stat.is-ok { color: var(--cfg-success); border-color: var(--cfg-success-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .hero-stat.is-warn { color: var(--cfg-warning); border-color: var(--cfg-warning-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-hero .close { position: static; flex-shrink: 0; }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-tabs {
             display: flex; gap: 4px; padding: 12px 24px 14px; border-bottom: 1px solid var(--cfg-border);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-tabs .tab-btn {
             display: inline-flex; align-items: center; gap: 7px;
             padding: 8px 16px; border: none; background: transparent; border-radius: 8px;
             font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer;
             transition: background 0.15s, color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn:hover { background: var(--bg); color: var(--text-2); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-tabs .tab-btn.active { background: var(--cfg-primary-light); color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .tab-count {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-tabs .tab-btn:hover { background: var(--bg); color: var(--text-2); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-tabs .tab-btn.active { background: var(--cfg-primary-light); color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .tab-count {
             display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
             padding: 0 5px; border-radius: 999px; background: var(--cfg-border); color: var(--text-2);
             font-size: 10.5px; font-weight: 700; transition: background 0.15s, color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .tab-btn.active .tab-count { background: var(--cfg-primary); color: #fff; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .tab-btn.active .tab-count { background: var(--cfg-primary); color: #fff; }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-body .tab-content { display: none; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-body .tab-content.active {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-body .tab-content { display: none; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-body .tab-content.active {
             display: flex; flex-direction: column; gap: 18px; animation: fadeSlide 0.22s ease;
         }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-card {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-card {
             background: var(--cfg-surface); border: 1px solid var(--cfg-border);
             border-radius: var(--r-lg); box-shadow: var(--cfg-shadow-sm); overflow: hidden;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-header {
             padding: 16px 20px 14px; border-bottom: 1px solid var(--cfg-border);
             display: flex; align-items: center; gap: 11px;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-body { padding: 18px 20px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-body { padding: 18px 20px; }
 
         /* Filtro de ano: chip discreto e redondo (só ícone + rótulo curto),
            alinhado à direita — não deve ocupar uma linha inteira. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-filters { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip { position: relative; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-filters { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-chip { position: relative; }
+
+        /* Filtro de período (mês inicial → mês final): mesmo chip do ano, com
+           popover de formulário em vez de lista. Reaproveita .dash-year-btn
+           para os dois ficarem idênticos lado a lado. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-range-chip { position: relative; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-range-chip.is-active .dash-year-btn {
+            background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-range-chip.is-open .dash-year-btn { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .hfilter-chip-popover-range {
+            left: auto; right: 0; width: 240px; padding: 12px; z-index: 60;
+        }
+        .dash-range-fields { display: flex; flex-direction: column; gap: 10px; }
+        .dash-range-field { display: flex; flex-direction: column; gap: 4px; }
+        .dash-range-field span { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .02em; }
+        .dash-range-field input {
+            height: 32px; padding: 0 10px; border-radius: var(--r-sm, 8px);
+            border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
+            font-size: 12.5px; font-family: inherit; color: var(--text-1); box-sizing: border-box; width: 100%;
+        }
+        .dash-range-field input:focus { outline: none; border-color: var(--cfg-primary); }
+        .dash-range-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .dash-range-btn {
+            flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            height: 30px; border-radius: 999px; border: 1.5px solid var(--cfg-border);
+            font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background 0.14s, border-color 0.14s, color 0.14s;
+        }
+        .dash-range-btn i { font-size: 11px; }
+        .dash-range-btn.is-ghost { background: var(--cfg-surface); color: var(--text-2); }
+        .dash-range-btn.is-ghost:hover { border-color: var(--cfg-danger); color: var(--cfg-danger); }
+        .dash-range-btn.is-primary { background: var(--cfg-primary); border-color: var(--cfg-primary); color: #fff; }
+        .dash-range-btn.is-primary:hover { filter: brightness(1.05); }
+
+        /* "Baixar em planilha": mesmo formato de pílula dos chips de data que
+           ficam ao lado, em verde de planilha pra não se confundir com filtro. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-export-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            height: 30px; padding: 0 14px; border-radius: 999px; box-sizing: border-box;
+            border: 1.5px solid #10b981; background: #10b981; color: #fff;
+            font-size: 12px; font-weight: 600; font-family: inherit; white-space: nowrap;
+            cursor: pointer; transition: filter 0.15s, box-shadow 0.15s, opacity 0.15s;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-export-btn i { font-size: 12px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-export-btn:hover { filter: brightness(1.06); box-shadow: var(--cfg-shadow-sm); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-export-btn:disabled { opacity: 0.6; cursor: progress; filter: none; box-shadow: none; }
+        /* "Baixar relatório" (PDF): mesma pílula, no azul-petróleo do relatório,
+           pra ficar claro que são dois arquivos diferentes e não dois cliques
+           do mesmo botão. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-export-btn.is-pdf {
+            border-color: #028090; background: #028090;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-btn {
             display: inline-flex; align-items: center; gap: 6px;
             height: 30px; padding: 0 12px; border-radius: 999px;
             border: 1.5px solid var(--cfg-border); background: var(--cfg-surface);
             color: var(--text-2); font-size: 12px; font-weight: 600; font-family: inherit;
             cursor: pointer; transition: border-color 0.14s, color 0.14s, background 0.14s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-btn i { font-size: 11px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-btn:hover { border-color: #c5d3e8; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip.is-active .dash-year-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-btn i { font-size: 11px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-btn:hover { border-color: #c5d3e8; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-chip.is-active .dash-year-btn {
             background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip.is-open .dash-year-btn { border-color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-year-chip .hfilter-chip-popover { left: auto; right: 0; width: 150px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-chip.is-open .dash-year-btn { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-year-chip .hfilter-chip-popover { left: auto; right: 0; width: 150px; }
+        /* Função: mesmo botão do chip de ano, popover mais largo porque
+           cargos são nomes longos ("Técnico de Enfermagem") e com campo de
+           busca no topo — a lista passa de dezenas de itens. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-role-chip { position: relative; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-role-chip.is-active .dash-year-btn {
+            background: var(--cfg-primary-light); border-color: var(--cfg-primary); color: var(--cfg-primary);
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-role-chip.is-open .dash-year-btn { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-role-chip .hfilter-chip-popover {
+            left: auto; right: 0; width: 240px; z-index: 60;
+        }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-role-chip .hfilter-chip-list { max-height: 240px; overflow-y: auto; }
+        /* Cursos têm nomes bem mais longos que cargos ("NR-32 — Segurança no
+           Trabalho em Serviços de Saúde"), então o popover é mais largo e os
+           itens quebram em duas linhas em vez de truncar. */
+        :is(#cfg-dash-user-modal, #cfg-dash-unit-modal) :is(#cfg-dash-user-course-chip, #cfg-dash-unit-course-chip) .hfilter-chip-popover { width: 300px; }
+        :is(#cfg-dash-user-modal, #cfg-dash-unit-modal) :is(#cfg-dash-user-course-chip, #cfg-dash-unit-course-chip) .hfilter-chip-item {
+            align-items: flex-start; line-height: 1.35;
+        }
         /* Unidade (múltipla escolha): abre pra esquerda, senão estoura a
            borda direita do card; overflow:visible no card + z-index alto no
            popover pra não ficar atrás do card vizinho nem cortado. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-chip .hfilter-chip-popover { left: auto; right: 0; width: 220px; z-index: 60; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-chip.is-open { position: relative; z-index: 41; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card:has(.dash-unit-chip.is-open) { overflow: visible; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-unit-chip .hfilter-chip-popover { left: auto; right: 0; width: 220px; z-index: 60; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-unit-chip.is-open { position: relative; z-index: 41; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-card:has(.dash-unit-chip.is-open) { overflow: visible; }
 
         /* Popover de unidade que também lista os usuários das unidades
            marcadas (Tempo para Conclusão) — mais largo que o chip simples
            de filtro pra caber os nomes sem quebrar demais. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-unit-users-chip .hfilter-chip-popover { width: 260px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-unit-users-chip .hfilter-chip-popover { width: 260px; }
         .hfilter-chip-unit-users { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cfg-border); }
         .hfilter-chip-unit-users:empty { display: none; }
         .hfilter-chip-unit-users-title { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .02em; padding: 2px 9px 6px; }
@@ -2322,7 +2472,7 @@
         .hfilter-chip-unit-user { padding: 6px 9px; border-radius: 8px; font-size: 12.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
         .hfilter-chip-unit-user i { font-size: 10px; color: var(--text-3); }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
         /* column, não row: canvas e paginação (quando presente) empilham em
            vez de disputar espaço lado a lado — sem isso, com muitas barras
            (ex.: "Tempo para Conclusão da Avaliação" com todas as unidades
@@ -2330,67 +2480,87 @@
            embaixo. min-height:0 deixa o canvas de fato encolher dentro do
            flex quando o pager ocupa espaço, já que canvas sozinho não respeita
            o container sem isso. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .panel-body {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-card .panel-body {
             height: 260px; display: flex; flex-direction: column; align-items: stretch; justify-content: center;
         }
         /* Tempo para Conclusão (da Avaliação / geral): com muitas unidades,
            280px espremia demais as barras. Mais alto evita ficar achatado. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card-tall .panel-body { height: 380px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card canvas { flex: 1 1 auto; min-height: 0; max-height: 100%; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-card-tall .panel-body { height: 380px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-card canvas { flex: 1 1 auto; min-height: 0; max-height: 100%; }
+
+        /* Balão dos riscos de referência (média do curso / meta esperada).
+           Eles são desenhados por plugin, não são elementos do Chart.js, então
+           não têm tooltip nativo — este balão é posicionado à mão sobre o
+           risco (ver bindMarkerTooltip). O host precisa de position:relative
+           pro left/top do balão serem relativos ao card. */
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-body.dash-marker-host { position: relative; }
+        .dash-marker-tip {
+            position: absolute; z-index: 5; pointer-events: none;
+            display: none; align-items: center; gap: 6px;
+            transform: translate(-50%, calc(-100% - 6px));
+            padding: 5px 10px; border-radius: 8px; white-space: nowrap;
+            background: rgba(15, 23, 42, 0.92); color: #fff;
+            font-size: 11.5px; font-weight: 500; line-height: 1;
+            box-shadow: 0 4px 12px -2px rgba(9, 15, 30, 0.35);
+        }
+        .dash-marker-tip.is-visible { display: inline-flex; }
+        .dash-marker-tip-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+        .dash-marker-tip-label { opacity: 0.8; }
+        .dash-marker-tip b { font-weight: 800; font-variant-numeric: tabular-nums; }
         /* margin-top:auto empurra o pager pro fim do card (colado na borda
            inferior) mesmo quando o canvas não preenche toda a altura —
            sem isso o justify-content:center do .panel-body colava o pager
            logo abaixo do canvas, flutuando no meio do card em vez de fixo
            embaixo. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-card .dash-comments-pagination { flex: 0 0 auto; margin-top: auto; padding-top: 8px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-card .dash-comments-pagination { flex: 0 0 auto; margin-top: auto; padding-top: 8px; }
         @media (max-width: 900px) {
-            :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-chart-row { grid-template-columns: 1fr; }
+            :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-chart-row { grid-template-columns: 1fr; }
         }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; border-radius: 10px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) #cfg-dash-course-comments.dashboard-table-wrap { max-height: none; overflow-y: visible; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; border-radius: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) #cfg-dash-course-comments.dashboard-table-wrap { max-height: none; overflow-y: visible; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th {
             text-align: left; padding: 9px 10px; color: var(--text-2);
             font-weight: 700; border-bottom: 1.5px solid var(--cfg-border); white-space: nowrap;
             font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap table.is-sticky thead th {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap table.is-sticky thead th {
             position: sticky; top: 0; background: var(--cfg-surface); z-index: 1;
         }
         /* Cabeçalho clicável: ordena a tabela por aquela coluna. O ícone
            mostra a direção atual e fica apagado nas colunas não ordenadas. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sortable {
             cursor: pointer; user-select: none; transition: color 0.12s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable:hover { color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable i {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sortable:hover { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sortable i {
             font-size: 10px; margin-left: 3px; opacity: 0.25;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sortable:hover i { opacity: 0.6; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sorted { color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap th.is-sorted i { opacity: 1; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap td {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sortable:hover i { opacity: 0.6; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sorted { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap th.is-sorted i { opacity: 1; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap td {
             padding: 10px 10px; border-bottom: 1px solid var(--cfg-border); color: var(--text); vertical-align: middle;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tr:last-child td { border-bottom: none; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tr:last-child td { border-bottom: none; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr {
             transition: background 0.12s;
             animation: rowFadeIn 0.25s ease backwards;
             animation-delay: calc(var(--row-i, 0) * 0.025s);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:nth-child(even) { background: var(--bg); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr:hover { background: var(--cfg-primary-light); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable { cursor: pointer; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable:hover { background: var(--cfg-primary-light); box-shadow: inset 3px 0 0 var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap tbody tr.is-clickable td:last-child { position: relative; z-index: 1; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr:nth-child(even) { background: var(--bg); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr:hover { background: var(--cfg-primary-light); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr.is-clickable { cursor: pointer; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr.is-clickable:hover { background: var(--cfg-primary-light); box-shadow: inset 3px 0 0 var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap tbody tr.is-clickable td:last-child { position: relative; z-index: 1; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-empty { padding: 16px 0; color: var(--text-3); font-size: 13px; }
         @keyframes rowFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Avatar com iniciais coloridas, mesmo critério de cor por hash usado
            nos cards de curso — identidade visual consistente sem foto. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .row-name { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .row-avatar {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .row-name { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .row-avatar {
             width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
             display: inline-flex; align-items: center; justify-content: center;
             font-size: 10px; font-weight: 800; color: #fff;
@@ -2399,180 +2569,306 @@
 
         /* Estado vazio ilustrado (ícone grande + texto), usado nas tabelas
            de Concluídos e Faltantes. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-empty-state {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 8px; padding: 34px 10px; color: var(--text-3); text-align: center;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state i { font-size: 26px; opacity: 0.5; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-empty-state p { font-size: 12.5px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-empty-state i { font-size: 26px; opacity: 0.5; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-empty-state p { font-size: 12.5px; }
 
         /* Badge de prazo com cor por status */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .deadline-pill {
             display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
             font-size: 11px; font-weight: 700; white-space: nowrap;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-good { background: var(--cfg-success-light); color: var(--cfg-success); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-mid { background: var(--cfg-warning-light); color: var(--cfg-warning); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .deadline-pill.is-neutral { background: var(--cfg-border); color: var(--text-2); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .deadline-pill.is-good { background: var(--cfg-success-light); color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .deadline-pill.is-mid { background: var(--cfg-warning-light); color: var(--cfg-warning); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .deadline-pill.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .deadline-pill.is-neutral { background: var(--cfg-border); color: var(--text-2); }
 
         /* Busca rápida no cabeçalho dos painéis */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-search {
             display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px;
             border: 1.5px solid var(--cfg-border); background: var(--cfg-surface); box-sizing: border-box;
             font-size: 12px; color: var(--text-3); transition: border-color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search:focus-within { border-color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search i { font-size: 11px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-search input {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-search:focus-within { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-search i { font-size: 11px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-search input {
             border: none; outline: none; background: transparent; font-size: 12px; color: var(--text);
             width: 130px; font-family: inherit; height: 100%;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-select {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-select {
             height: 30px; padding: 0 11px; border-radius: 999px; border: 1.5px solid var(--cfg-border);
             background: var(--cfg-surface); font-size: 12px; color: var(--text-2); box-sizing: border-box;
             font-family: inherit; cursor: pointer; outline: none; transition: border-color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-select:hover,
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-select:focus { border-color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-select:hover,
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-select:focus { border-color: var(--cfg-primary); }
 
         /* Toggle "Críticos" (notas < 6) no painel de Reprovados */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-critical-toggle {
             display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
             border: 1.5px solid var(--cfg-border); background: var(--cfg-surface); box-sizing: border-box;
             font-size: 12px; font-family: inherit; color: var(--text-2); cursor: pointer; transition: all 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle:hover { border-color: var(--cfg-danger); color: var(--cfg-danger); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-critical-toggle.is-active {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-critical-toggle:hover { border-color: var(--cfg-danger); color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-critical-toggle.is-active {
             background: var(--cfg-danger-light); border-color: var(--cfg-danger); color: var(--cfg-danger);
         }
 
         /* Alternador Geral/Unidade do gráfico de Satisfação: mesmo gráfico,
            duas leituras (distribuição de estrelas x média por unidade). */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-switch {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-mode-switch {
             display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px;
             border: 1.5px solid var(--cfg-border); background: var(--bg);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-mode-btn {
             height: 24px; padding: 0 12px; border: none; border-radius: 999px; background: none;
             font-size: 11.5px; font-weight: 600; font-family: inherit; color: var(--text-3);
             cursor: pointer; transition: background 0.15s, color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn:hover { color: var(--cfg-primary); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-mode-btn.is-active {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-mode-btn:hover { color: var(--cfg-primary); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-mode-btn.is-active {
             background: var(--cfg-surface); color: var(--cfg-primary); box-shadow: var(--cfg-shadow-sm);
         }
 
         /* --- Comentários: cards em vez de tabela crua, com estrelas douradas --- */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-cards { display: flex; flex-direction: column; gap: 10px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-cards { display: flex; flex-direction: column; gap: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card {
             border: 1px solid var(--cfg-border); border-radius: var(--r-md, 10px);
             background: var(--bg); padding: 12px 14px; transition: box-shadow 0.15s, border-color 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card:hover { border-color: var(--cfg-primary-light); box-shadow: var(--cfg-shadow-sm); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card:hover { border-color: var(--cfg-primary-light); box-shadow: var(--cfg-shadow-sm); }
         /* Borda lateral colorida pela nota: leitura rápida em fila de comentários. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card { border-left: 3px solid var(--cfg-border); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-high { border-left-color: var(--cfg-success); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-mid { border-left-color: var(--cfg-warning); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card.rating-low { border-left-color: var(--cfg-danger); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-head {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card { border-left: 3px solid var(--cfg-border); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card.rating-high { border-left-color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card.rating-mid { border-left-color: var(--cfg-warning); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card.rating-low { border-left-color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-head {
             display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-name {
             font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-name i { color: var(--cfg-primary); font-size: 14px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-name i { color: var(--cfg-primary); font-size: 14px; }
         /* Unidade do colaborador ao lado do nome: dá contexto ao comentário
            sem precisar abrir o detalhe da avaliação. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-unit {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-unit {
             font-size: 11px; font-weight: 600; color: var(--text-3);
             display: inline-flex; align-items: center; gap: 4px;
             background: var(--bg-2, #f1f5f9); border-radius: 999px; padding: 2px 8px;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-unit i { font-size: 10px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-head-left {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-unit i { font-size: 10px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-head-left {
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-rating { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-rating { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-text {
             font-size: 12.5px; color: var(--text-2); line-height: 1.5;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
             cursor: pointer;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text.is-expanded { -webkit-line-clamp: unset; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-text.is-empty { font-style: italic; color: var(--text-3); cursor: default; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-card-more {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-text.is-expanded { -webkit-line-clamp: unset; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-text.is-empty { font-style: italic; color: var(--text-3); cursor: default; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-card-more {
             font-size: 11px; font-weight: 700; color: var(--cfg-primary); cursor: pointer; margin-top: 4px; display: inline-block;
         }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars { display: inline-flex; gap: 2px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-stars { display: inline-flex; gap: 2px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-stars i {
             font-size: 12px; color: #e2c88a;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i.is-filled {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-stars i.is-filled {
             background: linear-gradient(180deg, #ffd76a, #f5a623);
             -webkit-background-clip: text; background-clip: text; color: transparent;
             filter: drop-shadow(0 0.5px 0.5px rgba(191, 130, 8, 0.4));
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comment-stars i.is-empty { color: var(--cfg-border); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comment-stars i.is-empty { color: var(--cfg-border); }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-comments-pagination {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-comments-pagination {
             display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 14px; margin-top: 4px;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comments-page-btn {
             width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--cfg-border);
             background: var(--cfg-surface); color: var(--text-2); cursor: pointer; font-size: 12px;
             display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn:hover:not(:disabled) {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comments-page-btn:hover:not(:disabled) {
             border-color: var(--cfg-primary); color: var(--cfg-primary); background: var(--cfg-primary-light);
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-btn:disabled { opacity: 0.35; cursor: default; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .comments-page-info { font-size: 12px; font-weight: 600; color: var(--text-3); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comments-page-btn:disabled { opacity: 0.35; cursor: default; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .comments-page-info { font-size: 12px; font-weight: 600; color: var(--text-3); }
 
         /* --- Aba Conclusões --- */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .panel-header { justify-content: space-between; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .panel-header { justify-content: space-between; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .conclusion-situation {
             display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
             font-size: 11.5px; font-weight: 700; white-space: nowrap;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .conclusion-situation.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .conclusion-situation.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .conclusion-situation.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress { display: flex; align-items: center; gap: 8px; min-width: 150px; }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-bar {
             flex: 1; height: 7px; border-radius: 999px; background: var(--cfg-border); overflow: hidden;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-bar span {
             display: block; height: 100%; border-radius: 999px;
             transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
         }
         /* Faixas de cor: vermelho/laranja no início, âmbar no meio, verde perto de concluir. */
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-low { background: linear-gradient(90deg, #ef4444, #f87171); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-mid { background: linear-gradient(90deg, var(--cfg-warning), #fbbf24); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-bar span.is-high { background: linear-gradient(90deg, #22c55e, var(--cfg-success)); }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .missing-progress-pct { font-size: 11.5px; font-weight: 700; color: var(--text-2); width: 34px; text-align: right; }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-bar span.is-low { background: linear-gradient(90deg, #ef4444, #f87171); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-bar span.is-mid { background: linear-gradient(90deg, var(--cfg-warning), #fbbf24); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-bar span.is-high { background: linear-gradient(90deg, #22c55e, var(--cfg-success)); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .missing-progress-pct { font-size: 11.5px; font-weight: 700; color: var(--text-2); width: 34px; text-align: right; }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-copy-missing-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-copy-missing-btn {
             display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
             border: 1.5px solid var(--cfg-primary-light); background: var(--cfg-primary-light); color: var(--cfg-primary);
             font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-copy-missing-btn:hover { background: var(--cfg-primary); color: #fff; transform: translateY(-1px); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-copy-missing-btn:hover { background: var(--cfg-primary); color: #fff; transform: translateY(-1px); }
 
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-footer {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-footer {
             padding: 16px 24px 22px; border-top: 1px solid var(--cfg-border);
             display: flex; justify-content: flex-end;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-reset-btn {
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-reset-btn {
             display: inline-flex; align-items: center; gap: 8px;
             padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--cfg-danger-light);
             background: var(--cfg-danger-light); color: var(--cfg-danger);
             font-size: 13px; font-weight: 700; cursor: pointer;
             transition: background 0.15s, transform 0.15s;
         }
-        :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-reset-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); }
+        :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-reset-btn:hover { background: var(--cfg-danger); color: #fff; transform: translateY(-1px); }
+
+        /* === MODAL: "de onde vêm os dados" (clique numa fatia/barra dos
+           gráficos do colaborador) === */
+        /* z-index acima do modal do colaborador (2000) e abaixo do detalhe da
+           avaliação (2200), que abre a partir daqui. */
+        #cfg-dash-drill-modal { z-index: 2100; }
+        #cfg-dash-drill-modal .dash-drill-modal-content {
+            max-width: 620px; width: 92vw; max-height: 84vh;
+            display: flex; flex-direction: column; padding: 0; overflow: hidden;
+        }
+        /* Faixa do topo no mesmo tom do hero do modal do colaborador, pra
+           ficar claro que é um detalhamento daquela tela, não outra seção. */
+        #cfg-dash-drill-modal .dash-drill-hero {
+            display: flex; align-items: center; gap: 14px;
+            padding: 20px 24px; background: linear-gradient(135deg, #eff4ff 0%, #f8fafc 100%);
+            border-bottom: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-drill-modal .dash-drill-hero-icon {
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+            width: 44px; height: 44px; border-radius: 14px;
+            background: var(--cfg-primary-light); color: var(--cfg-primary); font-size: 18px;
+        }
+        #cfg-dash-drill-modal .dash-drill-hero-icon.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-drill-modal .dash-drill-hero-icon.is-warn { background: var(--cfg-warning-light); color: var(--cfg-warning); }
+        #cfg-dash-drill-modal .dash-drill-hero-icon.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        #cfg-dash-drill-modal .dash-drill-hero-info { min-width: 0; flex: 1; }
+        #cfg-dash-drill-modal .dash-drill-hero-info h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+        #cfg-dash-drill-modal .dash-drill-subtitle { font-size: 12px; color: var(--text-3); margin-top: 3px; line-height: 1.4; }
+        #cfg-dash-drill-modal .close { align-self: flex-start; }
+
+        /* Três números-resumo do recorte, antes da lista. */
+        #cfg-dash-drill-modal .dash-drill-stats {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            padding: 16px 24px; border-bottom: 1px solid var(--cfg-border); background: var(--cfg-surface);
+        }
+        #cfg-dash-drill-modal .dash-drill-stat {
+            display: flex; flex-direction: column; gap: 2px; align-items: center; text-align: center;
+            padding: 10px 8px; border-radius: var(--r-md, 10px); background: var(--bg);
+            border: 1px solid var(--cfg-border);
+        }
+        #cfg-dash-drill-modal .dash-drill-stat-value { font-size: 19px; font-weight: 800; color: var(--text); line-height: 1.1; }
+        #cfg-dash-drill-modal .dash-drill-stat-label { font-size: 10.5px; font-weight: 600; color: var(--text-3); line-height: 1.25; }
+        #cfg-dash-drill-modal .dash-drill-stat.is-ok .dash-drill-stat-value { color: var(--cfg-success); }
+        #cfg-dash-drill-modal .dash-drill-stat.is-warn .dash-drill-stat-value { color: var(--cfg-warning); }
+        #cfg-dash-drill-modal .dash-drill-stat.is-bad .dash-drill-stat-value { color: var(--cfg-danger); }
+
+        #cfg-dash-drill-modal .dash-drill-body { overflow-y: auto; flex: 1; padding: 18px 24px 24px; }
+        #cfg-dash-drill-modal .dash-drill-list { display: flex; flex-direction: column; gap: 10px; }
+        /* Cada realização é um botão: o card inteiro abre o detalhe da prova. */
+        #cfg-dash-drill-modal .dash-drill-card {
+            display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left;
+            padding: 13px 15px; border: 1px solid var(--cfg-border); border-left: 3px solid var(--cfg-border);
+            border-radius: var(--r-md, 10px); background: var(--cfg-surface);
+            font-family: inherit; cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+        }
+        #cfg-dash-drill-modal .dash-drill-card:hover {
+            transform: translateY(-1px); box-shadow: var(--cfg-shadow-sm); border-color: var(--cfg-primary-light);
+        }
+        #cfg-dash-drill-modal .dash-drill-card.is-ok { border-left-color: var(--cfg-success); }
+        #cfg-dash-drill-modal .dash-drill-card.is-bad { border-left-color: var(--cfg-danger); }
+        /* Pendência não abre detalhe de prova (não existe prova): o card é só
+           leitura, então perde o cursor e o hover que prometem clique. */
+        #cfg-dash-drill-modal .dash-drill-card.is-pending {
+            cursor: default; border-left-color: var(--cfg-warning);
+        }
+        #cfg-dash-drill-modal .dash-drill-card.is-pending:hover {
+            transform: none; box-shadow: none; border-color: var(--cfg-border);
+            border-left-color: var(--cfg-warning);
+        }
+        #cfg-dash-drill-modal .dash-drill-pending-pct {
+            font-size: 12px; font-weight: 800; white-space: nowrap;
+        }
+        #cfg-dash-drill-modal .dash-drill-pending-pct.is-high { color: var(--cfg-success); }
+        #cfg-dash-drill-modal .dash-drill-pending-pct.is-mid { color: var(--cfg-warning); }
+        #cfg-dash-drill-modal .dash-drill-pending-pct.is-low { color: var(--cfg-danger); }
+        #cfg-dash-drill-modal .dash-drill-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        #cfg-dash-drill-modal .dash-drill-card-name {
+            font-size: 13.5px; font-weight: 700; color: var(--text); line-height: 1.3; min-width: 0;
+        }
+        #cfg-dash-drill-modal .dash-drill-card-meta {
+            display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--text-3);
+        }
+        #cfg-dash-drill-modal .dash-drill-card-meta span { display: inline-flex; align-items: center; gap: 5px; }
+        #cfg-dash-drill-modal .dash-drill-card-meta i { font-size: 10px; opacity: 0.8; }
+        #cfg-dash-drill-modal .dash-drill-card-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        #cfg-dash-drill-modal .dash-drill-card-extra {
+            display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px;
+            background: var(--cfg-primary-light); color: var(--cfg-primary);
+            font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        /* Os balões de nota/prazo/situação vivem em escopos de outros modais;
+           o detalhamento é um modal próprio e precisa da sua própria cópia. */
+        #cfg-dash-drill-modal .hist-score {
+            display: inline-flex; align-items: baseline; gap: 1px; flex-shrink: 0;
+            padding: 4px 7px; border-radius: 9px; font-variant-numeric: tabular-nums; white-space: nowrap;
+        }
+        #cfg-dash-drill-modal .hist-score b { font-size: 12px; font-weight: 800; }
+        #cfg-dash-drill-modal .hist-score small { font-size: 9px; font-weight: 700; opacity: 0.65; }
+        #cfg-dash-drill-modal .hist-score.is-high { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-drill-modal .hist-score.is-mid { background: #fef3c7; color: #b45309; }
+        #cfg-dash-drill-modal .hist-score.is-low { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        #cfg-dash-drill-modal :is(.deadline-pill, .conclusion-situation) {
+            display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+            font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        #cfg-dash-drill-modal .deadline-pill.is-good { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-drill-modal .deadline-pill.is-mid { background: var(--cfg-warning-light); color: var(--cfg-warning); }
+        #cfg-dash-drill-modal .deadline-pill.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        #cfg-dash-drill-modal .deadline-pill.is-neutral { background: var(--cfg-border); color: var(--text-2); }
+        #cfg-dash-drill-modal .conclusion-situation.is-ok { background: var(--cfg-success-light); color: var(--cfg-success); }
+        #cfg-dash-drill-modal .conclusion-situation.is-bad { background: var(--cfg-danger-light); color: var(--cfg-danger); }
+        #cfg-dash-drill-modal .dashboard-empty-state {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            padding: 40px 20px; color: var(--text-3); text-align: center;
+        }
+        #cfg-dash-drill-modal .dashboard-empty-state i { font-size: 26px; opacity: 0.5; }
+        #cfg-dash-drill-modal .dashboard-empty-state p { font-size: 12.5px; }
+
+        /* O detalhe da avaliação abre por cima do detalhamento. */
+        #cfg-dash-review-modal { z-index: 2200; }
+
+        @media (max-width: 640px) {
+            #cfg-dash-drill-modal .dash-drill-stats { grid-template-columns: 1fr; }
+            #cfg-dash-drill-modal .dash-drill-card-top { flex-direction: column; align-items: flex-start; gap: 6px; }
+        }
 
         /* === MODAL: "quem errou" (clique numa barra do gráfico Principais Erros) === */
         #cfg-dash-mistake-modal { z-index: 2100; }

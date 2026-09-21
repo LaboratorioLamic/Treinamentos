@@ -270,18 +270,21 @@
     let pendingDownloads = 0;
     let overlayEl = null;
 
-    function showDownloadOverlay() {
+    function showDownloadOverlay(options) {
         pendingDownloads++;
         if (overlayEl) return;
+        const icon = options?.icon || 'fa-award';
+        const title = options?.title || 'Baixando certificado';
+        const hint = options?.hint || 'Aguarde, estamos gerando seu PDF...';
         overlayEl = document.createElement('div');
         overlayEl.className = 'cert-loading-overlay';
         overlayEl.setAttribute('role', 'alert');
         overlayEl.setAttribute('aria-live', 'assertive');
         overlayEl.innerHTML = `
             <div class="cert-loading-panel">
-                <div class="cert-loading-spinner"><i class="fas fa-award"></i></div>
-                <div class="cert-loading-title">Baixando certificado</div>
-                <div class="cert-loading-hint">Aguarde, estamos gerando seu PDF...</div>
+                <div class="cert-loading-spinner"><i class="fas ${icon}"></i></div>
+                <div class="cert-loading-title">${title}</div>
+                <div class="cert-loading-hint">${hint}</div>
                 <div class="cert-loading-bar"><span></span></div>
             </div>`;
         // Trava rolagem e qualquer interação com a página por trás.
@@ -386,5 +389,8 @@
         return !!course?.certificateEnabled;
     }
 
-    U.Certificate = { download, isEnabled, parseTopics };
+    // O overlay serve a qualquer geração de PDF do sistema (certificado,
+    // relatório do colaborador): é o mesmo bloqueio de tela, com o mesmo
+    // contador de downloads pendentes, só trocando o texto.
+    U.Certificate = { download, isEnabled, parseTopics, showOverlay: showDownloadOverlay, hideOverlay: hideDownloadOverlay };
 })();

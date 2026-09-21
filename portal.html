@@ -15,13 +15,14 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css?v=202609181200">
-    <link rel="stylesheet" href="css/admin.css?v=202609181200">
-    <link rel="stylesheet" href="css/admin-courses.css?v=202609181200">
-    <link rel="stylesheet" href="css/auth.css?v=202609181200">
-    <link rel="stylesheet" href="css/certificate.css?v=202609181200">
+    <link rel="stylesheet" href="css/main.css?v=202609211830">
+    <link rel="stylesheet" href="css/admin.css?v=202609211830">
+    <link rel="stylesheet" href="css/admin-courses.css?v=202609211830">
+    <link rel="stylesheet" href="css/auth.css?v=202609211830">
+    <link rel="stylesheet" href="css/certificate.css?v=202609211830">
+    <link rel="stylesheet" href="css/admin-report.css?v=202609211830">
     <!-- Camada de override mobile: precisa ser SEMPRE a ultima folha. -->
-    <link rel="stylesheet" href="css/mobile.css?v=202609181200">
+    <link rel="stylesheet" href="css/mobile.css?v=202609211830">
 </head>
 <body>
 
@@ -1250,6 +1251,7 @@
             </div>
             <div class="dash-course-modal-tabs">
                 <button type="button" class="tab-btn active" data-dash-user-tab="history">Histórico <span class="tab-count" id="cfg-dash-user-tabcount-history">0</span></button>
+                <button type="button" class="tab-btn" data-dash-user-tab="info">Informações <span class="tab-count" id="cfg-dash-user-tabcount-info">0</span></button>
                 <button type="button" class="tab-btn" data-dash-user-tab="charts">Gráficos</button>
             </div>
             <div class="modal-body dash-course-modal-body">
@@ -1261,8 +1263,53 @@
                         </div>
                     </div>
                 </div>
+                <div class="tab-content" id="cfg-dash-user-tab-info">
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <h2>Comentários da Pesquisa de Satisfação</h2>
+                            <div class="panel-header-actions">
+                                <div class="hfilter-chip dash-unit-chip" id="cfg-dash-user-comments-course-chip" data-plural-label="cursos" data-empty-label="Nenhum curso com comentário.">
+                                    <button type="button" class="hfilter-chip-btn" title="Filtrar por curso">
+                                        <i class="fas fa-book"></i>
+                                        <span class="hfilter-chip-label" data-default="Curso">Curso</span>
+                                    </button>
+                                    <div class="hfilter-chip-popover">
+                                        <button type="button" class="hfilter-chip-clear" id="cfg-dash-user-comments-course-clear" hidden><i class="fas fa-eraser"></i> Limpar filtro</button>
+                                        <div class="hfilter-chip-list" id="cfg-dash-user-comments-course-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-user-comments" class="dashboard-table-wrap"></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-user-comments-pagination"></div>
+                        </div>
+                    </div>
+                </div>
                 <div class="tab-content" id="cfg-dash-user-tab-charts">
                     <div class="dashboard-chart-filters">
+                        <div class="hfilter-chip dash-range-chip" id="cfg-dash-user-range-chip">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por período (mês inicial e final)">
+                                <i class="fas fa-calendar-week"></i>
+                                <span class="hfilter-chip-label" data-default="Período">Período</span>
+                            </button>
+                            <div class="hfilter-chip-popover hfilter-chip-popover-range">
+                                <div class="dash-range-fields">
+                                    <label class="dash-range-field">
+                                        <span>Mês inicial</span>
+                                        <input type="month" id="cfg-dash-user-range-start">
+                                    </label>
+                                    <label class="dash-range-field">
+                                        <span>Mês final</span>
+                                        <input type="month" id="cfg-dash-user-range-end">
+                                    </label>
+                                </div>
+                                <div class="dash-range-actions">
+                                    <button type="button" class="dash-range-btn is-ghost" id="cfg-dash-user-range-clear"><i class="fas fa-eraser"></i> Limpar</button>
+                                    <button type="button" class="dash-range-btn is-primary" id="cfg-dash-user-range-apply"><i class="fas fa-check"></i> Aplicar</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="hfilter-chip dash-year-chip" id="cfg-dash-user-year-chip">
                             <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por ano">
                                 <i class="fas fa-calendar-days"></i>
@@ -1272,33 +1319,363 @@
                                 <div class="hfilter-chip-list" id="cfg-dash-user-year-list"></div>
                             </div>
                         </div>
+                        <div class="hfilter-chip dash-role-chip" id="cfg-dash-user-role-chip" data-plural-label="funções" data-empty-label="Nenhum curso com função definida.">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar pelos cursos destinados a uma função">
+                                <i class="fas fa-briefcase"></i>
+                                <span class="hfilter-chip-label" data-default="Função">Função</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <input type="text" class="hfilter-chip-search" id="cfg-dash-user-role-search" placeholder="Buscar função..." autocomplete="off" spellcheck="false">
+                                <div class="hfilter-chip-list" id="cfg-dash-user-role-list"></div>
+                            </div>
+                        </div>
+                        <div class="hfilter-chip dash-role-chip" id="cfg-dash-user-course-chip" data-plural-label="cursos" data-empty-label="Nenhum curso neste recorte.">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por curso, dentro do recorte de data e função">
+                                <i class="fas fa-graduation-cap"></i>
+                                <span class="hfilter-chip-label" data-default="Curso">Curso</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <input type="text" class="hfilter-chip-search" id="cfg-dash-user-course-search" placeholder="Buscar curso..." autocomplete="off" spellcheck="false">
+                                <div class="hfilter-chip-list" id="cfg-dash-user-course-list"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="dash-export-btn" id="cfg-dash-user-export-btn" title="Baixar relatório deste colaborador em Excel, respeitando os filtros de data">
+                            <i class="fas fa-file-excel"></i> Baixar em planilha
+                        </button>
+                        <button type="button" class="dash-export-btn is-pdf" id="cfg-dash-user-pdf-btn" title="Baixar relatório deste colaborador em PDF, respeitando os filtros de data">
+                            <i class="fas fa-file-pdf"></i> Baixar relatório
+                        </button>
                     </div>
                     <div class="panel-card dashboard-chart-card">
-                        <div class="panel-header"><h2>Histórico de Notas</h2></div>
+                        <div class="panel-header">
+                            <h2>Histórico de Notas</h2>
+                            <span class="panel-header-stat" id="cfg-dash-user-scores-avg"></span>
+                        </div>
                         <div class="panel-body"><canvas id="cfg-dash-user-scores-chart"></canvas></div>
                     </div>
                     <div class="dashboard-chart-row">
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Realização dos Cursos</h2></div>
-                            <div class="panel-body"><canvas id="cfg-dash-user-deadline-chart"></canvas></div>
+                            <div class="panel-header">
+                                <h2>Satisfação com os Cursos</h2>
+                                <div class="panel-header-actions">
+                                    <div class="dash-mode-switch" id="cfg-dash-user-satisfaction-mode">
+                                        <button type="button" class="dash-mode-btn is-active" data-mode="geral">Geral</button>
+                                        <button type="button" class="dash-mode-btn" data-mode="curso">Curso</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-user-satisfaction-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-user-satisfaction-empty" style="display:none;">Este colaborador ainda não respondeu nenhuma pesquisa de satisfação.</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-user-satisfaction-pagination"></div>
+                            </div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Tentativas das Avaliações</h2></div>
-                            <div class="panel-body"><canvas id="cfg-dash-user-approval-chart"></canvas></div>
+                            <div class="panel-header"><h2>Realização dos Cursos</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-deadline-chart"></canvas></div>
                         </div>
                     </div>
                     <div class="dashboard-chart-row">
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Progresso em Cursos Pendentes</h2></div>
-                            <div class="panel-body"><canvas id="cfg-dash-user-pending-chart"></canvas></div>
+                            <div class="panel-header"><h2>Tentativas das Avaliações</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-approval-chart"></canvas></div>
                         </div>
                         <div class="panel-card dashboard-chart-card">
-                            <div class="panel-header"><h2>Prazo por Mês</h2></div>
+                            <div class="panel-header"><h2>Retentativas</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-retries-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Notas</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-user-scoresdist-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Prazo por Mês</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
                             <div class="panel-body"><canvas id="cfg-dash-user-deadlinetrend-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                            <div class="panel-header">
+                                <h2>Tempo para Conclusão da Avaliação (Minutos)</h2>
+                                <span class="panel-header-hint"><i class="fas fa-scale-balanced"></i> vs. média do curso</span>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-user-evaltime-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-user-evaltime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-user-evaltime-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                            <div class="panel-header">
+                                <h2>Tempo para Conclusão (Horas)</h2>
+                                <span class="panel-header-hint"><i class="fas fa-scale-balanced"></i> vs. média do curso</span>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-user-completiontime-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-user-completiontime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-user-completiontime-pagination"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                        <div class="panel-header">
+                            <h2>Progresso em Cursos Pendentes</h2>
+                            <span class="panel-header-hint"><i class="fas fa-circle-info"></i> Cursos do público-alvo ainda não aprovados</span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="cfg-dash-user-pending-chart"></canvas>
+                            <p class="dashboard-table-empty" id="cfg-dash-user-pending-empty" style="display:none;">Nenhum curso pendente: este colaborador já concluiu tudo que o cargo exige.</p>
+                            <div class="dash-comments-pagination" id="cfg-dash-user-pending-pagination"></div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal da unidade (Dashboard > Por unidade): mesmo desenho do modal do
+         colaborador, com os números somados de todos os colaboradores da unidade -->
+    <div class="modal" id="cfg-dash-unit-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-unit-modal-title">
+        <div class="modal-content dash-course-modal-content">
+            <div class="dash-course-hero">
+                <div class="dash-course-hero-thumb" id="cfg-dash-unit-hero-thumb">?</div>
+                <div class="dash-course-hero-info">
+                    <h2 id="cfg-dash-unit-modal-title">Unidade</h2>
+                    <div class="dash-course-hero-tags" id="cfg-dash-unit-hero-tags"></div>
+                    <div class="dash-course-hero-stats" id="cfg-dash-unit-hero-stats"></div>
+                </div>
+                <span class="close" id="cfg-dash-unit-modal-close">&times;</span>
+            </div>
+            <div class="dash-course-modal-tabs">
+                <button type="button" class="tab-btn active" data-dash-unit-tab="people">Colaboradores <span class="tab-count" id="cfg-dash-unit-tabcount-people">0</span></button>
+                <button type="button" class="tab-btn" data-dash-unit-tab="history">Histórico <span class="tab-count" id="cfg-dash-unit-tabcount-history">0</span></button>
+                <button type="button" class="tab-btn" data-dash-unit-tab="info">Informações <span class="tab-count" id="cfg-dash-unit-tabcount-info">0</span></button>
+                <button type="button" class="tab-btn" data-dash-unit-tab="charts">Gráficos</button>
+            </div>
+            <div class="modal-body dash-course-modal-body">
+                <div class="tab-content active" id="cfg-dash-unit-tab-people">
+                    <div class="panel-card">
+                        <div class="panel-header"><h2><i class="fas fa-users" style="color:var(--cfg-primary);margin-right:6px;"></i>Colaboradores da unidade</h2></div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-unit-people" class="dashboard-table-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-content" id="cfg-dash-unit-tab-history">
+                    <div class="panel-card">
+                        <div class="panel-header"><h2><i class="fas fa-clock-rotate-left" style="color:var(--cfg-primary);margin-right:6px;"></i>Cursos realizados</h2></div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-unit-history" class="dashboard-table-wrap"></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-unit-history-pagination"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-content" id="cfg-dash-unit-tab-info">
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <h2>Comentários da Pesquisa de Satisfação</h2>
+                            <div class="panel-header-actions">
+                                <div class="hfilter-chip dash-unit-chip" id="cfg-dash-unit-comments-course-chip" data-plural-label="cursos" data-empty-label="Nenhum curso com comentário.">
+                                    <button type="button" class="hfilter-chip-btn" title="Filtrar por curso">
+                                        <i class="fas fa-book"></i>
+                                        <span class="hfilter-chip-label" data-default="Curso">Curso</span>
+                                    </button>
+                                    <div class="hfilter-chip-popover">
+                                        <button type="button" class="hfilter-chip-clear" id="cfg-dash-unit-comments-course-clear" hidden><i class="fas fa-eraser"></i> Limpar filtro</button>
+                                        <div class="hfilter-chip-list" id="cfg-dash-unit-comments-course-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="cfg-dash-unit-comments" class="dashboard-table-wrap"></div>
+                            <div class="dash-comments-pagination" id="cfg-dash-unit-comments-pagination"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-content" id="cfg-dash-unit-tab-charts">
+                    <div class="dashboard-chart-filters">
+                        <div class="hfilter-chip dash-range-chip" id="cfg-dash-unit-range-chip">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por período (mês inicial e final)">
+                                <i class="fas fa-calendar-week"></i>
+                                <span class="hfilter-chip-label" data-default="Período">Período</span>
+                            </button>
+                            <div class="hfilter-chip-popover hfilter-chip-popover-range">
+                                <div class="dash-range-fields">
+                                    <label class="dash-range-field">
+                                        <span>Mês inicial</span>
+                                        <input type="month" id="cfg-dash-unit-range-start">
+                                    </label>
+                                    <label class="dash-range-field">
+                                        <span>Mês final</span>
+                                        <input type="month" id="cfg-dash-unit-range-end">
+                                    </label>
+                                </div>
+                                <div class="dash-range-actions">
+                                    <button type="button" class="dash-range-btn is-ghost" id="cfg-dash-unit-range-clear"><i class="fas fa-eraser"></i> Limpar</button>
+                                    <button type="button" class="dash-range-btn is-primary" id="cfg-dash-unit-range-apply"><i class="fas fa-check"></i> Aplicar</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="hfilter-chip dash-year-chip" id="cfg-dash-unit-year-chip">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por ano">
+                                <i class="fas fa-calendar-days"></i>
+                                <span class="hfilter-chip-label" data-default="Ano">Ano</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <div class="hfilter-chip-list" id="cfg-dash-unit-year-list"></div>
+                            </div>
+                        </div>
+                        <div class="hfilter-chip dash-role-chip" id="cfg-dash-unit-role-chip" data-plural-label="funções" data-empty-label="Nenhuma função nesta unidade.">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por função dos colaboradores">
+                                <i class="fas fa-briefcase"></i>
+                                <span class="hfilter-chip-label" data-default="Função">Função</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <input type="text" class="hfilter-chip-search" id="cfg-dash-unit-role-search" placeholder="Buscar função..." autocomplete="off" spellcheck="false">
+                                <div class="hfilter-chip-list" id="cfg-dash-unit-role-list"></div>
+                            </div>
+                        </div>
+                        <div class="hfilter-chip dash-role-chip" id="cfg-dash-unit-course-chip" data-plural-label="cursos" data-empty-label="Nenhum curso neste recorte.">
+                            <button type="button" class="hfilter-chip-btn dash-year-btn" title="Filtrar por curso, dentro do recorte de data e função">
+                                <i class="fas fa-graduation-cap"></i>
+                                <span class="hfilter-chip-label" data-default="Curso">Curso</span>
+                            </button>
+                            <div class="hfilter-chip-popover">
+                                <input type="text" class="hfilter-chip-search" id="cfg-dash-unit-course-search" placeholder="Buscar curso..." autocomplete="off" spellcheck="false">
+                                <div class="hfilter-chip-list" id="cfg-dash-unit-course-list"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="dash-export-btn" id="cfg-dash-unit-export-btn" title="Baixar relatório desta unidade em Excel, respeitando os filtros de data">
+                            <i class="fas fa-file-excel"></i> Baixar em planilha
+                        </button>
+                        <button type="button" class="dash-export-btn is-pdf" id="cfg-dash-unit-pdf-btn" title="Baixar relatório desta unidade em PDF, respeitando os filtros de data">
+                            <i class="fas fa-file-pdf"></i> Baixar relatório
+                        </button>
+                    </div>
+                    <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                        <div class="panel-header">
+                            <h2>Notas por Colaborador</h2>
+                            <span class="panel-header-stat" id="cfg-dash-unit-scores-avg"></span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="cfg-dash-unit-scores-chart"></canvas>
+                            <p class="dashboard-table-empty" id="cfg-dash-unit-scores-empty" style="display:none;">Nenhuma prova enviada por esta unidade no período.</p>
+                            <div class="dash-comments-pagination" id="cfg-dash-unit-scores-pagination"></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header">
+                                <h2>Satisfação com os Cursos</h2>
+                                <div class="panel-header-actions">
+                                    <div class="dash-mode-switch" id="cfg-dash-unit-satisfaction-mode">
+                                        <button type="button" class="dash-mode-btn is-active" data-mode="geral">Geral</button>
+                                        <button type="button" class="dash-mode-btn" data-mode="curso">Curso</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-unit-satisfaction-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-unit-satisfaction-empty" style="display:none;">Esta unidade ainda não respondeu nenhuma pesquisa de satisfação.</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-unit-satisfaction-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Realização dos Cursos</h2></div>
+                            <div class="panel-body"><canvas id="cfg-dash-unit-deadline-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Tentativas das Avaliações</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-unit-approval-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                            <div class="panel-header"><h2>Retentativas por Colaborador</h2></div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-unit-retries-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-unit-retries-empty" style="display:none;">Nenhuma retentativa nesta unidade no período.</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-unit-retries-pagination"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Notas</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-unit-scoresdist-chart"></canvas></div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card">
+                            <div class="panel-header"><h2>Prazo por Mês</h2><span class="panel-header-hint"><i class="fas fa-hand-pointer"></i> Clique p/ detalhes</span></div>
+                            <div class="panel-body"><canvas id="cfg-dash-unit-deadlinetrend-chart"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                        <div class="panel-header">
+                            <h2>Curva de Conclusão por Curso</h2>
+                            <span class="panel-header-hint"><i class="fas fa-circle-info"></i> % da unidade que concluiu até cada dia</span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="cfg-dash-unit-curve-chart"></canvas>
+                            <p class="dashboard-table-empty" id="cfg-dash-unit-curve-empty" style="display:none;">Nenhum curso com conclusões suficientes para desenhar a curva.</p>
+                            <div class="dash-comments-pagination" id="cfg-dash-unit-curve-pagination"></div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-row">
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                            <div class="panel-header">
+                                <h2>Tempo para Conclusão da Avaliação (Minutos)</h2>
+                                <span class="panel-header-hint"><i class="fas fa-scale-balanced"></i> vs. média do curso</span>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-unit-evaltime-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-unit-evaltime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-unit-evaltime-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                            <div class="panel-header">
+                                <h2>Tempo para Conclusão (Horas)</h2>
+                                <span class="panel-header-hint"><i class="fas fa-scale-balanced"></i> vs. média do curso</span>
+                            </div>
+                            <div class="panel-body">
+                                <canvas id="cfg-dash-unit-completiontime-chart"></canvas>
+                                <p class="dashboard-table-empty" id="cfg-dash-unit-completiontime-empty" style="display:none;">Ainda não há dados suficientes (é preciso concluir o curso após esta atualização).</p>
+                                <div class="dash-comments-pagination" id="cfg-dash-unit-completiontime-pagination"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-card dashboard-chart-card dashboard-chart-card-tall">
+                        <div class="panel-header">
+                            <h2>Cursos Pendentes na Unidade</h2>
+                            <span class="panel-header-hint"><i class="fas fa-circle-info"></i> % do público-alvo da unidade que ainda não concluiu</span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="cfg-dash-unit-pending-chart"></canvas>
+                            <p class="dashboard-table-empty" id="cfg-dash-unit-pending-empty" style="display:none;">Nenhum curso pendente: a unidade concluiu tudo que os cargos exigem.</p>
+                            <div class="dash-comments-pagination" id="cfg-dash-unit-pending-pagination"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal "de onde vêm os dados" (Dashboard > Por colaborador > Gráficos): clicar numa fatia/barra lista os cursos que formaram aquele número -->
+    <div class="modal" id="cfg-dash-drill-modal" role="dialog" aria-modal="true" aria-labelledby="cfg-dash-drill-modal-title">
+        <div class="modal-content dash-drill-modal-content">
+            <div class="dash-drill-hero">
+                <span class="dash-drill-hero-icon" id="cfg-dash-drill-icon"><i class="fas fa-chart-simple"></i></span>
+                <div class="dash-drill-hero-info">
+                    <h2 id="cfg-dash-drill-modal-title">Origem dos dados</h2>
+                    <p class="dash-drill-subtitle" id="cfg-dash-drill-subtitle"></p>
+                </div>
+                <span class="close" id="cfg-dash-drill-modal-close">&times;</span>
+            </div>
+            <div class="dash-drill-stats" id="cfg-dash-drill-stats"></div>
+            <div class="modal-body dash-drill-body" id="cfg-dash-drill-body"></div>
         </div>
     </div>
 
@@ -2316,6 +2693,9 @@
                         <button type="button" class="deadline-mode-btn" id="cfg-dash-mode-user" data-mode="user">
                             <i class="fas fa-user"></i> Por colaborador
                         </button>
+                        <button type="button" class="deadline-mode-btn" id="cfg-dash-mode-unit" data-mode="unit">
+                            <i class="fas fa-building"></i> Por unidade
+                        </button>
                     </div>
 
                     <!-- Seletor: colaborador — busca + filtros por unidade/função, grade de cards -->
@@ -2357,6 +2737,24 @@
 
                     <!-- Colaboradores em cards, até 5 por linha -->
                     <div id="cfg-dash-user-cards" class="dash-user-grid" style="display:none;"></div>
+
+                    <!-- Seletor: unidade — só busca, porque a própria unidade já é o filtro -->
+                    <div id="cfg-dash-unit-picker" class="dashboard-picker dashboard-picker-users" style="display:none;">
+                        <div class="hfilter-row" id="cfg-dash-unit-filter-row">
+                            <div class="hfilter-chip hfilter-search-chip" data-field="search">
+                                <button type="button" class="hfilter-chip-btn hfilter-search-btn" id="cfg-dash-unit-search-btn" title="Buscar por unidade">
+                                    <i class="fas fa-magnifying-glass"></i>
+                                </button>
+                                <div class="hfilter-chip-popover hfilter-search-popover">
+                                    <input type="search" class="hfilter-chip-search" id="cfg-dash-unit-search" placeholder="Buscar unidade por nome..." autocomplete="off" spellcheck="false">
+                                </div>
+                            </div>
+                            <span class="hfilter-chip-note" id="cfg-dash-unit-count"></span>
+                        </div>
+                    </div>
+
+                    <!-- Unidades em cards: são poucas e cada uma carrega mais métricas que o card de pessoa -->
+                    <div id="cfg-dash-unit-cards" class="dash-unit-grid" style="display:none;"></div>
 
                     <!-- Seletor: curso (categoria fixa = a selecionada nas Configurações) -->
                     <div id="cfg-dash-course-picker" class="dashboard-picker" style="display:none;">
@@ -2520,32 +2918,34 @@
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-    <script defer src="js/course-image.js?v=202609181200"></script>
+    <script defer src="js/course-image.js?v=202609211830"></script>
     <!-- Carrega xlsx/jspdf/html2canvas sob demanda (js/vendor-loader.js). -->
-    <script defer src="js/vendor-loader.js?v=202609181200"></script>
-    <script defer src="js/firebase-config.js?v=202609181200"></script>
-    <script defer src="js/main.js?v=202609181200"></script>
-    <script defer src="js/connection-guard.js?v=202609181200"></script>
-    <script defer src="js/db-sync.js?v=202609181200"></script>
-    <script defer src="js/crypto-utils.js?v=202609181200"></script>
-    <script defer src="js/deadlines.js?v=202609181200"></script>
-    <script defer src="js/attempts.js?v=202609181200"></script>
-    <script defer src="js/certificate.js?v=202609181200"></script>
-    <script defer src="js/colaboradores-sync.js?v=202609181200"></script>
-    <script defer src="js/ui.js?v=202609181200"></script>
-    <script defer src="js/auth.js?v=202609181200"></script>
-    <script defer src="js/student-auth.js?v=202609181200"></script>
-    <script defer src="js/admin.js?v=202609181200"></script>
-    <script defer src="js/admin-courses.js?v=202609181200"></script>
-    <script defer src="js/admin-colaboradores.js?v=202609181200"></script>
-    <script defer src="js/admin-users.js?v=202609181200"></script>
-    <script defer src="js/admin-excel.js?v=202609181200"></script>
-    <script defer src="js/admin-dashboard.js?v=202609181200"></script>
-    <script defer src="js/admin-history.js?v=202609181200"></script>
-    <script defer src="js/portal-auth.js?v=202609181200"></script>
-    <script defer src="js/student-profile.js?v=202609181200"></script>
-    <script defer src="js/student-header.js?v=202609181200"></script>
+    <script defer src="js/vendor-loader.js?v=202609211830"></script>
+    <script defer src="js/firebase-config.js?v=202609211830"></script>
+    <script defer src="js/main.js?v=202609211830"></script>
+    <script defer src="js/connection-guard.js?v=202609211830"></script>
+    <script defer src="js/db-sync.js?v=202609211830"></script>
+    <script defer src="js/crypto-utils.js?v=202609211830"></script>
+    <script defer src="js/deadlines.js?v=202609211830"></script>
+    <script defer src="js/attempts.js?v=202609211830"></script>
+    <script defer src="js/certificate.js?v=202609211830"></script>
+    <script defer src="js/colaboradores-sync.js?v=202609211830"></script>
+    <script defer src="js/ui.js?v=202609211830"></script>
+    <script defer src="js/auth.js?v=202609211830"></script>
+    <script defer src="js/student-auth.js?v=202609211830"></script>
+    <script defer src="js/admin.js?v=202609211830"></script>
+    <script defer src="js/admin-courses.js?v=202609211830"></script>
+    <script defer src="js/admin-colaboradores.js?v=202609211830"></script>
+    <script defer src="js/admin-users.js?v=202609211830"></script>
+    <script defer src="js/admin-excel.js?v=202609211830"></script>
+    <script defer src="js/admin-xlsx-charts.js?v=202609211830"></script>
+    <script defer src="js/admin-pdf-report.js?v=202609211830"></script>
+    <script defer src="js/admin-dashboard.js?v=202609211830"></script>
+    <script defer src="js/admin-history.js?v=202609211830"></script>
+    <script defer src="js/portal-auth.js?v=202609211830"></script>
+    <script defer src="js/student-profile.js?v=202609211830"></script>
+    <script defer src="js/student-header.js?v=202609211830"></script>
     <!-- Depois de admin-history.js (U.getHistoryRows) e student-auth.js (sessão). -->
-    <script defer src="js/ranking.js?v=202609181200"></script>
+    <script defer src="js/ranking.js?v=202609211830"></script>
 </body>
 </html>

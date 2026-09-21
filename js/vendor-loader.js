@@ -18,6 +18,16 @@
 
     var SOURCES = {
         xlsx: ['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'],
+        // Fork da mesma SheetJS 0.18.5 com suporte a estilo de célula (cor,
+        // negrito, borda), que a versão community não tem. Só o relatório do
+        // colaborador precisa disso — os demais exports continuam na 'xlsx'
+        // normal. As duas expõem `window.XLSX` e são compatíveis entre si, de
+        // modo que carregar esta por cima da outra não quebra nada.
+        'xlsx-style': ['https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js'],
+        // Zip em ~30 KB. O relatório do colaborador abre o .xlsx recém-escrito
+        // pra injetar as partes de gráfico (ver js/admin-xlsx-charts.js) e
+        // fecha de novo — a SheetJS não expõe o zip dela pra isso.
+        fflate: ['https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js'],
         // O certificado precisa das duas juntas; pedir "pdf" traz o par.
         pdf: [
             'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',

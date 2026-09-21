@@ -394,7 +394,7 @@
     /* Chart.js: o canvas é responsivo, mas o container precisa de teto de
        altura, senão o aspect ratio padrão gera blocos altíssimos. */
     #cfg-root .dashboard-chart-row canvas,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) canvas { max-height: 260px; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) canvas { max-height: 260px; }
 }
 
 
@@ -415,18 +415,18 @@
 @media (max-width: 720px) {
     /* Sem o box de 360px com scroll próprio: dentro de um modal que já rola,
        scroll aninhado é armadilha no toque. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dashboard-table-wrap {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dashboard-table-wrap {
         max-height: none;
         overflow: visible;
     }
 
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody { display: block; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody { display: block; }
 
     /* O cabeçalho vira redundante: cada chip carrega o próprio rótulo. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards thead { display: none; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards thead { display: none; }
 
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody tr {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody tr {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -439,16 +439,16 @@
         box-shadow: var(--cfg-shadow-sm);
     }
     /* Zebrado e hover de linha não fazem sentido em card. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody tr:nth-child(even),
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody tr:hover { background: var(--cfg-surface); }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody tr.is-clickable:hover {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody tr:nth-child(even),
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody tr:hover { background: var(--cfg-surface); }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody tr.is-clickable:hover {
         border-color: var(--cfg-primary);
         box-shadow: none;
     }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards tbody tr:last-child { margin-bottom: 0; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards tbody tr:last-child { margin-bottom: 0; }
 
     /* Cada célula vira um chip. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td {
         display: inline-flex;
         align-items: center;
         gap: 5px;
@@ -460,7 +460,7 @@
         font-size: 11.5px;
     }
 
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label]::before {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label]::before {
         content: attr(data-label);
         flex-shrink: 0;
         font-size: 9.5px;
@@ -471,49 +471,49 @@
     }
 
     /* Título do card: nome da pessoa (ou do curso, no modal do colaborador). */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Nome"],
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Curso"] {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Nome"],
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Curso"] {
         order: 1;
         flex: 1 1 100%;
         font-size: 13.5px;
         font-weight: 600;
         margin-bottom: 2px;
     }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Nome"]::before,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Curso"]::before { content: none; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Nome"]::before,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Curso"]::before { content: none; }
 
     /* Badges que já se explicam sozinhos: sem rótulo, só o próprio badge. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Situação"] { order: 2; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Nota"]     { order: 3; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Prazo"]    { order: 4; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Situação"]::before,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Nota"]::before,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Prazo"]::before { content: none; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Situação"] { order: 2; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Nota"]     { order: 3; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Prazo"]    { order: 4; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Situação"]::before,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Nota"]::before,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Prazo"]::before { content: none; }
 
     /* Chips de texto: fundo suave para separar visualmente do título. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Unidade"],
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Cargo"],
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Tempo"],
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Conclusão"] {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Unidade"],
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Cargo"],
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Tempo"],
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Conclusão"] {
         padding: 4px 9px;
         border: 1px solid var(--cfg-border);
         border-radius: 999px;
         background: var(--bg);
     }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Unidade"]   { order: 5; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Cargo"]     { order: 6; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Tempo"]     { order: 7; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Conclusão"] { order: 8; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Unidade"]   { order: 5; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Cargo"]     { order: 6; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Tempo"]     { order: 7; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Conclusão"] { order: 8; }
 
     /* Barra de progresso ocupa a linha inteira para continuar legível. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Progresso"] {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Progresso"] {
         order: 9;
         flex: 1 1 100%;
     }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Progresso"] .missing-progress { flex: 1; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Progresso"] .missing-progress { flex: 1; }
 
     /* Data/hora como rodapé discreto do card. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td[data-label="Data/Hora"] {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td[data-label="Data/Hora"] {
         order: 10;
         flex: 1 1 100%;
         margin-top: 4px;
@@ -524,18 +524,18 @@
     }
 
     /* Última coluna (botão "Desconsiderar atraso") não tem data-label. */
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td:not([data-label]) {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td:not([data-label]) {
         order: 11;
         flex: 1 1 100%;
     }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards td:not([data-label]):empty { display: none; }
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards .dash-forgive-btn {
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards td:not([data-label]):empty { display: none; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards .dash-forgive-btn {
         width: 100%;
         justify-content: center;
         min-height: 40px;
     }
 
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-cards .row-name { min-width: 0; }
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-cards .row-name { min-width: 0; }
 }
 
 
@@ -622,7 +622,7 @@
     #cfg-history-form-modal .modal-content,
     #cfg-theme-form-modal .modal-content,
     #cfg-subject-manage-modal .modal-content,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-content,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-content,
     #cfg-dash-review-modal .dash-review-modal-content,
     #cfg-course-detail-modal .course-drawer-content,
     .cert-modal-card {
@@ -643,7 +643,7 @@
     #cfg-history-form-modal .modal-content,
     #cfg-theme-form-modal .modal-content,
     #cfg-subject-manage-modal .modal-content,
-    :is(#cfg-dash-course-modal, #cfg-dash-user-modal) .dash-course-modal-content,
+    :is(#cfg-dash-course-modal, #cfg-dash-user-modal, #cfg-dash-unit-modal) .dash-course-modal-content,
     #cfg-dash-review-modal .dash-review-modal-content,
     #cfg-course-detail-modal .course-drawer-content,
     .cert-modal-card {
