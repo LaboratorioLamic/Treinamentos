@@ -38,25 +38,43 @@
     line-height: 1.35;
 }
 
+/* Folhas comuns (não a capa) empilham cabeçalho, corpo e rodapé em coluna:
+   o rodapé fica no fluxo, colado ao pé, e o corpo é o único que encolhe.
+   Assim um cabeçalho mais alto que o previsto (tarja de recorte longa, título
+   em duas linhas) come espaço do corpo em vez de empurrá-lo sobre o rodapé. */
+.rp-slide:not(.is-cover) {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 20px;
+}
+.rp-slide:not(.is-cover) > .rp-head { flex: 0 0 auto; }
+
 /* ─── Cabeçalho e rodapé ─── */
 .rp-head { padding: 34px 54px 0; }
+/* Uma linha só: a paginação por altura (feedbacks, pendentes) conta com o
+   cabeçalho de sempre. Período + funções + cursos longos quebravam a tarja em
+   duas linhas e o último bloco da folha descia sobre o rodapé. O que não
+   cabe vira reticências — o rodapé repete o recorte por extenso. */
 .rp-eyebrow {
+    display: flex; align-items: baseline; white-space: nowrap;
     font-size: 10px; font-weight: 800; letter-spacing: 1.6px;
     text-transform: uppercase; color: #028090;
 }
 .rp-title { margin: 6px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -0.4px; }
 .rp-sub { margin: 4px 0 0; font-size: 13px; color: #55666b; }
 
-/* O corpo nunca pode invadir o rodapé: ele é `position:absolute` no pé da
-   folha, então sem teto de altura um bloco a mais escorre por cima dele e sai
-   impresso sobreposto. A altura é o que sobra dos 540px depois do cabeçalho
-   (~34px de topo + título) e da faixa do rodapé, e o overflow corta o que
-   ainda assim passar — preferível a texto sobreposto e ilegível. */
+/* O corpo nunca pode invadir o rodapé. O teto é o que sobra dos 540px depois
+   do cabeçalho padrão (~34px de topo + título) e da faixa do rodapé, e é nele
+   que a paginação por altura se baseia; se o cabeçalho crescer além disso, o
+   flex encolhe o corpo. O overflow corta o que ainda assim passar —
+   preferível a texto sobreposto e ilegível. */
 .rp-body {
     box-sizing: border-box;
     padding: 20px 54px 0;
     max-height: 383px;
     overflow: hidden;
+    flex: 0 1 auto;
+    min-height: 0;
 }
 /* Folha sem subtítulo tem o cabeçalho mais curto, então o corpo pode crescer
    na mesma medida (a classe é posta por slideHtml, não via :has(), para não
@@ -64,8 +82,8 @@
 .rp-body.is-tall { max-height: 405px; }
 
 .rp-foot {
-    position: absolute; left: 54px; right: 54px; bottom: 20px;
-    display: flex; justify-content: space-between; align-items: center;
+    flex: 0 0 auto; margin: auto 54px 0;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
     padding-top: 9px; border-top: 1px solid #dceaec;
     font-size: 10px; color: #55666b;
 }
@@ -256,6 +274,7 @@
 }
 .rp-cover-period b { color: #02c39a; font-weight: 800; }
 .rp-eyebrow-period {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
     margin-left: 10px; padding-left: 10px; border-left: 1px solid #c6dcde;
     font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
     text-transform: none; color: #55666b;
