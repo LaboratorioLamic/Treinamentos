@@ -687,7 +687,7 @@
         // Repopula as opções de curso antes de desenhar: mudar data ou
         // função muda quais cursos existem no recorte, e `setOptions` já
         // descarta da seleção o que saiu de cena.
-        userChartCourseChip.setOptions(courseOptionsOf(userRowsBeforeCourse(userChartRowsCache)));
+        userChartCourseChip.setOptions(userCourseOptions(userChartColabCache, userChartRowsCache));
         renderUserCharts(userChartColabCache, userChartRowsCache);
     }
     const userChartYearChip = createYearFilterChip('cfg-dash-user-year-chip', 'cfg-dash-user-year-list', repaintUserCharts);
@@ -777,9 +777,48 @@
         return sortedRoles(roles);
     }
 
-    function courseOptionsOf(rows) {
-        return [...new Set(rows.map(rowCourseLabel).filter(Boolean))]
-            .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    // Opções do chip de curso: o que aparece no histórico recortado mais os
+    // cursos do público-alvo que ainda não têm nenhuma aprovação — sem eles
+    // o gestor não conseguiria isolar justamente o curso que ninguém fez.
+    // A deduplicação é pelo nome normalizado, preferindo o rótulo do
+    // histórico, que é o que filterRowsByCourseChip compara.
+    function courseOptionsOf(rows, extraLabels = []) {
+        const byKey = new Map();
+        [...rows.map(rowCourseLabel), ...extraLabels].forEach(label => {
+            const key = normalizeName(label || '');
+            if (key && !byKey.has(key)) byKey.set(key, label);
+        });
+        return [...byKey.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    // Rótulos dos cursos ativos da categoria atual aceitos por `accept`.
+    // Categorias sem público-alvo (estágios) não entram: lá só existe o que
+    // foi realizado.
+    function audienceCourseLabels(accept) {
+        const slug = currentSlug();
+        if (AUDIENCE_EXEMPT_SLUGS.includes(slug)) return [];
+        const labels = [];
+        Object.values(allTrainingData[slug] || {}).forEach(subject => {
+            Object.entries(subject?.themes || {}).forEach(([themeId, theme]) => {
+                if (!theme || theme.active === false || !accept(theme)) return;
+                labels.push(theme.name || subject.name || themeId);
+            });
+        });
+        return labels;
+    }
+
+    // Cursos exigidos do colaborador (mesma regra do gráfico de pendentes),
+    // já recortados pelo chip de função-alvo: com funções marcadas, só os
+    // cursos dirigidos a alguma delas.
+    function userCourseOptions(colab, rows) {
+        const roleKey = normalizeName(colab?.role || '');
+        const wanted = selectedRoleKeys(userChartRoleChip);
+        const extra = audienceCourseLabels(theme => {
+            const roles = Array.isArray(theme.roles) ? theme.roles.filter(Boolean).map(r => normalizeName(r)) : [];
+            if (roles.length && !roles.includes(roleKey)) return false;
+            return !wanted.size || roles.some(r => wanted.has(r));
+        });
+        return courseOptionsOf(userRowsBeforeCourse(rows), extra);
     }
 
     // Casa um tema do CADASTRO com os rótulos marcados no chip, que vêm do
@@ -937,7 +976,7 @@
         // vindo da sincronização ao vivo.
         userChartRangeChip.setBounds(rows);
         userChartRoleChip.setOptions(userRoleOptions(rows));
-        userChartCourseChip.setOptions(courseOptionsOf(userRowsBeforeCourse(rows)));
+        userChartCourseChip.setOptions(userCourseOptions(colab, rows));
         renderUserCharts(colab, rows);
 
         if (heroStatsEl) {
@@ -3187,7 +3226,7 @@
 
     function repaintUnitCharts() {
         if (!unitChartKeyCache) return;
-        unitChartCourseChip.setOptions(courseOptionsOf(unitRowsBeforeCourse(unitChartRowsCache, unitChartColabsCache)));
+        unitChartCourseChip.setOptions(unitCourseOptions(unitChartColabsCache, unitChartRowsCache));
         renderUnitCharts(unitChartColabsCache, unitChartRowsCache);
         renderUnitHero(unitChartColabsCache, unitChartRowsCache);
     }
@@ -3234,6 +3273,16 @@
     // cursos, que só deve listar o que sobrou de data e função.
     function unitRowsBeforeCourse(rows, colaboradores) {
         return filterUnitRowsByRole(filterUnitRowsByDate(rows), colaboradores || unitChartColabsCache);
+    }
+
+    // Cursos do recorte mais os que têm público-alvo entre os colaboradores
+    // da unidade que sobram no chip de função, mesmo sem nenhuma aprovação.
+    function unitCourseOptions(colaboradores, rows) {
+        const ids = new Set(filterUnitColabsByRole(colaboradores).map(c => c.id));
+        const extra = ids.size
+            ? audienceCourseLabels(theme => courseAudience(theme).some(colab => ids.has(colab.id)))
+            : [];
+        return courseOptionsOf(unitRowsBeforeCourse(rows, colaboradores), extra);
     }
 
     // Colaboradores que sobram no recorte de função — é o denominador de
@@ -3304,7 +3353,7 @@
         // Sem reset aqui: ver closeUnitModal().
         unitChartRangeChip.setBounds(rows);
         unitChartRoleChip.setOptions(unitRoleOptions(colaboradores));
-        unitChartCourseChip.setOptions(courseOptionsOf(unitRowsBeforeCourse(rows, colaboradores)));
+        unitChartCourseChip.setOptions(unitCourseOptions(colaboradores, rows));
         renderUnitCharts(colaboradores, rows);
 
         renderUnitHero(colaboradores, rows);
