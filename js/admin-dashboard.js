@@ -2535,7 +2535,7 @@
             roleLabel: reportScopeLabel(userReportRoleLabel(), userChartRoleChip, userReportCourseLabel(), userChartCourseChip),
             dataRangeLabel: rowsDateRangeLabel(rows),
             generatedAt: new Date().toLocaleString('pt-BR'),
-            filename: `relatorio_${normalizeName(colab.fullName || 'colaborador').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'colaborador'}_${new Date().toISOString().split('T')[0]}.pdf`,
+            filename: `UniLAMIC_relatorio_${normalizeName(colab.fullName || 'colaborador').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'colaborador'}_${new Date().toISOString().split('T')[0]}.pdf`,
             summary: {
                 coursesCount: courses.length,
                 attempts: rows.length,
@@ -4437,7 +4437,7 @@
             roleLabel: reportScopeLabel(unitReportRoleLabel(), unitChartRoleChip, unitReportCourseLabel(), unitChartCourseChip),
             dataRangeLabel: rowsDateRangeLabel(rows),
             generatedAt: new Date().toLocaleString('pt-BR'),
-            filename: `relatorio_unidade_${normalizeName(unitKey).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unidade'}_${new Date().toISOString().split('T')[0]}.pdf`,
+            filename: `UniLAMIC_relatorio_unidade_${normalizeName(unitKey).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unidade'}_${new Date().toISOString().split('T')[0]}.pdf`,
             summary: {
                 coursesCount: courses.length,
                 attempts: rows.length,
