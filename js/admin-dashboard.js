@@ -140,23 +140,33 @@
     }
 
     // Barras de "Prazo por Mês": seguem o período escolhido no chip quando
-    // ele existe, senão continuam nos últimos 6 meses. Teto de 24 barras pra
-    // um intervalo largo não espremer o gráfico até virar rabisco.
+    // ele existe; sem período, cobrem do primeiro ao último mês com dados.
+    // Teto de 24 barras pra um intervalo largo não espremer o gráfico até
+    // virar rabisco.
     const MONTH_BUCKET_MAX = 24;
     function monthBucketsForRange(range, rows, year) {
         let startIndex = monthIndexFromInput(range?.start);
         let endIndex = monthIndexFromInput(range?.end);
+        const indexes = rows.map(r => r.submittedAt ? monthIndexOfDate(r.submittedAt) : null).filter(i => i !== null);
         if (startIndex === null && endIndex === null) {
             // Chip de ano sem período: as barras são o ano inteiro. Sem isso
             // as 6 barras continuavam ancoradas no mês de hoje e um filtro de
             // 2025 desenhava meses de 2026 todos zerados — o gráfico parecia
             // ignorar o filtro.
             if (year) return buildMonthBuckets(monthIndexOf(Number(year), 0), monthIndexOf(Number(year), 11));
+            // "Todo o histórico": o intervalo real dos dados. A janela fixa
+            // dos últimos 6 meses escondia conclusões mais antigas — um
+            // atraso de 2025 sumia do gráfico enquanto o texto ao lado o
+            // contava.
+            if (indexes.length) {
+                endIndex = Math.max(...indexes);
+                startIndex = Math.max(Math.min(...indexes), endIndex - (MONTH_BUCKET_MAX - 1));
+                return buildMonthBuckets(startIndex, endIndex);
+            }
             const now = new Date();
             endIndex = monthIndexOf(now.getFullYear(), now.getMonth());
             return buildMonthBuckets(endIndex - 5, endIndex);
         }
-        const indexes = rows.map(r => r.submittedAt ? monthIndexOfDate(r.submittedAt) : null).filter(i => i !== null);
         const now = new Date();
         const fallback = monthIndexOf(now.getFullYear(), now.getMonth());
         if (startIndex === null) startIndex = indexes.length ? Math.min(...indexes) : endIndex;
@@ -365,8 +375,15 @@
 
     // Equivalente a attemptsByPerson, mas do ponto de vista do colaborador:
     // agrupa as linhas DELE por curso para contar quantas tentativas cada
-    // curso exigiu e se terminou aprovado — base do gráfico "Retentativas"
-    // do modal do colaborador.
+    // curso teve e como terminou — base do gráfico "Retentativas" do modal
+    // do colaborador e dos cards do relatório.
+    //
+    // A situação é a da ÚLTIMA tentativa, a mesma que os cards de "situação
+    // final" mostram: quem aprovou, refez e reprovou está reprovado hoje.
+    // Contar "aprovou alguma vez" fazia o card dizer "Reprovado" enquanto o
+    // resumo e o plano de ação tratavam o curso como resolvido.
+    // `attempts` é o total de envios no período, não só até a 1ª aprovação:
+    // senão um curso com três provas aparecia como "1 tentativa".
     function attemptsByCourse(rows) {
         const byCourse = new Map();
         rows.forEach(row => {
@@ -376,17 +393,29 @@
         });
         return [...byCourse.entries()].map(([key, courseRows]) => {
             const sorted = courseRows.slice().sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
-            const approvedIndex = sorted.findIndex(r => r.approved);
             const last = sorted[sorted.length - 1];
+            const approved = !!last.approved;
+            const hadFailure = sorted.some(r => !r.approved);
             return {
                 key,
                 name: last.theme || last.subject || '—',
-                approved: approvedIndex !== -1,
-                // Tentativas até aprovar (as posteriores são reenvios, não
-                // esforço para passar); sem aprovação, conta tudo.
-                attempts: approvedIndex !== -1 ? approvedIndex + 1 : sorted.length
+                approved,
+                attempts: sorted.length,
+                firstTry: approved && !hadFailure,
+                retried: approved && hadFailure
             };
         });
+    }
+
+    // Prazo de um envio. Curso sem prazo ('livre') não tem limite a cumprir
+    // nem a perder, então fica fora do percentual de cumprimento — contá-lo
+    // como "no prazo" inflava a taxa com cursos que nunca tiveram data.
+    function hasDeadline(status) { return !!status && status !== 'livre'; }
+    function isLateStatus(status) { return hasDeadline(status) && !isOnTime(status); }
+    // Cor da célula "Prazo" nas planilhas: sem prazo fica neutro, não verde.
+    function deadlineTone(status) {
+        if (!hasDeadline(status)) return undefined;
+        return isOnTime(status) ? 'ok' : 'bad';
     }
 
     // Nome legível do curso de uma linha de histórico — rótulo das barras
@@ -857,13 +886,15 @@
         paintUserScoresAvg(scores);
 
         // "Realização dos Cursos": situação final por curso (última
-        // tentativa), não uma linha por tentativa/reenvio.
+        // tentativa), não uma linha por tentativa/reenvio. Curso sem prazo é
+        // fatia própria, fora de "No prazo".
         const lastAttempts = lastAttemptByCourse(rows);
-        const onTime = lastAttempts.filter(r => r.deadlineStatus === 'on_time' || r.deadlineStatus === 'livre' || r.deadlineStatus === 'forgiven').length;
-        const late = lastAttempts.length - onTime;
+        const late = lastAttempts.filter(r => isLateStatus(r.deadlineStatus)).length;
+        const noDeadline = lastAttempts.filter(r => !hasDeadline(r.deadlineStatus)).length;
+        const onTime = lastAttempts.length - late - noDeadline;
         renderChart('userDeadline', 'cfg-dash-user-deadline-chart', {
             type: 'pie',
-            data: { labels: ['No prazo', 'Fora do prazo'], datasets: [{ data: [onTime, late], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger] }] },
+            data: { labels: ['No prazo', 'Fora do prazo', 'Sem prazo'], datasets: [{ data: [onTime, late, noDeadline], backgroundColor: [CHART_COLORS.accent, CHART_COLORS.danger, CHART_COLORS.muted] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => pieTooltipLabel(ctx) } } } }
         });
 
@@ -905,44 +936,44 @@
 
         // "Prazo por Mês" segue o mesmo critério: 1 barra por curso concluído
         // (situação final), agrupado pelo mês da última tentativa. As barras
-        // acompanham o período escolhido no chip (padrão: últimos 6 meses).
+        // acompanham o período escolhido no chip (padrão: do primeiro ao
+        // último mês com dados). Curso sem prazo é uma série à parte: não
+        // cumpriu nem perdeu limite nenhum.
         const range = userChartRangeChip.getRange();
         const monthBuckets = monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue());
         const bucketsOf = (subset) => countIntoMonthBuckets(subset, monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue()));
-        const onTimeRows = lastAttempts.filter(r => ['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus));
-        const lateRows = lastAttempts.filter(r => !['on_time', 'livre', 'forgiven'].includes(r.deadlineStatus));
-        const onTimeByMonth = bucketsOf(onTimeRows);
-        const lateByMonth = bucketsOf(lateRows);
+        const deadlineSeries = [
+            { label: 'No prazo', icon: 'fa-calendar-check', tone: 'is-ok', color: CHART_COLORS.accent, rows: lastAttempts.filter(r => hasDeadline(r.deadlineStatus) && isOnTime(r.deadlineStatus)) },
+            { label: 'Fora do prazo', icon: 'fa-triangle-exclamation', tone: 'is-bad', color: CHART_COLORS.danger, rows: lastAttempts.filter(r => isLateStatus(r.deadlineStatus)) },
+            { label: 'Sem prazo', icon: 'fa-calendar', tone: '', color: CHART_COLORS.muted, rows: lastAttempts.filter(r => !hasDeadline(r.deadlineStatus)) }
+        ].map(series => ({ ...series, byMonth: bucketsOf(series.rows) }));
         renderChart('userDeadlineTrend', 'cfg-dash-user-deadlinetrend-chart', {
             type: 'bar',
             data: {
                 labels: monthBuckets.map(b => b.label),
-                datasets: [
-                    { label: 'No prazo', data: onTimeByMonth.map(b => b.count), backgroundColor: CHART_COLORS.accent },
-                    { label: 'Fora do prazo', data: lateByMonth.map(b => b.count), backgroundColor: CHART_COLORS.danger }
-                ]
+                datasets: deadlineSeries.map(series => ({ label: series.label, data: series.byMonth.map(b => b.count), backgroundColor: series.color }))
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 ...drillChartHandlers(({ datasetIndex, index }) => {
-                    const onTimePick = datasetIndex === 0;
+                    const series = deadlineSeries[datasetIndex];
                     const bucket = monthBuckets[index];
                     // O mesmo recorte da barra: status do dataset + mês do
                     // rótulo (a chave do bucket é "ano-mês", base zero).
                     const [year, month] = bucket.key.split('-').map(Number);
-                    const picked = (onTimePick ? onTimeRows : lateRows).filter(r => {
+                    const picked = series.rows.filter(r => {
                         if (!r.submittedAt) return false;
                         const d = new Date(r.submittedAt);
                         return d.getFullYear() === year && d.getMonth() === month;
                     });
-                    const total = onTimeByMonth[index].count + lateByMonth[index].count;
+                    const total = deadlineSeries.reduce((sum, s) => sum + s.byMonth[index].count, 0);
                     openDrillModal({
-                        title: `${onTimePick ? 'No prazo' : 'Fora do prazo'} — ${bucket.label}`,
+                        title: `${series.label} — ${bucket.label}`,
                         subtitle: 'Um curso por linha, pela situação da última tentativa no mês.',
-                        icon: onTimePick ? 'fa-calendar-check' : 'fa-triangle-exclamation',
-                        tone: onTimePick ? 'is-ok' : 'is-bad',
+                        icon: series.icon,
+                        tone: series.tone,
                         stats: [
-                            { label: onTimePick ? 'No prazo' : 'Fora do prazo', value: picked.length, tone: onTimePick ? 'is-ok' : 'is-bad' },
+                            { label: series.label, value: picked.length, tone: series.tone },
                             { label: 'Concluídos no mês', value: total },
                             { label: 'Do mês', value: total ? `${Math.round((picked.length / total) * 100)}%` : '—' }
                         ],
@@ -1252,8 +1283,8 @@
     function renderUserRetriesChart(rows) {
         const courses = attemptsByCourse(rows);
         const buckets = [
-            { label: 'Aprovado na 1ª tentativa', icon: 'fa-bullseye', tone: 'is-ok', color: CHART_COLORS.success, courses: courses.filter(c => c.approved && c.attempts === 1) },
-            { label: 'Aprovado após retentativa', icon: 'fa-rotate-right', tone: 'is-warn', color: CHART_COLORS.warning, courses: courses.filter(c => c.approved && c.attempts > 1) },
+            { label: 'Aprovado na 1ª tentativa', icon: 'fa-bullseye', tone: 'is-ok', color: CHART_COLORS.success, courses: courses.filter(c => c.firstTry) },
+            { label: 'Aprovado após retentativa', icon: 'fa-rotate-right', tone: 'is-warn', color: CHART_COLORS.warning, courses: courses.filter(c => c.retried) },
             { label: 'Ainda reprovado', icon: 'fa-circle-xmark', tone: 'is-bad', color: CHART_COLORS.danger, courses: courses.filter(c => !c.approved) }
         ];
         renderChart('userRetries', 'cfg-dash-user-retries-chart', {
@@ -1915,7 +1946,9 @@
         const durations = rows.map(r => Number(r.durationSeconds)).filter(Number.isFinite);
         const actives = lastAttempts.map(userCompletionDurationOf).filter(ms => Number.isFinite(ms) && ms > 0);
         const ratings = ratedOnly(rows).map(r => Number(r.rating));
-        const onTime = lastAttempts.filter(r => isOnTime(r.deadlineStatus)).length;
+        const late = lastAttempts.filter(r => isLateStatus(r.deadlineStatus)).length;
+        const noDeadline = lastAttempts.filter(r => !hasDeadline(r.deadlineStatus)).length;
+        const onTime = lastAttempts.length - late - noDeadline;
         const approved = rows.filter(r => r.approved).length;
         const avg = (list) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
 
@@ -1934,12 +1967,13 @@
 
             { section: 'Prazo' },
             { label: 'Concluídos no prazo', value: onTime, tone: 'ok' },
-            { label: 'Concluídos fora do prazo', value: lastAttempts.length - onTime, tone: lastAttempts.length - onTime > 0 ? 'bad' : undefined },
-            { label: '% no prazo', value: pctLabel(onTime, lastAttempts.length), tone: 'strong' },
+            { label: 'Concluídos fora do prazo', value: late, tone: late > 0 ? 'bad' : undefined },
+            { label: 'Cursos sem prazo', value: noDeadline },
+            { label: '% no prazo (cursos com prazo)', value: pctLabel(onTime, onTime + late), tone: 'strong' },
 
             { section: 'Retentativas' },
-            { label: 'Aprovado na 1ª tentativa', value: courses.filter(c => c.approved && c.attempts === 1).length, tone: 'ok' },
-            { label: 'Aprovado após retentativa', value: courses.filter(c => c.approved && c.attempts > 1).length, tone: 'warn' },
+            { label: 'Aprovado na 1ª tentativa', value: courses.filter(c => c.firstTry).length, tone: 'ok' },
+            { label: 'Aprovado após retentativa', value: courses.filter(c => c.retried).length, tone: 'warn' },
             { label: 'Ainda reprovado', value: courses.filter(c => !c.approved).length, tone: 'bad' },
 
             { section: 'Tempos' },
@@ -2062,8 +2096,8 @@
         // 2) Retentativas
         const courses = attemptsOf(rows);
         const retries = [
-            { label: 'Aprovado na 1ª tentativa', value: courses.filter(c => c.approved && c.attempts === 1).length, color: CHART_COLORS.success, tone: 'ok' },
-            { label: 'Aprovado após retentativa', value: courses.filter(c => c.approved && c.attempts > 1).length, color: CHART_COLORS.warning, tone: 'warn' },
+            { label: 'Aprovado na 1ª tentativa', value: courses.filter(c => c.firstTry).length, color: CHART_COLORS.success, tone: 'ok' },
+            { label: 'Aprovado após retentativa', value: courses.filter(c => c.retried).length, color: CHART_COLORS.warning, tone: 'warn' },
             { label: 'Ainda reprovado', value: courses.filter(c => !c.approved).length, color: CHART_COLORS.danger, tone: 'bad' }
         ];
         const retriesFirst = block(9, 'Retentativas', ['Situação', 'Cursos'],
@@ -2078,20 +2112,32 @@
         });
 
         // 3) Realização dos Cursos (prazo da última tentativa de cada curso)
+        // No relatório do colaborador (sem `opts`) curso sem prazo sai de "No
+        // prazo" e vira linha própria, como na tela e no PDF dele. O da
+        // unidade ainda soma os dois, igual às telas da unidade.
+        const splitNoDeadline = !opts;
         const lastAttempts = lastAttemptsOf(rows);
-        const onTimeTotal = lastAttempts.filter(r => isOnTime(r.deadlineStatus)).length;
-        const lateTotal = lastAttempts.length - onTimeTotal;
-        const deadlineFirst = block(15, 'Realização dos Cursos', ['Prazo', 'Cursos'], [
-            [xlsCell('No prazo'), xlsCell(onTimeTotal, { tone: 'ok', bold: true })],
-            [xlsCell('Fora do prazo', { zebra: true }), xlsCell(lateTotal, { tone: 'bad', bold: true, zebra: true })]
-        ]);
+        const deadlineGroups = splitNoDeadline
+            ? [
+                { label: 'No prazo', tone: 'ok', color: CHART_COLORS.accent, match: r => hasDeadline(r.deadlineStatus) && isOnTime(r.deadlineStatus) },
+                { label: 'Fora do prazo', tone: 'bad', color: CHART_COLORS.danger, match: r => isLateStatus(r.deadlineStatus) },
+                { label: 'Sem prazo', tone: undefined, color: CHART_COLORS.muted, match: r => !hasDeadline(r.deadlineStatus) }
+            ]
+            : [
+                { label: 'No prazo', tone: 'ok', color: CHART_COLORS.accent, match: r => isOnTime(r.deadlineStatus) },
+                { label: 'Fora do prazo', tone: 'bad', color: CHART_COLORS.danger, match: r => !isOnTime(r.deadlineStatus) }
+            ];
+        const deadlineTotals = deadlineGroups.map(g => lastAttempts.filter(g.match).length);
+        const deadlineFirst = block(15, 'Realização dos Cursos', ['Prazo', 'Cursos'],
+            deadlineGroups.map((g, i) => [xlsCell(g.label, { zebra: i % 2 === 1 }), xlsCell(deadlineTotals[i], { tone: g.tone, bold: true, zebra: i % 2 === 1 })]));
+        const deadlineLastRow = deadlineFirst + deadlineGroups.length - 1;
         charts.push({
             type: 'pie', title: 'Realização dos Cursos',
             anchor: { col: XLS_CHART_COL_A, row: 21, colSpan: XLS_CHART_WIDTH, rowSpan: XLS_CHART_HEIGHT },
-            catRef: xlsRange('A', deadlineFirst, deadlineFirst + 1),
-            categories: ['No prazo', 'Fora do prazo'],
-            pointColors: [xlsHex(CHART_COLORS.accent), xlsHex(CHART_COLORS.danger)],
-            series: [{ name: 'Cursos', nameRef: '$B$16', valRef: xlsRange('B', deadlineFirst, deadlineFirst + 1), values: [onTimeTotal, lateTotal] }]
+            catRef: xlsRange('A', deadlineFirst, deadlineLastRow),
+            categories: deadlineGroups.map(g => g.label),
+            pointColors: deadlineGroups.map(g => xlsHex(g.color)),
+            series: [{ name: 'Cursos', nameRef: '$B$16', valRef: xlsRange('B', deadlineFirst, deadlineLastRow), values: deadlineTotals }]
         });
 
         // 4) Satisfação
@@ -2131,25 +2177,25 @@
 
         // 6) Prazo por mês
         const monthBuckets = monthBucketsForRange(monthRange, lastAttempts, chartYear);
-        const onTimeByMonth = countIntoMonthBuckets(lastAttempts.filter(r => isOnTime(r.deadlineStatus)), monthBucketsForRange(monthRange, lastAttempts, chartYear));
-        const lateByMonth = countIntoMonthBuckets(lastAttempts.filter(r => !isOnTime(r.deadlineStatus)), monthBucketsForRange(monthRange, lastAttempts, chartYear));
-        const monthFirst = block(42, 'Prazo por Mês', ['Mês', 'No prazo', 'Fora do prazo'],
+        const byMonth = deadlineGroups.map(g => countIntoMonthBuckets(lastAttempts.filter(g.match), monthBucketsForRange(monthRange, lastAttempts, chartYear)));
+        const monthFirst = block(42, 'Prazo por Mês', ['Mês', ...deadlineGroups.map(g => g.label)],
             monthBuckets.map((b, i) => [
                 xlsCell(b.label, { bold: true, zebra: i % 2 === 1 }),
-                xlsCell(onTimeByMonth[i].count, { tone: 'ok', zebra: i % 2 === 1 }),
-                xlsCell(lateByMonth[i].count, { tone: 'bad', zebra: i % 2 === 1 })
+                ...deadlineGroups.map((g, gi) => xlsCell(byMonth[gi][i].count, { tone: g.tone, zebra: i % 2 === 1 }))
             ]));
         const monthLast = monthFirst + monthBuckets.length - 1;
+        const monthCols = ['B', 'C', 'D'];
         charts.push({
             type: 'bar', title: 'Prazo por Mês', stacked: true,
             anchor: { col: XLS_CHART_COL_B, row: 39, colSpan: XLS_CHART_WIDTH, rowSpan: XLS_CHART_HEIGHT },
             catRef: xlsRange('A', monthFirst, monthLast),
             categories: monthBuckets.map(b => b.label),
             valTitle: 'Cursos concluídos',
-            series: [
-                { name: 'No prazo', nameRef: '$B$43', valRef: xlsRange('B', monthFirst, monthLast), values: onTimeByMonth.map(b => b.count), color: xlsHex(CHART_COLORS.accent) },
-                { name: 'Fora do prazo', nameRef: '$C$43', valRef: xlsRange('C', monthFirst, monthLast), values: lateByMonth.map(b => b.count), color: xlsHex(CHART_COLORS.danger) }
-            ]
+            series: deadlineGroups.map((g, gi) => ({
+                name: g.label, nameRef: `$${monthCols[gi]}$43`,
+                valRef: xlsRange(monthCols[gi], monthFirst, monthLast),
+                values: byMonth[gi].map(b => b.count), color: xlsHex(g.color)
+            }))
         });
 
         // Preenche buracos deixados pelas linhas em branco entre blocos, senão
@@ -2161,7 +2207,9 @@
         // cada um ao escrever, e uma referência compartilhada viraria uma
         // coluna só com o resultado de todas.
         ws['!cols'] = [
-            { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 3 },
+            // A coluna D só guarda dados com a série "Sem prazo"; sem ela é
+            // o respiro entre as tabelas e os gráficos.
+            { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: splitNoDeadline ? 12 : 3 },
             ...Array.from({ length: 18 }, () => ({ wch: 9 }))
         ];
         ws['!rows'] = [{ hpt: 26 }, { hpt: 16 }];
@@ -2212,7 +2260,7 @@
                     { header: 'Nota', width: 8, cell: (r) => ({ value: Number.isFinite(Number(r.score)) ? Number(r.score) : '—', tone: Number(r.score) >= 8 ? 'ok' : Number(r.score) >= 6 ? 'warn' : 'bad', bold: true }) },
                     { header: 'Situação', width: 13, cell: (r) => ({ value: r.approved ? 'Aprovado' : 'Reprovado', tone: r.approved ? 'ok' : 'bad', bold: true }) },
                     { header: 'Tentativas', width: 11, cell: (r) => attemptsByKey.get(rowCourseKey(r)) || 1 },
-                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: isOnTime(r.deadlineStatus) ? 'ok' : 'bad' }) },
+                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: deadlineTone(r.deadlineStatus) }) },
                     { header: 'Tempo de prova', width: 14, cell: (r) => formatDuration(r.durationSeconds) },
                     { header: 'Média de prova do curso', width: 20, cell: (r) => { const d = evalByLabel.get(rowCourseLabel(r)); return d?.avgMs ? formatMsAsDuration(d.avgMs) : '—'; } },
                     { header: 'Tempo de conclusão', width: 17, cell: (r) => formatHHMMSS(userCompletionDurationOf(r)) },
@@ -2236,7 +2284,7 @@
                     { header: 'Situação', width: 13, cell: (r) => ({ value: r.approved ? 'Aprovado' : 'Reprovado', tone: r.approved ? 'ok' : 'bad', bold: true }) },
                     { header: 'Tempo de prova', width: 14, cell: (r) => formatDuration(r.durationSeconds) },
                     { header: 'Tempo de conclusão', width: 17, cell: (r) => formatHHMMSS(userCompletionDurationOf(r)) },
-                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: isOnTime(r.deadlineStatus) ? 'ok' : 'bad' }) },
+                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: deadlineTone(r.deadlineStatus) }) },
                     { header: 'Satisfação', width: 10, cell: (r) => starsLabel(r.rating) },
                     { header: 'Comentário', width: 50, cell: (r) => r.comment || '' }
                 ],
@@ -2245,10 +2293,7 @@
             }), 'Tentativas');
 
             // Prazo por mês — a mesma quebra do gráfico de barras empilhadas.
-            const range = userChartRangeChip.getRange();
-            const monthBuckets = monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue());
-            const onTimeByMonth = countIntoMonthBuckets(lastAttempts.filter(r => isOnTime(r.deadlineStatus)), monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue()));
-            const lateByMonth = countIntoMonthBuckets(lastAttempts.filter(r => !isOnTime(r.deadlineStatus)), monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue()));
+            const deadlineByMonth = buildUserDeadlineByMonth(lastAttempts);
             XLSXLib.utils.book_append_sheet(wb, xlsTableSheet(XLSXLib, {
                 title: 'Prazo por mês',
                 subtitle: 'Cursos concluídos em cada mês, pela situação da última tentativa',
@@ -2256,10 +2301,13 @@
                     { header: 'Mês', width: 14, cell: (b) => ({ value: b.label, bold: true }) },
                     { header: 'No prazo', width: 12, cell: (b) => ({ value: b.onTime, tone: 'ok' }) },
                     { header: 'Fora do prazo', width: 14, cell: (b) => ({ value: b.late, tone: b.late > 0 ? 'bad' : undefined }) },
-                    { header: 'Total', width: 10, cell: (b) => ({ value: b.onTime + b.late, bold: true }) },
+                    { header: 'Sem prazo', width: 12, cell: (b) => b.noDeadline },
+                    { header: 'Total', width: 10, cell: (b) => ({ value: b.onTime + b.late + b.noDeadline, bold: true }) },
+                    // Só entre os cursos que tinham prazo: "sem prazo" não
+                    // cumpre nem perde limite.
                     { header: '% no prazo', width: 12, cell: (b) => ({ value: pctLabel(b.onTime, b.onTime + b.late), tone: 'strong' }) }
                 ],
-                rows: monthBuckets.map((b, i) => ({ label: b.label, onTime: onTimeByMonth[i].count, late: lateByMonth[i].count }))
+                rows: deadlineByMonth
             }), 'Prazo por Mês');
 
             // Distribuição de notas — o histograma do gráfico "Notas".
@@ -2413,6 +2461,23 @@
         return { feedbacks, hiddenCount };
     }
 
+    // Prazo por mês do colaborador: exatamente os mesmos baldes da aba
+    // "Prazo por Mês" da planilha e do gráfico empilhado da tela.
+    function buildUserDeadlineByMonth(lastAttempts) {
+        const range = userChartRangeChip.getRange();
+        const year = userChartYearChip.getValue();
+        const bucketsOf = (subset) => countIntoMonthBuckets(subset, monthBucketsForRange(range, lastAttempts, year));
+        const onTimeByMonth = bucketsOf(lastAttempts.filter(r => hasDeadline(r.deadlineStatus) && isOnTime(r.deadlineStatus)));
+        const lateByMonth = bucketsOf(lastAttempts.filter(r => isLateStatus(r.deadlineStatus)));
+        const noDeadlineByMonth = bucketsOf(lastAttempts.filter(r => !hasDeadline(r.deadlineStatus)));
+        return monthBucketsForRange(range, lastAttempts, year).map((b, i) => ({
+            label: b.label,
+            onTime: onTimeByMonth[i].count,
+            late: lateByMonth[i].count,
+            noDeadline: noDeadlineByMonth[i].count
+        }));
+    }
+
     function buildUserPdfPayload(colab, rows) {
         const lastAttempts = lastAttemptByCourse(rows);
         const courses = attemptsByCourse(rows);
@@ -2422,20 +2487,19 @@
         const evalSeconds = rows.map(r => Number(r.durationSeconds)).filter(Number.isFinite);
         const rated = ratedOnly(rows);
         const ratings = rated.map(r => Number(r.rating));
-        const onTime = lastAttempts.filter(r => isOnTime(r.deadlineStatus)).length;
+        // Cumprimento de prazo só entre os cursos que tinham prazo; os "sem
+        // prazo" são contados à parte.
+        const late = lastAttempts.filter(r => isLateStatus(r.deadlineStatus)).length;
+        const noDeadline = lastAttempts.filter(r => !hasDeadline(r.deadlineStatus)).length;
+        const deadlineCount = lastAttempts.length - noDeadline;
+        const onTime = deadlineCount - late;
         const approved = rows.filter(r => r.approved).length;
         const avg = (list) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
         const avgScore = avg(scores);
         const avgRating = avg(ratings);
-        const onTimePct = lastAttempts.length ? Math.round((onTime / lastAttempts.length) * 100) : null;
+        const onTimePct = deadlineCount ? Math.round((onTime / deadlineCount) * 100) : null;
 
-        // Prazo por mês: exatamente os mesmos baldes da aba "Prazo por Mês" da
-        // planilha e do gráfico empilhado da tela.
-        const range = userChartRangeChip.getRange();
-        const monthBuckets = monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue());
-        const onTimeByMonth = countIntoMonthBuckets(lastAttempts.filter(r => isOnTime(r.deadlineStatus)), monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue()));
-        const lateByMonth = countIntoMonthBuckets(lastAttempts.filter(r => !isOnTime(r.deadlineStatus)), monthBucketsForRange(range, lastAttempts, userChartYearChip.getValue()));
-        const deadlineByMonth = monthBuckets.map((b, i) => ({ label: b.label, onTime: onTimeByMonth[i].count, late: lateByMonth[i].count }));
+        const deadlineByMonth = buildUserDeadlineByMonth(lastAttempts);
         const worstMonth = deadlineByMonth.filter(m => m.late > 0).sort((a, b) => b.late - a.late)[0] || null;
 
         const timeVsGoal = buildUserTimeComparison(rows, userCompletionDurationOf).map(item => ({
@@ -2483,14 +2547,18 @@
                 minScoreLabel: scores.length ? formatScore(Math.min(...scores)) : '—',
                 maxScoreLabel: scores.length ? formatScore(Math.max(...scores)) : '—',
                 lastAttemptsCount: lastAttempts.length,
+                deadlineCount,
+                noDeadline,
                 onTime,
-                late: lastAttempts.length - onTime,
+                late,
                 onTimePct,
-                onTimePctLabel: pctLabel(onTime, lastAttempts.length),
-                retryApproved: courses.filter(c => c.approved && c.attempts > 1).length,
+                onTimePctLabel: pctLabel(onTime, deadlineCount),
+                retryApproved: courses.filter(c => c.retried).length,
                 stillFailing: courses.filter(c => !c.approved).length,
                 avgEvalLabel: evalSeconds.length ? formatDuration(avg(evalSeconds)) : null,
+                evalCount: evalSeconds.length,
                 ratingsCount: ratings.length,
+                lowRatingsCount: rated.filter(r => Number(r.rating) <= 3).length,
                 avgRating,
                 avgRatingLabel: avgRating === null ? null : avgRating.toFixed(1).replace('.', ','),
                 commentsCount: rows.filter(r => r.comment).length,
@@ -2519,13 +2587,18 @@
                     attempts: attemptsByKey.get(rowCourseKey(row)) || 1,
                     deadlineLabel: deadlineStatusLabel(row.deadlineStatus),
                     onTime: isOnTime(row.deadlineStatus),
+                    noDeadline: !hasDeadline(row.deadlineStatus),
                     rating: Number.isFinite(Number(row.rating)) ? Number(row.rating) : null,
                     ratingLabel: starsLabel(row.rating),
                     comment: row.comment || '',
                     activeLabel: formatHHMMSS(activeMs),
+                    // Sem tempo gravado (prova anterior à métrica, ou sem conta)
+                    // o que falta é o registro, não a meta.
                     goalHint: hasBoth
                         ? `${coverage.pct}% da meta (${formatHHMMSS(expectedMs)})`
-                        : (time?.avgMs ? `Média do curso ${formatHHMMSS(time.avgMs)}` : 'Sem meta cadastrada'),
+                        : !(Number.isFinite(activeMs) && activeMs > 0)
+                            ? 'Tempo não registrado'
+                            : (time?.avgMs ? `Média do curso ${formatHHMMSS(time.avgMs)}` : 'Sem meta cadastrada'),
                     timeLevel: coverage ? coverage.level : null,
                     timeLevelLabel: coverage ? coverage.label : null,
                     timePct: coverage ? coverage.pct : null
@@ -2540,10 +2613,45 @@
             timeVsGoal,
             feedbacks: userFeedbacks.feedbacks,
             feedbackHiddenCount: userFeedbacks.hiddenCount,
-            // Pendentes: único recorte fora do filtro de data, igual à aba
-            // "Pendentes" da planilha — são cursos sem conclusão para datar.
-            pending: userPendingDataCache.map(p => ({ name: p.name, subject: p.subject, pct: p.pct }))
+            pending: buildUserPdfPending(colab, lastAttempts, attemptsByKey)
         };
+    }
+
+    // "O que ainda falta concluir" do PDF. Duas origens:
+    // - pendentes do público-alvo (nunca aprovados): único recorte fora do
+    //   filtro de data, igual à aba "Pendentes" da planilha — não há
+    //   conclusão para datar;
+    // - cursos que terminaram o período reprovados (última tentativa
+    //   reprovada): já tiveram prova, mas continuam sem aprovação e precisam
+    //   ser refeitos. Sem eles a folha não listava justamente o curso que o
+    //   plano de ação manda retomar.
+    // Um curso que está nos dois grupos aparece uma vez só, com a situação
+    // de reprovado.
+    function buildUserPdfPending(colab, lastAttempts, attemptsByKey) {
+        const failingByName = new Map();
+        lastAttempts.filter(r => !r.approved).forEach(r => {
+            const attempts = attemptsByKey.get(rowCourseKey(r)) || 1;
+            failingByName.set(normalizeName(rowCourseLabel(r)), {
+                row: r,
+                statusLabel: `Reprovado (nota ${formatScore(r.score)}, ${attempts} ${attempts === 1 ? 'tentativa' : 'tentativas'})`
+            });
+        });
+
+        const pending = userPendingDataCache.map(p => {
+            const key = normalizeName(p.name);
+            const failing = failingByName.get(key);
+            failingByName.delete(key);
+            return { name: p.name, subject: p.subject, pct: p.pct, failed: !!failing, statusLabel: failing ? failing.statusLabel : 'Não concluído' };
+        });
+        const failingOnly = [...failingByName.values()].map(({ row, statusLabel }) => ({
+            name: rowCourseLabel(row),
+            subject: row.subject || '',
+            pct: row.slug && row.subjectId && row.themeId ? progressPctFor(colab, row.slug, row.subjectId, row.themeId) : null,
+            failed: true,
+            statusLabel
+        }));
+        // Reprovados primeiro: são os que já foram tentados e não passaram.
+        return [...failingOnly, ...pending].sort((a, b) => (b.failed - a.failed));
     }
 
     async function exportUserPdf() {
@@ -2931,7 +3039,11 @@
                 personName: last.unitPersonName || last.fullName || 'Sem nome',
                 name: rowCourseLabel(last),
                 approved: approvedIndex !== -1,
-                attempts: approvedIndex !== -1 ? approvedIndex + 1 : sorted.length
+                attempts: approvedIndex !== -1 ? approvedIndex + 1 : sorted.length,
+                // Mesmos campos de attemptsByCourse, para a aba de gráficos
+                // da planilha (compartilhada) classificar os dois do mesmo jeito.
+                firstTry: approvedIndex === 0,
+                retried: approvedIndex > 0
             };
         });
     }
@@ -4511,7 +4623,7 @@
                     { header: 'Tentativas', width: 11, cell: (r) => attemptsByKey.get(personCourseKey(r)) || 1 },
                     { header: 'Tempo de prova', width: 14, cell: (r) => formatDuration(r.durationSeconds) },
                     { header: 'Tempo de conclusão', width: 17, cell: (r) => formatHHMMSS(userCompletionDurationOf(r)) },
-                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: isOnTime(r.deadlineStatus) ? 'ok' : 'bad' }) },
+                    { header: 'Prazo', width: 15, cell: (r) => ({ value: deadlineStatusLabel(r.deadlineStatus), tone: deadlineTone(r.deadlineStatus) }) },
                     { header: 'Satisfação', width: 10, cell: (r) => starsLabel(r.rating) },
                     { header: 'Comentário', width: 50, cell: (r) => r.comment || '' }
                 ],

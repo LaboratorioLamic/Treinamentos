@@ -44,10 +44,9 @@
         surface: '#f4f9f9'
     };
 
-    // Quantos itens cabem em cada folha sem estourar os 540px.
-    var COURSES_PER_SLIDE = 4;
-    var PENDING_PER_SLIDE = 8;
     var TIME_BARS = 6;
+    // Até quantas barras o histórico de notas mostra a data de cada uma.
+    var SCORE_LABELS_MAX = 24;
     var CURVE_SERIES = 5;
     // O eixo da curva para no 10º dia; o 11º ponto é o balde de tudo que veio
     // depois (quem monta o payload já colapsa os dias seguintes nele).
@@ -66,22 +65,89 @@
             .replace(/"/g, '&quot;');
     }
 
-    function chunk(list, size) {
-        var out = [];
-        for (var i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-        return out;
-    }
-
-    // Paginação equilibrada: 5 itens com teto de 4 viram 3+2, não 4+1. Uma
-    // folha quase vazia no fim é o que mais denuncia relatório gerado por
-    // máquina, e o custo de evitá-la é uma divisão.
-    function spread(list, max) {
-        if (!list.length) return [];
-        var pages = Math.ceil(list.length / max);
-        return chunk(list, Math.ceil(list.length / pages));
-    }
 
     function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+    // ─── Paginação por altura medida ───
+    // Contar cards por folha não basta: nome de curso em duas linhas ou a
+    // dica "83% da meta (00:28:00)" quebrando deixam o card mais alto, e o
+    // quarto card da folha saía cortado pelo overflow do corpo. Aqui cada
+    // item é desenhado de verdade num palco invisível, com a mesma largura e
+    // CSS da folha, e o que não cabe vai para a folha seguinte.
+    // .rp-body tem max-height 383px com 20px de padding-top; os 3px a menos
+    // são folga para arredondamento de subpixel.
+    var MEASURED_BUDGET = 360;
+
+    function withMeasureBody(fn) {
+        var stage = document.createElement('div');
+        stage.className = 'report-stage';
+        stage.innerHTML = '<div class="rp-slide"><div class="rp-body" style="max-height:none"></div></div>';
+        document.body.appendChild(stage);
+        try {
+            return fn(stage.querySelector('.rp-body'));
+        } finally {
+            stage.remove();
+        }
+    }
+
+    // Altura de cada bloco solto (card de curso) e a margem que ele deixa
+    // para o próximo — a margem do último da folha não ocupa espaço útil.
+    function measureBlocks(htmlList) {
+        return withMeasureBody(function (body) {
+            return htmlList.map(function (html) {
+                body.innerHTML = html;
+                var el = body.firstElementChild;
+                return {
+                    height: el.getBoundingClientRect().height,
+                    gap: parseFloat(window.getComputedStyle(el).marginBottom) || 0
+                };
+            });
+        });
+    }
+
+    function pageFits(sizes, budget) {
+        var used = 0;
+        sizes.forEach(function (size, i) { used += size.height + (i < sizes.length - 1 ? size.gap : 0); });
+        return used <= budget;
+    }
+
+    // Quantas folhas o empacotamento guloso precisa; depois tenta a mesma
+    // quantidade de folhas com divisão equilibrada (5 viram 3+2, não 4+1):
+    // uma folha quase vazia no fim é o que mais denuncia relatório gerado
+    // por máquina. Se o equilíbrio estourar alguma folha, fica o guloso.
+    // Item mais alto que a folha inteira vai sozinho para a sua.
+    function paginateMeasured(items, sizes, budget) {
+        if (!items.length) return [];
+        var greedy = [];
+        var current = [];
+        var currentSizes = [];
+        items.forEach(function (item, i) {
+            if (current.length && !pageFits(currentSizes.concat([sizes[i]]), budget)) {
+                greedy.push(current);
+                current = [];
+                currentSizes = [];
+            }
+            current.push(item);
+            currentSizes.push(sizes[i]);
+        });
+        greedy.push(current);
+        if (greedy.length === 1) return greedy;
+
+        // Mesma quantidade de folhas, com a sobra distribuída pelas
+        // primeiras: 10 itens em 4 folhas viram 3+3+2+2, não 3+3+3+1.
+        var pagesCount = greedy.length;
+        var base = Math.floor(items.length / pagesCount);
+        var extra = items.length % pagesCount;
+        var balanced = [];
+        var start = 0;
+        for (var p = 0; p < pagesCount; p++) {
+            var size = base + (p < extra ? 1 : 0);
+            if (!pageFits(sizes.slice(start, start + size), budget)) return greedy;
+            balanced.push(items.slice(start, start + size));
+            start += size;
+        }
+        return balanced;
+    }
 
     // ─── Gráficos ───
     // Um canvas solto, desenhado em 2x, devolvido como data URL. O Chart.js
@@ -129,6 +195,29 @@
         return '<img src="' + url + '" alt="' + esc(alt) + '">';
     }
 
+    // ─── Base do cumprimento de prazo ───
+    // O payload do colaborador separa os cursos sem prazo (`deadlineCount`
+    // conta só os que tinham limite); o da unidade ainda não, e aí a base é
+    // o total de conclusões.
+    function deadlineBase(s) {
+        return s.deadlineCount !== undefined ? s.deadlineCount : s.lastAttemptsCount;
+    }
+
+    function deadlineNoun(s, count) {
+        return (count === 1 ? 'curso' : 'cursos') + (s.deadlineCount !== undefined ? ' com prazo' : '');
+    }
+
+    function noDeadlineText(count) {
+        return count + (count === 1 ? ' curso sem prazo' : ' cursos sem prazo');
+    }
+
+    function deadlineKpiHint(s) {
+        if (!s.lastAttemptsCount) return 'Sem conclusões no período';
+        var base = deadlineBase(s);
+        if (!base) return 'Nenhum curso com prazo';
+        return s.onTime + ' de ' + base + ' dentro do limite' + (s.noDeadline ? ' · ' + noDeadlineText(s.noDeadline) : '');
+    }
+
     // ─── Leitura executiva e plano de ação ───
     // Frases determinísticas: cada regra olha um número do payload e só entra
     // quando aquele número existe. Sem dado, a folha diz que não há dado — em
@@ -152,14 +241,26 @@
                 ', com ' + s.reproved + ' ' + (s.reproved === 1 ? 'reprovação' : 'reprovações') + ' no período.');
         }
 
-        if (s.lastAttemptsCount > 0) {
+        var withDeadline = deadlineBase(s);
+        if (withDeadline > 0) {
             if (s.onTimePct !== null && s.onTimePct < 70) {
-                notes.push('<b>Adesão fora do prazo.</b> ' + s.late + ' de ' + s.lastAttemptsCount +
-                    ' cursos foram concluídos depois do limite (' + esc(s.onTimePctLabel) + ' no prazo).');
+                notes.push('<b>Adesão fora do prazo.</b> ' + s.late + ' de ' + withDeadline + ' ' +
+                    deadlineNoun(s, withDeadline) + ' foram concluídos depois do limite (' + esc(s.onTimePctLabel) + ' no prazo).');
             } else if (s.late === 0) {
-                notes.push('<b>Prazo em dia.</b> Todos os ' + s.lastAttemptsCount +
-                    ' cursos concluídos no período ficaram dentro do limite.');
+                notes.push('<b>Prazo em dia.</b> ' + (withDeadline === 1 ? 'O único ' : 'Todos os ' + withDeadline + ' ') +
+                    deadlineNoun(s, withDeadline) + (withDeadline === 1 ? ' ficou' : ' ficaram') + ' dentro do limite.');
+            } else {
+                // Atraso abaixo do limiar de alerta ainda é atraso: sem esta
+                // nota a leitura ficava muda sobre um curso fora do prazo.
+                notes.push('<b>Atraso pontual.</b> ' + s.late + ' de ' + withDeadline + ' ' +
+                    deadlineNoun(s, withDeadline) + ' ' + (s.late === 1 ? 'foi concluído' : 'foram concluídos') +
+                    ' depois do limite (' + esc(s.onTimePctLabel) + ' no prazo).');
             }
+        }
+
+        if (s.stillFailing > 0) {
+            notes.push('<b>Curso sem aprovação.</b> ' + s.stillFailing + ' ' +
+                (s.stillFailing === 1 ? 'curso terminou' : 'cursos terminaram') + ' o período com situação final reprovada.');
         }
 
         if (s.retryApproved > 0) {
@@ -253,6 +354,14 @@
                 text: isUnit
                     ? 'Acompanhar nominalmente quem concluiu depois do limite (' + s.late + ' ' + (s.late === 1 ? 'caso' : 'casos') + ') e combinar um lembrete antes do prazo.'
                     : 'Acompanhar nominalmente os ' + s.late + ' cursos concluídos em atraso e combinar um lembrete antes do limite.'
+            });
+        } else if (s.late > 0) {
+            actions.push({
+                title: 'Rever os atrasos pontuais',
+                text: s.late + ' ' + (s.late === 1 ? 'curso foi concluído' : 'cursos foram concluídos') +
+                    ' depois do limite. ' + (isUnit
+                        ? 'Identificar quem atrasou e combinar um lembrete antes do prazo.'
+                        : 'Entender o motivo com o colaborador e combinar um lembrete antes do prazo.')
             });
         }
         if (s.underGoalCourses > 0) {
@@ -427,7 +536,7 @@
             kpiHtml(s.avgScore === null ? '—' : s.avgScoreLabel + '/10', 'Nota média',
                 s.avgScore === null ? 'Sem provas no período' : 'Entre ' + s.minScoreLabel + ' e ' + s.maxScoreLabel) +
             kpiHtml(s.onTimePct === null ? '—' : s.onTimePctLabel, 'Cursos no prazo',
-                s.lastAttemptsCount ? s.onTime + ' de ' + s.lastAttemptsCount + ' dentro do limite' : 'Sem conclusões no período',
+                deadlineKpiHint(s),
                 s.onTimePct !== null && s.onTimePct < 70 ? 'is-bad' : null) +
             kpiHtml(s.avgRating === null ? '—' : s.avgRatingLabel + '/5', 'Satisfação com os cursos',
                 s.ratingsCount ? s.ratingsCount + (s.ratingsCount === 1 ? ' pesquisa respondida' : ' pesquisas respondidas') : 'Sem pesquisas respondidas',
@@ -484,7 +593,7 @@
             '<div class="rp-metrics">' +
             '<div class="rp-metric">' +
             '<div class="rp-metric-label">Prazo</div>' +
-            '<div class="rp-metric-value ' + (course.onTime ? 'is-ok' : 'is-bad') + '">' + esc(course.deadlineLabel) + '</div>' +
+            '<div class="rp-metric-value ' + (course.noDeadline ? '' : course.onTime ? 'is-ok' : 'is-bad') + '">' + esc(course.deadlineLabel) + '</div>' +
             '<div class="rp-metric-hint">' + esc(course.attempts) + (course.attempts === 1 ? ' tentativa' : ' tentativas') + '</div>' +
             '</div>' +
             '<div class="rp-metric">' +
@@ -708,7 +817,10 @@
                 },
                 scales: {
                     y: { min: 0, max: 10, ticks: { font: axisFont(), color: COLORS.muted, stepSize: 2 }, grid: { color: COLORS.line } },
-                    x: { ticks: { font: axisFont(), color: COLORS.muted, maxRotation: 60, minRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { display: false } }
+                    // Até 24 provas, toda barra leva a data: pular rótulos
+                    // deixava metade das barras sem dia. Acima disso o
+                    // eixo volta a amostrar para não virar borrão.
+                    x: { ticks: { font: axisFont(), color: COLORS.muted, maxRotation: 90, minRotation: history.length > 12 ? 60 : 0, autoSkip: history.length > SCORE_LABELS_MAX, maxTicksLimit: history.length > SCORE_LABELS_MAX ? 12 : history.length }, grid: { display: false } }
                 }
             })
         });
@@ -717,14 +829,19 @@
     function deadlineChart(data) {
         var months = data.deadlineByMonth;
         if (!months.length) return Promise.resolve(null);
+        var datasets = [
+            { label: 'No prazo', data: months.map(function (m) { return m.onTime; }), backgroundColor: COLORS.good, borderRadius: 3 * S, maxBarThickness: 34 * S },
+            { label: 'Fora do prazo', data: months.map(function (m) { return m.late; }), backgroundColor: COLORS.bad, borderRadius: 3 * S, maxBarThickness: 34 * S }
+        ];
+        // Série "Sem prazo" só quando o payload a traz e há algum curso nela.
+        if (months.some(function (m) { return m.noDeadline > 0; })) {
+            datasets.push({ label: 'Sem prazo', data: months.map(function (m) { return m.noDeadline; }), backgroundColor: '#b7c7ca', borderRadius: 3 * S, maxBarThickness: 34 * S });
+        }
         return chartImage(600, 330, {
             type: 'bar',
             data: {
                 labels: months.map(function (m) { return m.label; }),
-                datasets: [
-                    { label: 'No prazo', data: months.map(function (m) { return m.onTime; }), backgroundColor: COLORS.good, borderRadius: 3 * S, maxBarThickness: 34 * S },
-                    { label: 'Fora do prazo', data: months.map(function (m) { return m.late; }), backgroundColor: COLORS.bad, borderRadius: 3 * S, maxBarThickness: 34 * S }
-                ]
+                datasets: datasets
             },
             options: baseChartOptions({
                 plugins: {
@@ -858,9 +975,14 @@
 
         // Curso a curso
         if (data.courses.length) {
-            // O card da unidade tem uma linha a mais (o veredito), então
-            // cabe um card a menos por folha.
-            var pages = spread(data.courses, isUnit ? COURSES_PER_SLIDE - 1 : COURSES_PER_SLIDE);
+            // Paginação pela altura real de cada card (ver paginateMeasured).
+            // A fonte precisa estar carregada antes da medida, senão o texto
+            // medido em fonte de sistema quebra diferente do capturado.
+            await ensureFontsLoaded();
+            var courseSizes = measureBlocks(data.courses.map(function (course, idx) {
+                return courseCardHtml(course, idx + 1);
+            }));
+            var pages = paginateMeasured(data.courses, courseSizes, MEASURED_BUDGET);
             var courseOffset = 0;
             pages.forEach(function (page, pageIndex) {
                 var firstPosition = courseOffset + 1;
@@ -922,7 +1044,12 @@
                         '<li>' + (s.retryApproved > 0
                             ? s.retryApproved + ' ' + (s.retryApproved === 1 ? 'curso precisou' : 'cursos precisaram') + ' de retentativa até aprovar.'
                             : 'Nenhum curso precisou de retentativa para aprovar.') + '</li>',
-                        s.avgEvalLabel ? '<li>Tempo médio de prova: <b>' + esc(s.avgEvalLabel) + '</b>.</li>' : ''
+                        // Provas antigas não têm cronômetro: a média diz sobre
+                        // quantas provas ela foi feita quando não são todas.
+                        s.avgEvalLabel ? '<li>Tempo médio de prova: <b>' + esc(s.avgEvalLabel) + '</b>' +
+                            (s.evalCount !== undefined && s.evalCount < s.attempts
+                                ? ' (' + s.evalCount + ' de ' + s.attempts + ' provas com tempo registrado)'
+                                : '') + '.</li>' : ''
                     ].join('')) +
                 '</ul></div>';
             return slideHtml(data, i, t, {
@@ -942,11 +1069,15 @@
                 (s.lastAttemptsCount === 0
                     ? '<li>Nenhum curso concluído no período selecionado.</li>'
                     : [
-                        '<li><b>' + esc(s.onTimePctLabel) + '</b> dos cursos concluídos ficaram dentro do prazo (' +
-                        s.onTime + ' de ' + s.lastAttemptsCount + ').</li>',
+                        deadlineBase(s) > 0
+                            ? '<li><b>' + esc(s.onTimePctLabel) + '</b> dos ' + deadlineNoun(s, 2) + ' ficaram dentro do limite (' +
+                              s.onTime + ' de ' + deadlineBase(s) + ').</li>'
+                            : '<li>Nenhum dos cursos concluídos tinha prazo definido.</li>',
                         '<li>' + (s.late > 0
                             ? '<b>' + s.late + '</b> ' + (s.late === 1 ? 'curso foi concluído' : 'cursos foram concluídos') + ' fora do limite.'
                             : 'Nenhuma conclusão fora do limite no período.') + '</li>',
+                        s.noDeadline ? '<li><b>' + s.noDeadline + '</b> ' + (s.noDeadline === 1 ? 'curso não tinha' : 'cursos não tinham') +
+                            ' prazo definido e ' + (s.noDeadline === 1 ? 'fica' : 'ficam') + ' fora do percentual.</li>' : '',
                         s.worstMonthLabel ? '<li>Mês com mais atrasos: <b>' + esc(s.worstMonthLabel) + '</b>.</li>' : ''
                     ].join('')) +
                 '</ul></div>';
@@ -994,9 +1125,13 @@
                         (s.avgScore !== null && s.avgRating !== null && s.avgScore >= 9 && s.avgRating < 3
                             ? 'o conteúdo é absorvido, mas a experiência é rejeitada.'
                             : 'resultado e percepção seguem na mesma direção.') + '</li>',
+                        // Sem nenhuma nota baixa, "todas vieram com comentário"
+                        // é verdade vazia — diz-se que não houve nenhuma.
                         '<li>' + (s.lowRatingsWithoutComment > 0
                             ? '<b>' + s.lowRatingsWithoutComment + '</b> ' + (s.lowRatingsWithoutComment === 1 ? 'nota baixa veio' : 'notas baixas vieram') + ' sem feedback escrito.'
-                            : 'Todas as notas baixas vieram acompanhadas de comentário.') + '</li>',
+                            : s.lowRatingsCount === 0
+                                ? 'Nenhuma avaliação de até 3 estrelas no período.'
+                                : 'Todas as notas baixas vieram acompanhadas de comentário.') + '</li>',
                         '<li>' + s.commentsCount + ' ' + (s.commentsCount === 1 ? 'comentário deixado' : 'comentários deixados') + ' no período.</li>'
                     ].join('')) +
                 '</ul></div>';
@@ -1064,22 +1199,39 @@
                     });
                 });
             } else {
-                var pendPages = spread(data.pending, PENDING_PER_SLIDE);
+                // Coluna "Situação" só no payload que a traz (o do colaborador).
+                var hasStatus = data.pending.some(function (p) { return p.statusLabel; });
+                var pendHead = '<thead><tr>' +
+                    '<th>Curso</th><th>Assunto</th>' + (hasStatus ? '<th>Situação</th>' : '') +
+                    '<th style="text-align:right">% assistido</th>' +
+                    '</tr></thead>';
+                var pendRowHtml = function (p) {
+                    var hasPct = p.pct !== null && p.pct !== undefined;
+                    var tone = !hasPct ? '' : p.pct >= 75 ? 'is-ok' : p.pct > 0 ? 'is-warn' : 'is-bad';
+                    return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.subject || '—') + '</td>' +
+                        (hasStatus ? '<td class="' + (p.failed ? 'is-bad' : '') + '">' + esc(p.statusLabel || '—') + '</td>' : '') +
+                        '<td class="rp-td-num ' + tone + '">' + (hasPct ? esc(p.pct) + '%' : '—') + '</td></tr>';
+                };
+                // Linha com nome longo ou situação quebra em duas; a folha é
+                // fechada pela altura medida de cada linha, não por contagem.
+                await ensureFontsLoaded();
+                var pendMeasure = withMeasureBody(function (body) {
+                    body.innerHTML = '<table class="rp-table">' + pendHead + '<tbody>' + data.pending.map(pendRowHtml).join('') + '</tbody></table>';
+                    return {
+                        head: body.querySelector('thead').getBoundingClientRect().height,
+                        rows: Array.prototype.map.call(body.querySelectorAll('tbody tr'), function (tr) {
+                            return { height: tr.getBoundingClientRect().height, gap: 0 };
+                        })
+                    };
+                });
+                var pendPages = paginateMeasured(data.pending, pendMeasure.rows, MEASURED_BUDGET - pendMeasure.head);
                 pendPages.forEach(function (page, pageIndex) {
                     push(function (i, t) {
                         return slideHtml(data, i, t, {
                             eyebrow: 'Cursos pendentes' + (pendPages.length > 1 ? ' (' + (pageIndex + 1) + '/' + pendPages.length + ')' : ''),
                             title: 'O que ainda falta concluir',
-                            sub: 'Cursos do público-alvo ainda não aprovados — não dependem do filtro de data, mas seguem os de função e curso',
-                            body: '<table class="rp-table"><thead><tr>' +
-                                '<th>Curso</th><th>Assunto</th><th style="text-align:right">% assistido</th>' +
-                                '</tr></thead><tbody>' +
-                                page.map(function (p) {
-                                    var tone = p.pct >= 75 ? 'is-ok' : p.pct > 0 ? 'is-warn' : 'is-bad';
-                                    return '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.subject || '—') + '</td>' +
-                                        '<td class="rp-td-num ' + tone + '">' + esc(p.pct) + '%</td></tr>';
-                                }).join('') +
-                                '</tbody></table>'
+                            sub: 'Cursos que terminaram o período reprovados e cursos do público-alvo ainda não aprovados',
+                            body: '<table class="rp-table">' + pendHead + '<tbody>' + page.map(pendRowHtml).join('') + '</tbody></table>'
                         });
                     });
                 });
