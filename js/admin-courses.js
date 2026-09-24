@@ -524,6 +524,16 @@ function extractYouTubeId(raw) {
     return null;
 }
 
+// Campo "ID do Vídeo": colar/digitar um link inteiro troca o valor pelo ID,
+// para o admin ver na hora o que será salvo.
+const moduleVideoIdInput = document.getElementById('cfg-module-video');
+function normalizeModuleVideoInput() {
+    const id = extractYouTubeId(moduleVideoIdInput.value);
+    if (id && id !== moduleVideoIdInput.value) moduleVideoIdInput.value = id;
+}
+moduleVideoIdInput?.addEventListener('paste', () => setTimeout(normalizeModuleVideoInput, 0));
+moduleVideoIdInput?.addEventListener('change', normalizeModuleVideoInput);
+
 // ── Lista de vídeos curtos: estado em memória + espelho em JSON no hidden.
 // admin.js lê só o hidden na hora de salvar — não precisa conhecer esta UI.
 let shortsItems = [];

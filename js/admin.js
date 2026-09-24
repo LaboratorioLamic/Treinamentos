@@ -1888,11 +1888,19 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 showWarning('Adicione ao menos uma pergunta ao quiz.');
                 return;
             }
+            // Aceita link inteiro (youtu.be, watch?v=, shorts, embed) ou o ID puro;
+            // extractYouTubeId vem de js/admin-courses.js.
+            const rawVideo = moduleVideoInput.value.trim();
+            const videoId = kind === 'video' && rawVideo ? extractYouTubeId(rawVideo) : null;
+            if (kind === 'video' && rawVideo && !videoId) {
+                showWarning('Link ou ID do YouTube inválido.');
+                return;
+            }
             const module = {
                 title,
                 type: kind,
                 ...(moduleCaptionInput.value.trim() && { caption: moduleCaptionInput.value.trim() }),
-                ...(kind === 'video' && moduleVideoInput.value.trim() && { videoId: moduleVideoInput.value.trim() }),
+                ...(videoId && { videoId }),
                 ...(kind === 'pdf' && modulePdfInput.value.trim() && { pdfUrl: modulePdfInput.value.trim() }),
                 ...(kind === 'shorts' && { shorts }),
                 ...(kind === 'quiz' && { questions }),
