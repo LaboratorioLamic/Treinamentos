@@ -1901,7 +1901,7 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 type: kind,
                 ...(moduleCaptionInput.value.trim() && { caption: moduleCaptionInput.value.trim() }),
                 ...(videoId && { videoId }),
-                ...(kind === 'pdf' && modulePdfInput.value.trim() && { pdfUrl: modulePdfInput.value.trim() }),
+                ...(kind === 'pdf' && modulePdfInput.value.trim() && { pdfUrl: window.extractDropboxPath(modulePdfInput.value) }),
                 ...(kind === 'shorts' && { shorts }),
                 ...(kind === 'quiz' && { questions }),
                 attachments: attachments.length ? attachments : []

@@ -537,6 +537,31 @@ function normalizeModuleVideoInput() {
 moduleVideoIdInput?.addEventListener('paste', () => setTimeout(normalizeModuleVideoInput, 0));
 moduleVideoIdInput?.addEventListener('change', normalizeModuleVideoInput);
 
+// Link de compartilhamento do Dropbox → caminho salvo em pdfUrl (o que vem
+// depois de /scl/fi/), com dl=1 para baixar o arquivo em vez da página de
+// visualização. O ID já no formato certo passa só pela troca do dl.
+function extractDropboxPath(raw) {
+    let value = (raw || '').trim();
+    if (!value) return '';
+    const marker = value.search(/\/scl\/fi\//i);
+    if (marker !== -1) value = value.slice(marker + '/scl/fi/'.length);
+    if (/[?&]dl=[^&]*/.test(value)) {
+        value = value.replace(/([?&]dl=)[^&]*/, (_, prefix) => `${prefix}1`);
+    } else if (value.includes('?')) {
+        value += '&dl=1';
+    }
+    return value;
+}
+window.extractDropboxPath = extractDropboxPath;
+
+const modulePdfPathInput = document.getElementById('cfg-module-pdf');
+function normalizeModulePdfInput() {
+    const path = extractDropboxPath(modulePdfPathInput.value);
+    if (path !== modulePdfPathInput.value) modulePdfPathInput.value = path;
+}
+modulePdfPathInput?.addEventListener('paste', () => setTimeout(normalizeModulePdfInput, 0));
+modulePdfPathInput?.addEventListener('change', normalizeModulePdfInput);
+
 // ── Lista de vídeos curtos: estado em memória + espelho em JSON no hidden.
 // admin.js lê só o hidden na hora de salvar — não precisa conhecer esta UI.
 let shortsItems = [];
