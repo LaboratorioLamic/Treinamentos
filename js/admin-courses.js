@@ -523,6 +523,9 @@ function extractYouTubeId(raw) {
     }
     return null;
 }
+// admin.js normaliza o videoId ao salvar o módulo e precisa deste helper,
+// que fica preso no escopo deste IIFE.
+window.extractYouTubeId = extractYouTubeId;
 
 // Campo "ID do Vídeo": colar/digitar um link inteiro troca o valor pelo ID,
 // para o admin ver na hora o que será salvo.

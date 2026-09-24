@@ -1889,9 +1889,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                 return;
             }
             // Aceita link inteiro (youtu.be, watch?v=, shorts, embed) ou o ID puro;
-            // extractYouTubeId vem de js/admin-courses.js.
+            // window.extractYouTubeId vem de js/admin-courses.js.
             const rawVideo = moduleVideoInput.value.trim();
-            const videoId = kind === 'video' && rawVideo ? extractYouTubeId(rawVideo) : null;
+            const videoId = kind === 'video' && rawVideo ? window.extractYouTubeId(rawVideo) : null;
             if (kind === 'video' && rawVideo && !videoId) {
                 showWarning('Link ou ID do YouTube inválido.');
                 return;
