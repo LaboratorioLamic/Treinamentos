@@ -1061,8 +1061,6 @@
         // primeiro curto espera um toque, e daí em diante os próximos já
         // podem começar sozinhos ao virar.
         let shortsUserGesture = false;
-        // Players vizinhos tocando mudos só para encher o buffer.
-        const shortsPrebuffering = new Set();
         // Invalida callbacks assíncronos (carga da API do YouTube) quando o
         // aluno troca de módulo antes de a promessa resolver.
         let shortsToken = 0;
@@ -1213,7 +1211,6 @@
             if (shortsObserver) { shortsObserver.disconnect(); shortsObserver = null; }
             shortsPlayers.forEach(player => { try { player.destroy(); } catch { /* já destruído */ } });
             shortsPlayers.clear();
-            shortsPrebuffering.clear();
             shortsList = [];
             shortsWatched = [];
             shortsActive = 0;
@@ -1238,7 +1235,6 @@
                 if (keep.includes(index)) return;
                 const player = shortsPlayers.get(index);
                 shortsPlayers.delete(index);
-                shortsPrebuffering.delete(index);
                 try { player.destroy(); } catch { /* já destruído */ }
                 resetShortsHost(index);
                 setShortsProgress(index, shortsWatched[index] ? 1 : 0);
@@ -1278,18 +1274,11 @@
                 },
                 events: {
                     onReady: (event) => {
-                        if (index === shortsActive) {
-                            try { if (shortsMuted) event.target.mute(); else event.target.unMute(); } catch { /* indisponível */ }
-                            if (shortsUserGesture) safeShortsPlay(event.target);
-                            return;
-                        }
-                        // Vizinho: o embed só baixa o vídeo depois de um play.
-                        // Toca mudo por um instante (onShortsStateChange pausa
-                        // e volta ao início) para o buffer já estar cheio
-                        // quando o aluno chegar nele.
-                        shortsPrebuffering.add(index);
-                        try { event.target.mute(); } catch { /* indisponível */ }
-                        safeShortsPlay(event.target);
+                        try { if (shortsMuted) event.target.mute(); else event.target.unMute(); } catch { /* indisponível */ }
+                        // Vizinhos ficam só montados, sem play: pré-carregar a
+                        // mídia deles abria três fluxos/decoders ao mesmo tempo
+                        // e travava a reprodução a partir do terceiro curto.
+                        if (index === shortsActive && shortsUserGesture) safeShortsPlay(event.target);
                     },
                     onStateChange: (event) => onShortsStateChange(index, event)
                 }
@@ -1307,16 +1296,9 @@
                 // ele é um aviso do instante em que passou dos 90%, não um
                 // selo permanente sobre o vídeo.
                 slide?.classList.remove('is-just-watched');
-                // Um player fora de foco só pode ter voltado a tocar sozinho
-                // (pré-carga): silencia para o áudio não se sobrepor.
-                if (index !== shortsActive) {
-                    try {
-                        event.target.pauseVideo();
-                        if (shortsPrebuffering.delete(index)) event.target.seekTo(0, true);
-                    } catch { /* indisponível */ }
-                    return;
-                }
-                shortsPrebuffering.delete(index);
+                // Um player fora de foco só pode ter voltado a tocar sozinho:
+                // silencia para o áudio não se sobrepor.
+                if (index !== shortsActive) { try { event.target.pauseVideo(); } catch { /* indisponível */ } return; }
                 clearShortsGateIdle();
                 registerStudyActivity();
                 setModuleTimerGate('playing');
@@ -1461,8 +1443,6 @@
             });
             const player = shortsPlayers.get(index);
             if (player) {
-                // Pode chegar ainda mudo da pré-carga do buffer.
-                shortsPrebuffering.delete(index);
                 try { if (shortsMuted) player.mute(); else player.unMute(); } catch { /* ainda montando */ }
                 if (shortsUserGesture) safeShortsPlay(player);
                 else { try { player.pauseVideo(); } catch { /* ainda montando */ } }
