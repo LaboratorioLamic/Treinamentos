@@ -3514,7 +3514,7 @@
             height: 100%;
             width: var(--shorts-w);
             max-width: 100%;
-            background: #000;
+            background: #000 center / cover no-repeat;
             overflow: hidden;
             box-shadow: 0 18px 50px -12px rgba(0,0,0,0.75);
         }

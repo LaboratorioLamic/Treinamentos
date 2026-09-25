@@ -604,7 +604,7 @@
         // continua tocando o áudio em segundo plano). Silencioso quando não há
         // player ou a API ainda não carregou.
         function pauseVideoIfPlaying() {
-            // Os curtos têm players próprios (janela de 3), fora de ytPlayer:
+            // Os curtos têm player próprio (só o atual), fora de ytPlayer:
             // precisam ser pausados antes do early return abaixo.
             pauseShortsIfPlaying();
             if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
@@ -1043,7 +1043,7 @@
         const SHORTS_HINT_IDLE_DELAY_MS = 6000;
 
         let shortsList = [];
-        const shortsPlayers = new Map(); // índice → YT.Player (janela de 3)
+        const shortsPlayers = new Map(); // índice → YT.Player (só o atual)
         let shortsWatched = [];
         let shortsActive = 0;
         let shortsKey = null;            // chave localStorage do módulo atual
@@ -1099,6 +1099,8 @@
 
             const frame = document.createElement('div');
             frame.className = 'shorts-frame';
+            // Capa do vídeo: só o curto atual tem iframe montado.
+            frame.style.backgroundImage = `url("https://i.ytimg.com/vi/${encodeURIComponent(item.id)}/hqdefault.jpg")`;
 
             // A API do YouTube substitui este elemento pelo iframe.
             const host = document.createElement('div');
@@ -1196,7 +1198,7 @@
 
             loadYouTubeAPI().then(() => {
                 if (token !== shortsToken) return; // já trocou de módulo
-                ensureShortsPlayers(shortsActive);
+                ensureShortsPlayer(shortsActive);
                 startShortsTicker();
             });
         }
@@ -1224,22 +1226,20 @@
             if (shortsTotalEl) { shortsTotalEl.style.display = 'none'; shortsTotalEl.classList.remove('is-complete'); }
         }
 
-        // Só três iframes vivos por vez (anterior/atual/próximo): um módulo
-        // com dez curtos não pode montar dez players do YouTube de uma vez.
-        function ensureShortsPlayers(center) {
-            const keep = [];
-            for (let i = center - 1; i <= center + 1; i++) {
-                if (i >= 0 && i < shortsList.length) keep.push(i);
-            }
+        // Um único iframe vivo: o do curto atual. Os demais slides mostram só
+        // a capa. Manter vizinhos montados (mesmo pausados) deixava o player
+        // carregando indefinidamente a partir do terceiro curto; ao sair de um
+        // vídeo ele é destruído e, na volta, remonta do início.
+        function ensureShortsPlayer(active) {
             Array.from(shortsPlayers.keys()).forEach(index => {
-                if (keep.includes(index)) return;
+                if (index === active) return;
                 const player = shortsPlayers.get(index);
                 shortsPlayers.delete(index);
                 try { player.destroy(); } catch { /* já destruído */ }
                 resetShortsHost(index);
                 setShortsProgress(index, shortsWatched[index] ? 1 : 0);
             });
-            keep.forEach(index => createShortsPlayer(index));
+            createShortsPlayer(active);
         }
 
         // destroy() remove o iframe: repõe o div hospedeiro para o slide
@@ -1275,12 +1275,11 @@
                 events: {
                     onReady: (event) => {
                         try { if (shortsMuted) event.target.mute(); else event.target.unMute(); } catch { /* indisponível */ }
-                        // Vizinhos ficam só montados, sem play: pré-carregar a
-                        // mídia deles abria três fluxos/decoders ao mesmo tempo
-                        // e travava a reprodução a partir do terceiro curto.
                         if (index === shortsActive && shortsUserGesture) safeShortsPlay(event.target);
                     },
-                    onStateChange: (event) => onShortsStateChange(index, event)
+                    onStateChange: (event) => onShortsStateChange(index, event),
+                    // Sem isto um vídeo bloqueado/removido fica só tela preta.
+                    onError: (event) => console.warn(`Curto ${index + 1} (${shortsList[index]?.id}): erro ${event.data} do player do YouTube`)
                 }
             });
             shortsPlayers.set(index, player);
@@ -1436,17 +1435,8 @@
             // Virar o vídeo é a interação de estudo dos curtos — equivale à
             // virada de página do PDF e rearma a trava de inatividade.
             registerStudyActivity();
-            ensureShortsPlayers(index);
-            shortsPlayers.forEach((player, playerIndex) => {
-                if (playerIndex === index) return;
-                try { player.pauseVideo(); } catch { /* indisponível */ }
-            });
-            const player = shortsPlayers.get(index);
-            if (player) {
-                try { if (shortsMuted) player.mute(); else player.unMute(); } catch { /* ainda montando */ }
-                if (shortsUserGesture) safeShortsPlay(player);
-                else { try { player.pauseVideo(); } catch { /* ainda montando */ } }
-            }
+            // Player novo: som e play são aplicados no onReady.
+            ensureShortsPlayer(index);
             paintShortsUI();
         }
 
