@@ -242,6 +242,8 @@ body.cfg-mstack-open { overflow: hidden; }
     display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;
 }
 .course-drawer-section-head h3 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; }
+.course-drawer-section-head:has(.course-drawer-section-actions) { flex-wrap: wrap; }
+.course-drawer-section-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 
 /* listas de módulo/questão dentro do drawer, reaproveitando .module-card/.quiz-card */
 .course-drawer-list { display: flex; flex-direction: column; gap: 10px; }
@@ -460,6 +462,11 @@ body.cfg-mstack-open { overflow: hidden; }
 /* ─── Perguntas do módulo de Quiz ───
    Mesma mecânica da lista de vídeos curtos: lista acima, editor abaixo
    (o mesmo editor serve para adicionar e para editar um item existente). */
+#cfg-root .mquiz-list-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;
+}
+#cfg-root .mquiz-list-head .form-label { margin-bottom: 0; }
+#cfg-root .mquiz-sheet-actions { display: flex; gap: 6px; }
 #cfg-root .mquiz-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 #cfg-root .mquiz-list-empty { font-size: 12px; color: var(--text-3); margin: 0; padding: 2px; }
 #cfg-root .mquiz-list-item {

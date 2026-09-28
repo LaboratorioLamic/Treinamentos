@@ -2196,6 +2196,41 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
             }
         });
 
+        // Planilha da avaliação (js/quiz-sheet.js): exportar baixa todas as
+        // questões; importar acrescenta as da planilha ao fim, sem mexer nas
+        // existentes, e grava na hora.
+        const quizSheetFile = document.getElementById('cfg-quiz-sheet-file');
+
+        document.getElementById('cfg-quiz-sheet-export')?.addEventListener('click', async () => {
+            const subjectId = quizSubjectSelect.value;
+            const themeId = quizThemeSelect.value;
+            if (!subjectId || !themeId) { showWarning('Por favor, selecione tema e assunto.'); return; }
+            const courseName = data.trainingData[subjectId]?.themes?.[themeId]?.name;
+            try {
+                await U.QuizSheet.exportQuestions(data.quizData[`${subjectId}_${themeId}`] || [], {
+                    fileName: `avaliacao_${courseName || themeId}`
+                });
+            } catch (error) { showWarning(`Erro ao exportar planilha: ${error.message}`); }
+        });
+
+        quizSheetFile?.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            quizSheetFile.value = '';
+            if (!file) return;
+            const subjectId = quizSubjectSelect.value;
+            const themeId = quizThemeSelect.value;
+            if (!subjectId || !themeId) { showWarning('Por favor, selecione tema e assunto.'); return; }
+            try {
+                const { items, skipped } = await U.QuizSheet.importQuestions(file);
+                if (!items.length) { showWarning(U.QuizSheet.describeImport(0, skipped)); return; }
+                const quizKey = `${subjectId}_${themeId}`;
+                if (!data.quizData[quizKey]) data.quizData[quizKey] = [];
+                data.quizData[quizKey].push(...items);
+                if (await saveData()) showWarning(U.QuizSheet.describeImport(items.length, skipped));
+                populateQuizzes();
+            } catch (error) { showWarning(`Erro ao importar planilha: ${error.message}`); populateQuizzes(); }
+        });
+
 // ─── Abertura do painel (chamada pelo portal apos validar a senha) ───
 let adminInitialized = false;
 

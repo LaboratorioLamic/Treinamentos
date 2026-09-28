@@ -15,14 +15,14 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css?v=202609211830">
-    <link rel="stylesheet" href="css/admin.css?v=202609211830">
-    <link rel="stylesheet" href="css/admin-courses.css?v=202609211830">
-    <link rel="stylesheet" href="css/auth.css?v=202609211830">
-    <link rel="stylesheet" href="css/certificate.css?v=202609211830">
-    <link rel="stylesheet" href="css/admin-report.css?v=202609211830">
+    <link rel="stylesheet" href="css/main.css?v=202609281200">
+    <link rel="stylesheet" href="css/admin.css?v=202609281200">
+    <link rel="stylesheet" href="css/admin-courses.css?v=202609281200">
+    <link rel="stylesheet" href="css/auth.css?v=202609281200">
+    <link rel="stylesheet" href="css/certificate.css?v=202609281200">
+    <link rel="stylesheet" href="css/admin-report.css?v=202609281200">
     <!-- Camada de override mobile: precisa ser SEMPRE a ultima folha. -->
-    <link rel="stylesheet" href="css/mobile.css?v=202609211830">
+    <link rel="stylesheet" href="css/mobile.css?v=202609281200">
 </head>
 <body>
 
@@ -2285,9 +2285,19 @@
                     </div>
                     <div class="course-drawer-section-head">
                         <h3>Questões da avaliação</h3>
-                        <button type="button" class="btn btn-primary btn-sm" id="cfg-course-detail-add-quiz">
-                            <i class="fas fa-plus"></i> Adicionar questão
-                        </button>
+                        <div class="course-drawer-section-actions">
+                            <!-- Planilha: js/quiz-sheet.js. Importar só acrescenta ao fim da lista. -->
+                            <label class="btn btn-ghost btn-sm" for="cfg-quiz-sheet-file" title="Importar questões de planilha (.xlsx)">
+                                <i class="fas fa-file-import"></i> Importar
+                            </label>
+                            <input type="file" id="cfg-quiz-sheet-file" accept=".xlsx,.xls,.csv" hidden>
+                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-quiz-sheet-export" title="Exportar todas as questões para planilha (.xlsx)">
+                                <i class="fas fa-file-export"></i> Exportar
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm" id="cfg-course-detail-add-quiz">
+                                <i class="fas fa-plus"></i> Adicionar questão
+                            </button>
+                        </div>
                     </div>
                     <div id="cfg-quizzes-container" class="course-drawer-list quizzes-container"></div>
                 </div>
@@ -2404,7 +2414,19 @@
                     <input class="form-control" type="text" id="cfg-module-pdf" placeholder="Link do Dropbox ou código após dropbox.com/scl/fi/…">
                 </div>
                 <div class="ctype-panel form-group" data-ctype="quiz" hidden>
-                    <label class="form-label">Perguntas do quiz</label>
+                    <div class="mquiz-list-head">
+                        <label class="form-label">Perguntas do quiz</label>
+                        <div class="mquiz-sheet-actions">
+                            <!-- Planilha: js/quiz-sheet.js. Importar só acrescenta ao fim da lista. -->
+                            <label class="btn btn-ghost btn-sm" for="cfg-module-quiz-sheet-file" title="Importar perguntas de planilha (.xlsx)">
+                                <i class="fas fa-file-import"></i> Importar
+                            </label>
+                            <input type="file" id="cfg-module-quiz-sheet-file" accept=".xlsx,.xls,.csv" hidden>
+                            <button type="button" class="btn btn-ghost btn-sm" id="cfg-module-quiz-sheet-export" title="Exportar todas as perguntas para planilha (.xlsx)">
+                                <i class="fas fa-file-export"></i> Exportar
+                            </button>
+                        </div>
+                    </div>
                     <!-- Mesmo padrão dos vídeos curtos: a lista é montada por
                          js/admin-courses.js e espelhada em JSON no hidden abaixo,
                          que é o que js/admin.js lê ao salvar o módulo. O editor
@@ -2918,34 +2940,35 @@
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-    <script defer src="js/course-image.js?v=202609211830"></script>
+    <script defer src="js/course-image.js?v=202609281200"></script>
     <!-- Carrega xlsx/jspdf/html2canvas sob demanda (js/vendor-loader.js). -->
-    <script defer src="js/vendor-loader.js?v=202609211830"></script>
-    <script defer src="js/firebase-config.js?v=202609211830"></script>
-    <script defer src="js/main.js?v=202609211830"></script>
-    <script defer src="js/connection-guard.js?v=202609211830"></script>
-    <script defer src="js/db-sync.js?v=202609211830"></script>
-    <script defer src="js/crypto-utils.js?v=202609211830"></script>
-    <script defer src="js/deadlines.js?v=202609211830"></script>
-    <script defer src="js/attempts.js?v=202609211830"></script>
-    <script defer src="js/certificate.js?v=202609211830"></script>
-    <script defer src="js/colaboradores-sync.js?v=202609211830"></script>
-    <script defer src="js/ui.js?v=202609211830"></script>
-    <script defer src="js/auth.js?v=202609211830"></script>
-    <script defer src="js/student-auth.js?v=202609211830"></script>
-    <script defer src="js/admin.js?v=202609211830"></script>
-    <script defer src="js/admin-courses.js?v=202609211830"></script>
-    <script defer src="js/admin-colaboradores.js?v=202609211830"></script>
-    <script defer src="js/admin-users.js?v=202609211830"></script>
-    <script defer src="js/admin-excel.js?v=202609211830"></script>
-    <script defer src="js/admin-xlsx-charts.js?v=202609211830"></script>
-    <script defer src="js/admin-pdf-report.js?v=202609211830"></script>
-    <script defer src="js/admin-dashboard.js?v=202609211830"></script>
-    <script defer src="js/admin-history.js?v=202609211830"></script>
-    <script defer src="js/portal-auth.js?v=202609211830"></script>
-    <script defer src="js/student-profile.js?v=202609211830"></script>
-    <script defer src="js/student-header.js?v=202609211830"></script>
+    <script defer src="js/vendor-loader.js?v=202609281200"></script>
+    <script defer src="js/firebase-config.js?v=202609281200"></script>
+    <script defer src="js/main.js?v=202609281200"></script>
+    <script defer src="js/connection-guard.js?v=202609281200"></script>
+    <script defer src="js/db-sync.js?v=202609281200"></script>
+    <script defer src="js/crypto-utils.js?v=202609281200"></script>
+    <script defer src="js/deadlines.js?v=202609281200"></script>
+    <script defer src="js/attempts.js?v=202609281200"></script>
+    <script defer src="js/certificate.js?v=202609281200"></script>
+    <script defer src="js/colaboradores-sync.js?v=202609281200"></script>
+    <script defer src="js/ui.js?v=202609281200"></script>
+    <script defer src="js/auth.js?v=202609281200"></script>
+    <script defer src="js/student-auth.js?v=202609281200"></script>
+    <script defer src="js/quiz-sheet.js?v=202609281200"></script>
+    <script defer src="js/admin.js?v=202609281200"></script>
+    <script defer src="js/admin-courses.js?v=202609281200"></script>
+    <script defer src="js/admin-colaboradores.js?v=202609281200"></script>
+    <script defer src="js/admin-users.js?v=202609281200"></script>
+    <script defer src="js/admin-excel.js?v=202609281200"></script>
+    <script defer src="js/admin-xlsx-charts.js?v=202609281200"></script>
+    <script defer src="js/admin-pdf-report.js?v=202609281200"></script>
+    <script defer src="js/admin-dashboard.js?v=202609281200"></script>
+    <script defer src="js/admin-history.js?v=202609281200"></script>
+    <script defer src="js/portal-auth.js?v=202609281200"></script>
+    <script defer src="js/student-profile.js?v=202609281200"></script>
+    <script defer src="js/student-header.js?v=202609281200"></script>
     <!-- Depois de admin-history.js (U.getHistoryRows) e student-auth.js (sessão). -->
-    <script defer src="js/ranking.js?v=202609211830"></script>
+    <script defer src="js/ranking.js?v=202609281200"></script>
 </body>
 </html>

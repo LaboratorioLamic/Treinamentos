@@ -942,6 +942,34 @@ mquizListEl?.addEventListener('click', (event) => {
     renderQuizList();
 });
 
+// Planilha (js/quiz-sheet.js). Como o resto da lista, só vai para o banco
+// quando o módulo for salvo.
+const mquizSheetFile = document.getElementById('cfg-module-quiz-sheet-file');
+const warn = (message) => window.UniAdmin?.showWarning?.(message);
+
+document.getElementById('cfg-module-quiz-sheet-export')?.addEventListener('click', async () => {
+    try {
+        const title = document.getElementById('cfg-module-title')?.value.trim();
+        await window.UniAdmin.QuizSheet.exportQuestions(mquizItems, {
+            fileName: `quiz_${title || 'modulo'}`, withExplanation: true
+        });
+    } catch (error) { warn(`Erro ao exportar planilha: ${error.message}`); }
+});
+
+mquizSheetFile?.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    mquizSheetFile.value = '';
+    if (!file) return;
+    try {
+        const { items, skipped } = await window.UniAdmin.QuizSheet.importQuestions(file, { withExplanation: true });
+        if (mquizEditingIndex !== null) cancelQuizEdit();
+        mquizItems.push(...items);
+        writeQuizData();
+        renderQuizList();
+        warn(`${window.UniAdmin.QuizSheet.describeImport(items.length, skipped)}${items.length ? ' Salve o módulo para gravar.' : ''}`);
+    } catch (error) { warn(`Erro ao importar planilha: ${error.message}`); }
+});
+
 function setModuleType(kind) {
     const type = CTYPES[kind] ? kind : 'video';
     const meta = CTYPES[type];
