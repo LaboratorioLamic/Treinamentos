@@ -2173,14 +2173,14 @@
             pdfNavigation.appendChild(lastBtn);
 
             // Em apostilas longas, avançar de 3 em 3 botões é inviável: acima de
-            // PAGE_JUMP_MIN_PAGES aparece um seletor com a lista de páginas.
-            if (totalPages > PAGE_JUMP_MIN_PAGES) pdfNavigation.appendChild(buildPageJumpPicker());
+            // a partir de PAGE_JUMP_MIN_PAGES aparece um seletor com a lista de páginas.
+            if (totalPages >= PAGE_JUMP_MIN_PAGES) pdfNavigation.appendChild(buildPageJumpPicker());
         }
 
         // Seletor "Página X de N" — popover com busca e a lista completa de
         // páginas, ancorado no botão pela posição na viewport (a barra do PDF
         // tem overflow próprio e cortaria um popover posicionado por dentro).
-        const PAGE_JUMP_MIN_PAGES = 20;
+        const PAGE_JUMP_MIN_PAGES = 6;
 
         function buildPageJumpPicker() {
             const wrap = document.createElement('div');
