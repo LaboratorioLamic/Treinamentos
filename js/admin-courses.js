@@ -382,7 +382,65 @@ function renderCourseInfo(subjectId, themeId, theme) {
         <div class="course-info-card">
             <div class="course-info-card-head"><i class="fas fa-award"></i> Certificado</div>
             ${certHtml}
+        </div>
+
+        <div id="cfg-course-orphans"></div>`;
+    renderOrphanHistory(subjectId, themeId, theme);
+}
+
+// Histórico sem curso: resultados gravados sob uma chave que não existe mais
+// (curso migrado de tema antes de a migração levar o histórico junto).
+// Oferece vincular esses registros a este curso — quem realizou volta a
+// constar como concluído e a tabela volta a mostrar os nomes.
+async function renderOrphanHistory(subjectId, themeId, theme) {
+    const host = document.getElementById('cfg-course-orphans');
+    if (!host) return;
+    const slug = C().getCategorySlug();
+    let orphans = [];
+    try { orphans = await C().findOrphanHistory(slug, C().getData().trainingData); }
+    catch (error) { console.error('Erro ao buscar histórico sem curso:', error); return; }
+    // O modal pode ter trocado de curso enquanto a leitura estava em voo.
+    if (currentDetailSubjectId !== subjectId || currentDetailThemeId !== themeId) return;
+    if (!orphans.length) { host.innerHTML = ''; return; }
+
+    const fmt = ts => ts ? new Date(ts).toLocaleDateString('pt-BR') : '—';
+    host.innerHTML = `
+        <div class="course-info-card">
+            <div class="course-info-card-head"><i class="fas fa-link-slash"></i> Histórico sem curso</div>
+            <p class="course-info-muted">Registros gravados para cursos que não existem mais nesta categoria (ex.: curso migrado de tema). Vincule ao curso correto para que quem realizou conste como concluído.</p>
+            ${orphans.map(o => `
+                <div class="course-info-subrow">
+                    <span>Tema ${escapeHtml(o.subjectId)} / Assunto ${escapeHtml(o.themeId)} — ${o.count} registro(s), último em ${fmt(o.lastAt)}</span>
+                    <button type="button" class="btn btn-ghost btn-sm" data-orphan="${escapeHtml(o.subjectId)}|${escapeHtml(o.themeId)}"><i class="fas fa-link"></i> Vincular a este curso</button>
+                </div>`).join('')}
         </div>`;
+
+    host.querySelectorAll('[data-orphan]').forEach(btn => btn.addEventListener('click', async () => {
+        const [fromSubjectId, fromThemeId] = btn.dataset.orphan.split('|');
+        const U = window.UniAdmin;
+        const data = C().getData();
+        const ok = await U.showConfirm({
+            title: 'Vincular histórico',
+            message: `Os registros de "Tema ${fromSubjectId} / Assunto ${fromThemeId}" passarão a pertencer a "${theme.name}".`,
+            icon: 'fa-link',
+            tone: 'neutral',
+            confirmText: 'Vincular'
+        });
+        if (!ok) return;
+        btn.disabled = true;
+        try {
+            const moved = await C().relinkCourseHistory(slug,
+                { subjectId: fromSubjectId, themeId: fromThemeId },
+                { subjectId, themeId, subjectName: data.trainingData[subjectId]?.name, themeName: theme.name });
+            U.showWarning(`${moved} registro(s) vinculado(s) a "${theme.name}".`);
+            await U.refreshHistoryRows?.();
+            window.UniAdminCourses?.refresh?.();
+            renderOrphanHistory(subjectId, themeId, theme);
+        } catch (error) {
+            btn.disabled = false;
+            U.showWarning(`Erro ao vincular histórico: ${error.message}`);
+        }
+    }));
 }
 
 function openCourseDetail(subjectId, themeId) {

@@ -1378,6 +1378,9 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                     const oldQuizKey = `${oldSubjectId}_${themeId}`;
                     const newQuizKey = `${newSubjectId}_${newThemeId}`;
                     if (data.quizData[oldQuizKey]) { data.quizData[newQuizKey] = [...data.quizData[oldQuizKey]]; delete data.quizData[oldQuizKey]; }
+                    if (data.quizStatus && oldQuizKey in data.quizStatus) { data.quizStatus[newQuizKey] = data.quizStatus[oldQuizKey]; delete data.quizStatus[oldQuizKey]; }
+                    const relinkFrom = { subjectId: oldSubjectId, themeId, subjectName: data.trainingData[oldSubjectId].name, themeName: themeData.name };
+                    const relinkTo = { subjectId: newSubjectId, themeId: newThemeId, subjectName: data.trainingData[newSubjectId].name, themeName: themeData.name };
                     if (data.order?.modules?.[oldSubjectId]?.[themeId]) {
                         if (!data.order.modules[newSubjectId]) data.order.modules[newSubjectId] = {};
                         data.order.modules[newSubjectId][newThemeId] = [...data.order.modules[oldSubjectId][themeId]];
@@ -1389,7 +1392,12 @@ document.getElementById('cfg-category-select').addEventListener('keydown', (even
                         if (idx > -1) data.order.themes[oldSubjectId].splice(idx, 1);
                     }
                     if (await saveData()) {
-                        showWarning(`Assunto migrado com sucesso para "${data.trainingData[newSubjectId].name}"!`);
+                        try {
+                            await relinkCourseHistory(U.categoryPaths?.[currentCategory], relinkFrom, relinkTo);
+                            showWarning(`Assunto migrado com sucesso para "${data.trainingData[newSubjectId].name}"!`);
+                        } catch (error) {
+                            showWarning(`Curso migrado, mas o histórico não foi transferido: ${error.message}. Use "Vincular histórico" no curso.`);
+                        }
                         window.UniAdminImages?.clearCache(U.categoryPaths?.[currentCategory], oldSubjectId, themeId);
                         resetThemeForm();
                         populateSubjectSelects(); populateModuleThemes(); populateQuizThemes(); populateThemes();
@@ -2279,8 +2287,134 @@ initSidebarDrawer();
 // "Cursos" (js/admin-courses.js). Expõe leitura do estado e as mesmas
 // funções de CRUD/ordenação já usadas pelo painel legado — a camada nova
 // não duplica lógica, só monta a UI em cima disto.
+// ─── Histórico acompanha o curso ─────────────────────────────────────
+// Resultados, progresso e tentativas são gravados sob a chave
+// subjectId/themeId do curso (results/byUser, results/byCourse,
+// results/estagiosLivre, progress/byUser, attempts/byUser), e os importados
+// de planilha guardam subjectId/themeId ou os nomes de tema/curso. Quando o
+// curso muda de chave (migração de tema), tudo isso precisa ir junto — senão
+// o histórico fica órfão: a tabela mostra os ids crus no lugar dos nomes e o
+// curso aparece como se ninguém o tivesse concluído.
+async function readHistoryTrees(slug) {
+    const [byUser, estagios, imported, progress, attempts] = await Promise.all([
+        get(ref(db, `/${dbRoot}/results/byUser`)),
+        get(ref(db, `/${dbRoot}/results/estagiosLivre/${slug}`)),
+        get(ref(db, `/${dbRoot}/results/imported/${slug}`)),
+        get(ref(db, `/${dbRoot}/progress/byUser`)),
+        get(ref(db, `/${dbRoot}/attempts/byUser`))
+    ]);
+    const val = snap => (snap.exists() ? snap.val() : {}) || {};
+    return { byUser: val(byUser), estagios: val(estagios), imported: val(imported), progress: val(progress), attempts: val(attempts) };
+}
+
+// from/to = { subjectId, themeId, subjectName, themeName }. Em colisão (o
+// mesmo aluno já tem registro na chave de destino) vale a submissão mais
+// recente e, no progresso, o maior avanço — nada anda para trás.
+async function relinkCourseHistory(slug, from, to) {
+    if (!slug || !from?.subjectId || !from?.themeId || !to?.subjectId || !to?.themeId) return 0;
+    if (from.subjectId === to.subjectId && from.themeId === to.themeId) return 0;
+    const t = await readHistoryTrees(slug);
+    const updates = {};
+    let moved = 0;
+    const R = `/${dbRoot}/results`;
+
+    Object.keys(t.byUser).forEach(userId => {
+        const src = t.byUser[userId]?.[slug]?.[from.subjectId]?.[from.themeId];
+        if (!src) return;
+        const dst = t.byUser[userId]?.[slug]?.[to.subjectId]?.[to.themeId];
+        const keep = dst && (dst.submittedAt || 0) >= (src.submittedAt || 0) ? dst : src;
+        updates[`${R}/byUser/${userId}/${slug}/${to.subjectId}/${to.themeId}`] = keep;
+        updates[`${R}/byCourse/${slug}/${to.subjectId}/${to.themeId}/${userId}`] = keep;
+        updates[`${R}/byUser/${userId}/${slug}/${from.subjectId}/${from.themeId}`] = null;
+        moved += 1;
+    });
+    updates[`${R}/byCourse/${slug}/${from.subjectId}/${from.themeId}`] = null;
+
+    const livre = t.estagios?.[from.subjectId]?.[from.themeId];
+    if (livre) {
+        Object.entries(livre).forEach(([entryId, r]) => {
+            updates[`${R}/estagiosLivre/${slug}/${to.subjectId}/${to.themeId}/${entryId}`] = r;
+            moved += 1;
+        });
+        updates[`${R}/estagiosLivre/${slug}/${from.subjectId}/${from.themeId}`] = null;
+    }
+
+    const fromNameKey = from.subjectName && from.themeName ? normalizeName(`${from.subjectName}|${from.themeName}`) : null;
+    Object.entries(t.imported).forEach(([entryId, r]) => {
+        const byId = r?.subjectId === from.subjectId && r?.themeId === from.themeId;
+        const byName = !r?.subjectId && fromNameKey && normalizeName(`${r?.subject || ''}|${r?.theme || ''}`) === fromNameKey;
+        if (!byId && !byName) return;
+        const base = `${R}/imported/${slug}/${entryId}`;
+        if (byId) {
+            updates[`${base}/subjectId`] = to.subjectId;
+            updates[`${base}/themeId`] = to.themeId;
+        }
+        if (to.subjectName) updates[`${base}/subject`] = to.subjectName;
+        if (to.themeName) updates[`${base}/theme`] = to.themeName;
+        moved += 1;
+    });
+
+    Object.keys(t.progress).forEach(userId => {
+        const src = t.progress[userId]?.[slug]?.[from.subjectId]?.[from.themeId];
+        if (!src) return;
+        const dst = t.progress[userId]?.[slug]?.[to.subjectId]?.[to.themeId];
+        const merged = !dst ? src : {
+            ...src, ...dst,
+            done: Math.max(src.done || 0, dst.done || 0),
+            pct: Math.max(src.pct || 0, dst.pct || 0),
+            activeMs: Math.max(src.activeMs || 0, dst.activeMs || 0),
+            approved: Math.max(src.approved ?? -1, dst.approved ?? -1) >= 0 ? Math.max(src.approved ?? -1, dst.approved ?? -1) : null,
+            startedAt: Math.min(src.startedAt || Infinity, dst.startedAt || Infinity) === Infinity ? null : Math.min(src.startedAt || Infinity, dst.startedAt || Infinity)
+        };
+        updates[`/${dbRoot}/progress/byUser/${userId}/${slug}/${to.subjectId}/${to.themeId}`] = merged;
+        updates[`/${dbRoot}/progress/byUser/${userId}/${slug}/${from.subjectId}/${from.themeId}`] = null;
+    });
+
+    Object.keys(t.attempts).forEach(userId => {
+        const src = t.attempts[userId]?.[slug]?.[from.subjectId]?.[from.themeId];
+        if (!src) return;
+        if (!t.attempts[userId]?.[slug]?.[to.subjectId]?.[to.themeId]) {
+            updates[`/${dbRoot}/attempts/byUser/${userId}/${slug}/${to.subjectId}/${to.themeId}`] = src;
+        }
+        updates[`/${dbRoot}/attempts/byUser/${userId}/${slug}/${from.subjectId}/${from.themeId}`] = null;
+    });
+
+    await db.ref().update(updates);
+    return moved;
+}
+
+// Chaves subjectId/themeId com histórico gravado que não correspondem a
+// nenhum curso da categoria — resto de migrações feitas antes de o
+// histórico acompanhar o curso. Devolve [{ subjectId, themeId, count, lastAt }].
+async function findOrphanHistory(slug, trainingData) {
+    if (!slug) return [];
+    const t = await readHistoryTrees(slug);
+    const exists = (s, th) => !!trainingData?.[s]?.themes?.[th];
+    const orphans = new Map();
+    const add = (s, th, r) => {
+        if (!s || !th || exists(s, th)) return;
+        const key = `${s}_${th}`;
+        const o = orphans.get(key) || { subjectId: s, themeId: th, count: 0, lastAt: 0 };
+        o.count += 1;
+        o.lastAt = Math.max(o.lastAt, r?.submittedAt || 0);
+        orphans.set(key, o);
+    };
+    Object.keys(t.byUser).forEach(userId => {
+        const bySubject = t.byUser[userId]?.[slug] || {};
+        Object.keys(bySubject).forEach(s => Object.keys(bySubject[s] || {}).forEach(th => add(s, th, bySubject[s][th])));
+    });
+    Object.keys(t.estagios).forEach(s => Object.keys(t.estagios[s] || {}).forEach(th => {
+        Object.values(t.estagios[s][th] || {}).forEach(r => add(s, th, r));
+    }));
+    Object.values(t.imported).forEach(r => add(r?.subjectId, r?.themeId, r));
+    return [...orphans.values()].sort((a, b) => b.lastAt - a.lastAt);
+}
+
 window.UniAdminCoursesData = {
     getData: () => data,
+    getCategorySlug: () => U.categoryPaths?.[currentCategory] || null,
+    relinkCourseHistory,
+    findOrphanHistory,
     getCurrentCategory: () => currentCategory,
     // Contexto (Tema/Assunto) selecionado nos formulários de Módulo/Avaliação.
     // A camada de apresentação seta os <select> ocultos e dispara 'change'
